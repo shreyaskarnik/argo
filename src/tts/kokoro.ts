@@ -14,7 +14,7 @@ export class KokoroEngine implements TTSEngine {
     if (this.tts) return this.tts;
     const { KokoroTTS } = await import('kokoro-js');
     this.tts = await KokoroTTS.from_pretrained(this.modelId, {
-      dtype: this.dtype,
+      dtype: this.dtype as 'fp32' | 'fp16' | 'q8' | 'q4' | 'q4f16',
     });
     return this.tts;
   }
