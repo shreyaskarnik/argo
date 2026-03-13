@@ -1,0 +1,36 @@
+{
+  "name": "argo",
+  "version": "0.1.0",
+  "description": "Turn Playwright demo scripts into polished product demo videos with AI voiceover",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "argo": "./bin/argo.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "playwright": ">=1.40.0",
+    "@playwright/test": ">=1.40.0"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.0.0",
+    "commander": "^12.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "playwright": "^1.50.0",
+    "typescript": "^5.5.0",
+    "vitest": "^3.0.0"
+  }
+}
