@@ -122,5 +122,17 @@ test('showcase', async ({ page, narration }) => {
     placement: 'top-left',
     motion: 'fade-in',
     autoBackground: true,
-  }, narration.durationFor('mic-drop', { minMs: 3500, leadOutMs: 1200 }));
+  }, narration.durationFor('mic-drop', { minMs: 2800, leadOutMs: 400 }));
+
+  // Fade out everything for a clean ending
+  await page.evaluate(() => {
+    const overlay = document.getElementById('argo-zone-top-left');
+    const confetti = document.getElementById('confetti');
+    [overlay, confetti].forEach((el) => {
+      if (!el) return;
+      el.style.transition = 'opacity 0.8s ease-out';
+      el.style.opacity = '0';
+    });
+  });
+  await page.waitForTimeout(1000);
 });
