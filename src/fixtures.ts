@@ -1,0 +1,46 @@
+import { test as base, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { NarrationTimeline } from './narration.js';
+
+type TimelineFactory = (title: string) => NarrationTimeline;
+
+const defaultFactory: TimelineFactory = () => new NarrationTimeline();
+
+export function createNarrationFixture(factory: TimelineFactory = defaultFactory) {
+  return async (
+    _context: Record<string, unknown>,
+    use: (timeline: NarrationTimeline) => Promise<void>,
+    testInfo: { title: string },
+  ) => {
+    const timeline = factory(testInfo.title);
+    timeline.start();
+    try {
+      await use(timeline);
+    } finally {
+      await timeline.flush(`narration-${testInfo.title}.json`);
+    }
+  };
+}
+
+export async function demoType(
+  page: Page,
+  selector: string,
+  text: string,
+  delay = 60,
+): Promise<void> {
+  await page.locator(selector).pressSequentially(text, { delay });
+}
+
+export const test = base.extend<{ narration: NarrationTimeline }>({
+  narration: async ({}, use, testInfo) => {
+    const timeline = new NarrationTimeline();
+    timeline.start();
+    try {
+      await use(timeline);
+    } finally {
+      await timeline.flush(`narration-${testInfo.title}.json`);
+    }
+  },
+});
+
+export { expect };
