@@ -2,4 +2,6 @@ node_modules/
 dist/
 .argo/
 videos/
+demos/
+argo.config.ts
 *.tsbuildinfo
