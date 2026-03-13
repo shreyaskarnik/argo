@@ -56,9 +56,9 @@ export interface ImageCardCue {
 
 export type OverlayCue = LowerThirdCue | HeadlineCardCue | CalloutCue | ImageCardCue;
 
-export interface OverlayManifestEntry extends OverlayCue {
+export type OverlayManifestEntry = OverlayCue & {
   scene: string;
-}
+};
 
 export function isValidZone(value: string): value is Zone {
   return (ZONES as readonly string[]).includes(value);
