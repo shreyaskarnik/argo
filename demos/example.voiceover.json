@@ -1,0 +1,15 @@
+[
+  {
+    "scene": "welcome",
+    "text": "Welcome to our app — let me show you around."
+  },
+  {
+    "scene": "action",
+    "text": "It only takes one click to get started."
+  },
+  {
+    "scene": "done",
+    "text": "And that's it. You're all set.",
+    "voice": "af_heart"
+  }
+]

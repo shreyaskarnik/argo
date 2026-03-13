@@ -90,7 +90,6 @@ export function createProgram(): Command {
   return program;
 }
 
-const url = import.meta.url;
-if (url && process.argv[1] && url.endsWith(process.argv[1])) {
+if (process.env.VITEST === undefined) {
   createProgram().parseAsync(process.argv).catch((err) => { console.error(err.message); process.exit(1); });
 }
