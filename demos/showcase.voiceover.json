@@ -1,22 +1,27 @@
 [
   {
     "scene": "hero",
-    "text": "Meet Argo — the tool that turns Playwright scripts into polished product demo videos, complete with AI voiceover."
+    "text": "Meet Argo — the tool that turns Playwright scripts into polished product demo videos, complete with AI voiceover.",
+    "speed": 0.9
   },
   {
     "scene": "how-it-works",
-    "text": "The workflow is simple. Write a demo script using the Playwright API you already know. Argo records the browser, then exports a finished video."
+    "text": "The workflow is simple. Write a demo script using the Playwright API you already know. Argo records the browser, then exports a finished video.",
+    "speed": 0.9
   },
   {
     "scene": "features",
-    "text": "Add overlays like lower-thirds and headline cards. Argo generates voiceover narration from a simple JSON manifest."
+    "text": "Add overlays like lower-thirds and headline cards. Argo generates voiceover narration from a simple JSON manifest.",
+    "speed": 0.9
   },
   {
     "scene": "code",
-    "text": "Your demo scripts are just Playwright tests with a few extra helpers. If you know Playwright, you already know Argo."
+    "text": "Your demo scripts are just Playwright tests with a few extra helpers. If you know Playwright, you already know Argo.",
+    "speed": 0.9
   },
   {
     "scene": "closing",
-    "text": "Install Argo, initialize your project, and ship your first demo video in minutes. Oh, and this demo? It was recorded by Argo, using Argo."
+    "text": "Install Argo, initialize your project, and ship your first demo video in minutes. Oh, and this demo? It was recorded by Argo, using Argo.",
+    "speed": 0.9
   }
 ]
