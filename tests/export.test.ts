@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('node:child_process', () => ({
-  execSync: vi.fn(),
+  execFileSync: vi.fn(),
   spawnSync: vi.fn(),
 }));
 
@@ -10,11 +10,11 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
 }));
 
-import { execSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { checkFfmpeg, exportVideo } from '../src/export.js';
 
-const mockedExecSync = vi.mocked(execSync);
+const mockedExecFileSync = vi.mocked(execFileSync);
 const mockedSpawnSync = vi.mocked(spawnSync);
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedMkdirSync = vi.mocked(mkdirSync);
@@ -26,13 +26,13 @@ beforeEach(() => {
 // ---------- checkFfmpeg ----------
 describe('checkFfmpeg', () => {
   it('returns true when ffmpeg is available', () => {
-    mockedExecSync.mockReturnValue(Buffer.from('ffmpeg version 6.0'));
+    mockedExecFileSync.mockReturnValue(Buffer.from('ffmpeg version 6.0'));
     expect(checkFfmpeg()).toBe(true);
-    expect(mockedExecSync).toHaveBeenCalledWith('ffmpeg -version', { stdio: 'pipe' });
+    expect(mockedExecFileSync).toHaveBeenCalledWith('ffmpeg', ['-version'], { stdio: 'pipe' });
   });
 
   it('throws with install instructions when ffmpeg is missing', () => {
-    mockedExecSync.mockImplementation(() => {
+    mockedExecFileSync.mockImplementation(() => {
       throw new Error('command not found');
     });
     expect(() => checkFfmpeg()).toThrow(/ffmpeg is not installed/i);
@@ -45,7 +45,7 @@ describe('checkFfmpeg', () => {
 // ---------- exportVideo ----------
 describe('exportVideo', () => {
   function setupHappy() {
-    mockedExecSync.mockReturnValue(Buffer.from('ok'));
+    mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
     mockedExistsSync.mockReturnValue(true);
     mockedSpawnSync.mockReturnValue({ status: 0 } as any);
   }
@@ -91,18 +91,8 @@ describe('exportVideo', () => {
     expect((args as string[])[rIdx + 1]).toBe('30');
   });
 
-  it('adds -vf scale filter when width and height are specified', async () => {
-    setupHappy();
-    await exportVideo({ demoName: 'demo', argoDir: '.argo', outputDir: 'out', width: 1920, height: 1080 });
-
-    const [, args] = mockedSpawnSync.mock.calls[0];
-    const vfIdx = (args as string[]).indexOf('-vf');
-    expect(vfIdx).toBeGreaterThan(-1);
-    expect((args as string[])[vfIdx + 1]).toBe('scale=1920:1080');
-  });
-
   it('throws on missing video.webm', async () => {
-    mockedExecSync.mockReturnValue(Buffer.from('ok'));
+    mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
     mockedExistsSync.mockImplementation((p) => {
       if (String(p).endsWith('video.webm')) return false;
       return true;
@@ -113,7 +103,7 @@ describe('exportVideo', () => {
   });
 
   it('throws on missing narration-aligned.wav', async () => {
-    mockedExecSync.mockReturnValue(Buffer.from('ok'));
+    mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
     mockedExistsSync.mockImplementation((p) => {
       if (String(p).endsWith('narration-aligned.wav')) return false;
       return true;
@@ -124,7 +114,7 @@ describe('exportVideo', () => {
   });
 
   it('creates output directory if it does not exist', async () => {
-    mockedExecSync.mockReturnValue(Buffer.from('ok'));
+    mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
     mockedExistsSync.mockImplementation((p) => {
       if (String(p) === 'out') return false;
       return true;
@@ -137,11 +127,29 @@ describe('exportVideo', () => {
   });
 
   it('throws on non-zero exit code', async () => {
-    mockedExecSync.mockReturnValue(Buffer.from('ok'));
+    mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
     mockedExistsSync.mockReturnValue(true);
     mockedSpawnSync.mockReturnValue({ status: 1 } as any);
 
     await expect(exportVideo({ demoName: 'demo', argoDir: '.argo', outputDir: 'out' }))
       .rejects.toThrow(/ffmpeg.*failed|exit code/i);
+  });
+
+  it('throws with signal info when ffmpeg is killed', async () => {
+    mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
+    mockedExistsSync.mockReturnValue(true);
+    mockedSpawnSync.mockReturnValue({ status: null, signal: 'SIGKILL' } as any);
+
+    await expect(exportVideo({ demoName: 'demo', argoDir: '.argo', outputDir: 'out' }))
+      .rejects.toThrow(/killed by signal SIGKILL/);
+  });
+
+  it('throws with spawn error when ffmpeg cannot be launched', async () => {
+    mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
+    mockedExistsSync.mockReturnValue(true);
+    mockedSpawnSync.mockReturnValue({ status: null, error: new Error('ENOENT') } as any);
+
+    await expect(exportVideo({ demoName: 'demo', argoDir: '.argo', outputDir: 'out' }))
+      .rejects.toThrow(/Failed to launch ffmpeg/);
   });
 });

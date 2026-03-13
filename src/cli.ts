@@ -1,10 +1,18 @@
 import { Command } from 'commander';
-import { loadConfig } from './config.js';
+import { loadConfig, type ArgoConfig } from './config.js';
 import { record } from './record.js';
 import { generateClips } from './tts/generate.js';
 import { exportVideo } from './export.js';
 import { runPipeline } from './pipeline.js';
 import { init } from './init.js';
+
+async function ensureTTSEngine(config: ArgoConfig): Promise<ArgoConfig> {
+  if (!config.tts.engine) {
+    const { KokoroEngine } = await import('./tts/kokoro.js');
+    config.tts.engine = new KokoroEngine();
+  }
+  return config;
+}
 
 export function createProgram(): Command {
   const program = new Command();
@@ -20,9 +28,12 @@ export function createProgram(): Command {
     .action(async (demo: string) => {
       const configPath = program.opts().config;
       const config = await loadConfig(process.cwd(), configPath);
+      if (!config.baseURL) {
+        throw new Error('baseURL is required but not set. Set it in argo.config.js or pass --config.');
+      }
       await record(demo, {
         demosDir: config.demosDir,
-        baseURL: config.baseURL!,
+        baseURL: config.baseURL,
         video: { width: config.video.width, height: config.video.height },
       });
     });
@@ -36,21 +47,14 @@ export function createProgram(): Command {
     .description('Generate TTS clips from a manifest file')
     .action(async (manifest: string) => {
       const configPath = program.opts().config;
-      const config = await loadConfig(process.cwd(), configPath);
+      const config = await ensureTTSEngine(await loadConfig(process.cwd(), configPath));
       await generateClips({
         manifestPath: manifest,
-        demoName: manifest.replace(/\.voiceover\.json$/, '').replace(/\.json$/, ''),
+        demoName: manifest.replace(/^.*\//, '').replace(/\.voiceover\.json$/, '').replace(/\.json$/, ''),
         engine: config.tts.engine!,
         projectRoot: '.',
         defaults: { voice: config.tts.defaultVoice, speed: config.tts.defaultSpeed },
       });
-    });
-
-  tts
-    .command('align <demo>')
-    .description('Align TTS clips with video')
-    .action(async (demo: string) => {
-      console.log(`tts align: ${demo} — not yet implemented`);
     });
 
   program
@@ -66,8 +70,6 @@ export function createProgram(): Command {
         preset: config.export.preset,
         crf: config.export.crf,
         fps: config.video.fps,
-        width: config.video.width,
-        height: config.video.height,
       });
     });
 
@@ -76,7 +78,7 @@ export function createProgram(): Command {
     .description('Run the full pipeline: TTS → record → export')
     .action(async (demo: string) => {
       const configPath = program.opts().config;
-      const config = await loadConfig(process.cwd(), configPath);
+      const config = await ensureTTSEngine(await loadConfig(process.cwd(), configPath));
       await runPipeline(demo, config);
     });
 

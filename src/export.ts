@@ -1,4 +1,4 @@
-import { execSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -9,8 +9,6 @@ export interface ExportOptions {
   preset?: string;
   crf?: number;
   fps?: number;
-  width?: number;
-  height?: number;
 }
 
 /**
@@ -19,7 +17,7 @@ export interface ExportOptions {
  */
 export function checkFfmpeg(): boolean {
   try {
-    execSync('ffmpeg -version', { stdio: 'pipe' });
+    execFileSync('ffmpeg', ['-version'], { stdio: 'pipe' });
     return true;
   } catch {
     throw new Error(
@@ -42,8 +40,6 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     preset = 'slow',
     crf = 16,
     fps,
-    width,
-    height,
   } = options;
 
   checkFfmpeg();
@@ -79,14 +75,16 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     args.push('-r', String(fps));
   }
 
-  if (width !== undefined && height !== undefined) {
-    args.push('-vf', `scale=${width}:${height}`);
-  }
-
   args.push('-shortest', '-y', outputPath);
 
   const result = spawnSync('ffmpeg', args, { stdio: 'inherit' });
 
+  if (result.error) {
+    throw new Error(`Failed to launch ffmpeg: ${result.error.message}`);
+  }
+  if (result.signal) {
+    throw new Error(`ffmpeg was killed by signal ${result.signal}`);
+  }
   if (result.status !== 0) {
     throw new Error(`ffmpeg failed with exit code ${result.status}`);
   }

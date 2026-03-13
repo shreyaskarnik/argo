@@ -6,22 +6,32 @@ async function writeIfMissing(filePath: string, content: string): Promise<boolea
     await access(filePath);
     console.log(`  skip ${filePath} (already exists)`);
     return false;
-  } catch {
+  } catch (err: any) {
+    if (err?.code !== 'ENOENT') {
+      throw new Error(`Cannot access ${filePath}: ${err.message}`);
+    }
     await writeFile(filePath, content, 'utf-8');
     console.log(`  create ${filePath}`);
     return true;
   }
 }
 
-const EXAMPLE_DEMO = `import { test, demoType } from 'argo';
+const EXAMPLE_DEMO = `import { test } from 'argo';
+import { showCaption, withCaption } from 'argo';
 
 test('example', async ({ page, narration }) => {
   await page.goto('/');
-  await narration.showCaption(page, 'welcome', 'Welcome to our app', 3000);
-  await narration.withCaption(page, 'action', 'Watch how easy it is', async () => {
+
+  narration.mark('welcome');
+  await showCaption(page, 'welcome', 'Welcome to our app', 3000);
+
+  narration.mark('action');
+  await withCaption(page, 'action', 'Watch how easy it is', async () => {
     await page.click('button');
   });
+
   narration.mark('done');
+  await showCaption(page, 'done', 'All done!', 2000);
 });
 `;
 
@@ -40,7 +50,7 @@ const ARGO_CONFIG = `export default {
   demosDir: 'demos/',
   outputDir: 'videos/',
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
-  video: { width: 2560, height: 1440, fps: 30 },
+  video: { width: 1920, height: 1080, fps: 30 },
   export: { preset: 'slow', crf: 16 },
 };
 `;
@@ -48,13 +58,19 @@ const ARGO_CONFIG = `export default {
 const PLAYWRIGHT_CONFIG = `import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
+  preserveOutput: 'always',
   projects: [
     {
       name: 'demos',
       testDir: 'demos',
       testMatch: '**/*.demo.ts',
       use: {
-        video: 'on',
+        baseURL: process.env.BASE_URL || 'http://localhost:3000',
+        viewport: { width: 1920, height: 1080 },
+        video: {
+          mode: 'on',
+          size: { width: 1920, height: 1080 },
+        },
       },
     },
   ],

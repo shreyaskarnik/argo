@@ -40,10 +40,11 @@ const mockedRunPipeline = vi.mocked(runPipeline);
 const mockedInit = vi.mocked(init);
 
 const defaultConfig = {
+  baseURL: 'http://localhost:3000',
   demosDir: 'demos',
   outputDir: 'videos',
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
-  video: { width: 2560, height: 1440, fps: 30 },
+  video: { width: 1920, height: 1080, fps: 30 },
   export: { preset: 'slow', crf: 16 },
 };
 
@@ -89,16 +90,6 @@ describe('CLI', () => {
       expect(mockedGenerateClips).toHaveBeenCalledWith(
         expect.objectContaining({ manifestPath: 'manifest.json' }),
       );
-    });
-  });
-
-  describe('argo tts align <demo>', () => {
-    it('prints placeholder message', async () => {
-      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      await run('tts', 'align', 'onboarding');
-
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('align'));
-      spy.mockRestore();
     });
   });
 

@@ -24,7 +24,7 @@ export async function generateClips(options: GenerateClipsOptions): Promise<Clip
 
   // 1. Check manifest exists
   if (!fs.existsSync(manifestPath)) {
-    throw new Error('Manifest file not found');
+    throw new Error(`Manifest file not found: ${manifestPath}`);
   }
 
   // 2. Read and parse JSON
@@ -34,13 +34,13 @@ export async function generateClips(options: GenerateClipsOptions): Promise<Clip
     rawEntries = JSON.parse(content);
   } catch (err) {
     if (err instanceof SyntaxError) {
-      throw new Error('Failed to parse manifest');
+      throw new Error(`Failed to parse manifest ${manifestPath}: ${err.message}`);
     }
     throw err;
   }
 
   if (!Array.isArray(rawEntries)) {
-    throw new Error('Failed to parse manifest');
+    throw new Error(`Manifest ${manifestPath} must contain a JSON array`);
   }
 
   // 3. Validate entries

@@ -27,6 +27,14 @@ export function alignClips(
 ): AlignResult {
   // 1. Filter to clips with matching scenes
   const matched = clips.filter((c) => c.scene in timing);
+  const unmatched = clips.filter((c) => !(c.scene in timing));
+  if (unmatched.length > 0) {
+    const names = unmatched.map((c) => c.scene).join(', ');
+    console.warn(
+      `Warning: ${unmatched.length} clip(s) have no matching scene in timing and will be skipped: ${names}. ` +
+      `Check that voiceover manifest scene names match narration.mark() calls.`
+    );
+  }
 
   // 2. Sort by scene timestamp ascending
   matched.sort((a, b) => timing[a.scene] - timing[b.scene]);

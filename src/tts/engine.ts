@@ -79,7 +79,10 @@ export function parseWavHeader(wav: Buffer): WavHeader {
     throw new Error('Not a valid WAV file: missing WAVE marker');
   }
 
-  // Parse fmt chunk (must be present)
+  // Validate and parse fmt chunk (expected at byte 12)
+  if (wav.toString('ascii', 12, 16) !== 'fmt ') {
+    throw new Error('Not a valid WAV file: fmt chunk not found at expected offset');
+  }
   const audioFormat = wav.readUInt16LE(20);
   const numChannels = wav.readUInt16LE(22);
   const sampleRate = wav.readUInt32LE(24);

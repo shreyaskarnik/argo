@@ -1,15 +1,10 @@
 import { access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type { TTSEngine } from './tts/engine.js';
+export type { TTSEngine };
 
 // ---- Types ----
-
-export interface TTSEngine {
-  generate(
-    text: string,
-    options: { voice?: string; speed?: number; lang?: string },
-  ): Promise<Buffer>;
-}
 
 export interface TTSConfig {
   defaultVoice: string;
@@ -51,7 +46,7 @@ const DEFAULTS: ArgoConfig = {
   demosDir: 'demos',
   outputDir: 'videos',
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
-  video: { width: 2560, height: 1440, fps: 30 },
+  video: { width: 1920, height: 1080, fps: 30 },
   export: { preset: 'slow', crf: 16 },
 };
 
@@ -83,16 +78,18 @@ export function demosProject(options: {
 }
 
 const CONFIG_FILENAMES = [
+  'argo.config.ts',
   'argo.config.js',
   'argo.config.mjs',
 ];
 
-async function fileExists(path: string): Promise<boolean> {
+async function fileExists(filePath: string): Promise<boolean> {
   try {
-    await access(path);
+    await access(filePath);
     return true;
-  } catch {
-    return false;
+  } catch (err: any) {
+    if (err?.code === 'ENOENT') return false;
+    throw new Error(`Cannot access ${filePath}: ${err.message}`);
   }
 }
 
@@ -116,8 +113,13 @@ export async function loadConfig(
     return defineConfig({});
   }
 
-  const fileUrl = pathToFileURL(configPath).href;
-  const mod = await import(fileUrl);
+  let mod: any;
+  try {
+    const fileUrl = pathToFileURL(configPath).href;
+    mod = await import(fileUrl);
+  } catch (err) {
+    throw new Error(`Failed to load config from ${configPath}: ${(err as Error).message}`);
+  }
   const userConfig: UserConfig = mod.default ?? mod;
   return defineConfig(userConfig);
 }

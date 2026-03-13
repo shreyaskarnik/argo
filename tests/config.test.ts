@@ -14,7 +14,7 @@ const DEFAULTS: ArgoConfig = {
   demosDir: 'demos',
   outputDir: 'videos',
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
-  video: { width: 2560, height: 1440, fps: 30 },
+  video: { width: 1920, height: 1080, fps: 30 },
   export: { preset: 'slow', crf: 16 },
 };
 
@@ -135,12 +135,16 @@ describe('loadConfig', () => {
     expect(config.demosDir).toBe('demos');
   });
 
-  it('finds argo.config.js first in search order', async () => {
+  it('finds argo.config.ts first in search order', async () => {
+    await writeFile(
+      join(tmpDir, 'argo.config.ts'),
+      `export default { demosDir: 'from-ts' };`,
+    );
     await writeFile(
       join(tmpDir, 'argo.config.js'),
       `export default { demosDir: 'from-js' };`,
     );
     const config = await loadConfig(tmpDir);
-    expect(config.demosDir).toBe('from-js');
+    expect(config.demosDir).toBe('from-ts');
   });
 });
