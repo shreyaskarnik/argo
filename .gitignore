@@ -5,4 +5,6 @@ videos/
 demos/
 argo.config.*
 playwright.config.ts
+test-results/
+narration-*.json
 *.tsbuildinfo
