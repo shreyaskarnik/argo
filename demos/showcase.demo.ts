@@ -2,6 +2,7 @@ import { test } from '@argo-video/cli';
 import { showOverlay, withOverlay } from '@argo-video/cli';
 
 test('showcase', async ({ page, narration }) => {
+  test.setTimeout(60000);
   await page.goto('/showcase.html');
   await page.waitForTimeout(1000);
 
@@ -10,8 +11,9 @@ test('showcase', async ({ page, narration }) => {
   await showOverlay(page, 'hero', {
     type: 'lower-third',
     text: 'Argo — Demo videos, automated',
+    placement: 'top-left',
     motion: 'fade-in',
-  }, 4000);
+  }, 6000);
 
   // Scene 2: Scroll to How it Works
   narration.mark('how-it-works');
@@ -24,7 +26,7 @@ test('showcase', async ({ page, narration }) => {
     placement: 'top-right',
     motion: 'slide-in',
   }, async () => {
-    await page.waitForTimeout(4000);
+    await page.waitForTimeout(7000);
   });
 
   // Scene 3: Features section
@@ -34,9 +36,9 @@ test('showcase', async ({ page, narration }) => {
   await showOverlay(page, 'features', {
     type: 'callout',
     text: 'Overlays, voiceover, and more',
-    placement: 'bottom-left',
+    placement: 'top-left',
     motion: 'fade-in',
-  }, 4000);
+  }, 7000);
 
   // Scene 4: Code example
   narration.mark('code');
@@ -45,8 +47,9 @@ test('showcase', async ({ page, narration }) => {
   await showOverlay(page, 'code', {
     type: 'lower-third',
     text: 'Familiar Playwright API — nothing new to learn',
+    placement: 'top-left',
     motion: 'fade-in',
-  }, 4000);
+  }, 6000);
 
   // Scene 5: Closing
   narration.mark('closing');
@@ -56,7 +59,7 @@ test('showcase', async ({ page, narration }) => {
     type: 'headline-card',
     title: 'Get Started',
     body: 'npm i -D @argo-video/cli && npx argo init',
-    placement: 'center',
+    placement: 'top-right',
     motion: 'fade-in',
-  }, 3000);
+  }, 5000);
 });
