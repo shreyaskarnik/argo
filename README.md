@@ -9,11 +9,17 @@
                      |___/
 ```
 
-# Argo
+# @argo-video/cli
 
 **Turn Playwright demo scripts into polished product demo videos with AI voiceover.**
 
-Write a demo script with Playwright. Add a voiceover manifest. Run one command. Get an MP4 with captions and narration.
+Write a demo script with Playwright. Add a voiceover manifest. Run one command. Get an MP4 with overlays and narration.
+
+## Showcase
+
+<video src="videos/showcase.mp4" width="100%" controls autoplay muted></video>
+
+> *This demo was recorded by Argo, using Argo. Yes, really.*
 
 ## How it works
 
@@ -32,6 +38,9 @@ Write a demo script with Playwright. Add a voiceover manifest. Run one command. 
 ## Quick start
 
 ```bash
+# Install
+npm i -D @argo-video/cli
+
 # Initialize project
 npx argo init
 
@@ -54,8 +63,8 @@ A demo is two files: a **script** and a **voiceover manifest**.
 ### Demo script (`demos/my-feature.demo.ts`)
 
 ```ts
-import { test } from 'argo';
-import { showCaption, withCaption } from 'argo';
+import { test } from '@argo-video/cli';
+import { showCaption, withCaption } from '@argo-video/cli';
 
 test('my-feature', async ({ page, narration }) => {
   await page.goto('/');
@@ -139,9 +148,9 @@ argo --config <path> <command>     Use a custom config file
 Argo exports Playwright fixtures and helpers for use in demo scripts:
 
 ```ts
-import { test, expect, demoType } from 'argo';
-import { showCaption, hideCaption, withCaption } from 'argo';
-import { defineConfig, demosProject } from 'argo';
+import { test, expect, demoType } from '@argo-video/cli';
+import { showCaption, hideCaption, withCaption } from '@argo-video/cli';
+import { defineConfig, demosProject } from '@argo-video/cli';
 ```
 
 | Export | Description |
