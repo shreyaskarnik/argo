@@ -26,7 +26,7 @@ test('showcase', async ({ page, narration }) => {
     placement: 'top-right',
     motion: 'slide-in',
   }, async () => {
-    await page.waitForTimeout(7000);
+    await page.waitForTimeout(9000);
   });
 
   // Scene 3: Features section
