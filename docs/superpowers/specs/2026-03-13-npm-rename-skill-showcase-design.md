@@ -23,8 +23,8 @@ Three deliverables that prepare Argo for public distribution and AI-agent usage:
 ### Files to update
 
 - `package.json` — name field
-- `src/init.ts` — scaffolded `example.demo.ts` template uses `@argo-video/cli` in imports
-- `tests/init.test.ts` — update assertions to match new import path
+- `src/init.ts` — ALL `from 'argo'` occurrences in the `EXAMPLE_DEMO` template must change to `from '@argo-video/cli'` (there are two: `import { test }` and `import { showCaption, withCaption }`)
+- `tests/init.test.ts` — update both assertions that check for `'argo'` imports (lines checking `import { test } from 'argo'` and `import { showCaption, withCaption } from 'argo'`)
 - Any docs or README references to the package name
 
 ### Future namespace
@@ -52,7 +52,7 @@ Teaches Claude Code agents how to use Argo — from installation through finishe
 4. **Overlays** — `showOverlay`/`withOverlay` API, template types (`lower-third`, `headline-card`, `callout`, `image-card`), zones, motion presets. Overlay manifest format (`.overlays.json`).
 5. **Voiceover** — Voiceover manifest format (`.voiceover.json`): `scene`, `text`, optional `voice`/`speed`.
 6. **Config reference** — `argo.config.js` fields: `baseURL`, `demosDir`, `outputDir`, `tts`, `video`, `export`.
-7. **Pipeline execution** — `argo record <demo>` → `argo tts generate <manifest>` → `argo export <demo>`, or `argo pipeline <demo>` for all-in-one.
+7. **Pipeline execution** — The correct order is: `argo tts generate <path/to/demo.voiceover.json>` → `argo record <demo>` → `argo export <demo>`. TTS must run before recording because narration timing drives the recording. Note: `tts generate` takes a file path (e.g., `demos/example.voiceover.json`), not a bare demo name. Or use `argo pipeline <demo>` which handles the full sequence (TTS → record → align → export) automatically.
 8. **Troubleshooting** — Common errors: no video found (check Playwright video config), no timing file (need `narration.mark()` calls), ffmpeg not installed.
 
 ### Autonomous workflow
@@ -96,7 +96,11 @@ Simple, single-page HTML with inline CSS. Sections:
 
 ### Pipeline
 
-The showcase runs against a local file server (or `file://` protocol). Config sets `baseURL` to the local server serving `demos/showcase.html`.
+The showcase runs against a local HTTP server (e.g., `npx serve demos/` or a simple Node HTTP server). `file://` URLs are not compatible with Playwright's relative navigation (`page.goto('/')`). Config sets `baseURL` to the local server URL.
+
+### Note on template coverage
+
+The showcase demonstrates `lower-third`, `headline-card`, and `callout` templates. `image-card` is not showcased here but is documented in the skill's API reference section.
 
 ## Execution Order
 
