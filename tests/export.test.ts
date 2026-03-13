@@ -91,6 +91,15 @@ describe('exportVideo', () => {
     expect((args as string[])[rIdx + 1]).toBe('30');
   });
 
+  it('pads the final video frame when tailPadMs is specified', async () => {
+    setupHappy();
+    await exportVideo({ demoName: 'demo', argoDir: '.argo', outputDir: 'out', tailPadMs: 1250 });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    expect(args).toContain('-vf');
+    expect(args).toContain('tpad=stop_mode=clone:stop_duration=1.25');
+  });
+
   it('throws on missing video.webm', async () => {
     mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
     mockedExistsSync.mockImplementation((p) => {

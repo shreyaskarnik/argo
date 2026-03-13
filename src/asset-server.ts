@@ -23,7 +23,7 @@ const MIME_TYPES: Record<string, string> = {
 export function startAssetServer(assetDir: string): Promise<AssetServer> {
   const resolvedDir = resolve(assetDir);
 
-  return new Promise((resolvePromise) => {
+  return new Promise((resolvePromise, rejectPromise) => {
     const server = http.createServer((req, res) => {
       const rawUrl = req.url ?? '/';
       const urlPath = decodeURIComponent(rawUrl);
@@ -67,6 +67,10 @@ export function startAssetServer(assetDir: string): Promise<AssetServer> {
       const contentType = MIME_TYPES[ext] ?? 'application/octet-stream';
       res.writeHead(200, { 'Content-Type': contentType });
       createReadStream(filePath).pipe(res);
+    });
+
+    server.on('error', (err) => {
+      rejectPromise(new Error(`Asset server failed to start: ${err.message}`));
     });
 
     server.listen(0, '127.0.0.1', () => {

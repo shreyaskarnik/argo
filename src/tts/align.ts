@@ -15,9 +15,37 @@ export interface Placement {
 export interface AlignResult {
   placements: Placement[];
   samples: Float32Array;
+  requiredDurationMs: number;
+  overflowMs: number;
 }
 
-const OVERLAP_GAP_MS = 100;
+export interface ScheduledSceneInput {
+  scene: string;
+  startMs: number;
+  durationMs: number;
+}
+
+export const OVERLAP_GAP_MS = 100;
+
+export function schedulePlacements(scenes: ScheduledSceneInput[]): Placement[] {
+  const sorted = [...scenes].sort((a, b) => a.startMs - b.startMs);
+  const placements: Placement[] = [];
+  let previousEndMs = 0;
+
+  for (const scene of sorted) {
+    let startMs = scene.startMs;
+
+    if (placements.length > 0 && startMs < previousEndMs) {
+      startMs = previousEndMs + OVERLAP_GAP_MS;
+    }
+
+    const endMs = startMs + scene.durationMs;
+    placements.push({ scene: scene.scene, startMs, endMs });
+    previousEndMs = endMs;
+  }
+
+  return placements;
+}
 
 export function alignClips(
   timing: SceneTiming,
@@ -40,24 +68,21 @@ export function alignClips(
   matched.sort((a, b) => timing[a.scene] - timing[b.scene]);
 
   // 3. Place each clip, preventing overlap
-  const placements: Placement[] = [];
-  let previousEndMs = 0;
-
-  for (const clip of matched) {
-    let startMs = timing[clip.scene];
-
-    // If this would overlap the previous clip, push forward
-    if (placements.length > 0 && startMs < previousEndMs) {
-      startMs = previousEndMs + OVERLAP_GAP_MS;
-    }
-
-    const endMs = startMs + clip.durationMs;
-    placements.push({ scene: clip.scene, startMs, endMs });
-    previousEndMs = endMs;
-  }
+  const placements = schedulePlacements(
+    matched.map((clip) => ({
+      scene: clip.scene,
+      startMs: timing[clip.scene],
+      durationMs: clip.durationMs,
+    })),
+  );
+  const requiredDurationMs = placements.length > 0
+    ? placements[placements.length - 1].endMs
+    : 0;
+  const overflowMs = Math.max(0, requiredDurationMs - totalDurationMs);
 
   // 4. Create silence buffer
-  const totalSamples = Math.round((totalDurationMs / 1000) * sampleRate);
+  const outputDurationMs = Math.max(totalDurationMs, requiredDurationMs);
+  const totalSamples = Math.round((outputDurationMs / 1000) * sampleRate);
   const output = new Float32Array(totalSamples);
 
   // 5. Mix each clip's samples into output
@@ -71,5 +96,5 @@ export function alignClips(
     }
   }
 
-  return { placements, samples: output };
+  return { placements, samples: output, requiredDurationMs, overflowMs };
 }

@@ -8,6 +8,7 @@ export interface RecordOptions {
   demosDir: string;
   baseURL: string;
   video: { width: number; height: number };
+  autoBackground?: boolean;
 }
 
 export interface RecordResult {
@@ -71,10 +72,17 @@ export async function record(demoName: string, options: RecordOptions): Promise<
   // Start asset server if overlay manifest has image assets
   let assetServer: AssetServer | undefined;
   const overlayManifestPath = path.join(options.demosDir, `${demoName}.overlays.json`);
-  const overlayEntries = await loadOverlayManifest(overlayManifestPath);
-  if (overlayEntries && hasImageAssets(overlayEntries)) {
-    const assetDir = path.join(options.demosDir, 'assets');
-    assetServer = await startAssetServer(assetDir);
+  try {
+    const overlayEntries = await loadOverlayManifest(overlayManifestPath);
+    if (overlayEntries && hasImageAssets(overlayEntries)) {
+      const assetDir = path.join(options.demosDir, 'assets');
+      assetServer = await startAssetServer(assetDir);
+    }
+  } catch (err) {
+    // A malformed overlay manifest should not block recording —
+    // overlays are rendered by explicit showOverlay()/withOverlay() calls in the demo script,
+    // not from the manifest. Only warn.
+    console.warn(`Warning: could not parse overlay manifest: ${(err as Error).message}`);
   }
 
   try {
@@ -86,6 +94,8 @@ export async function record(demoName: string, options: RecordOptions): Promise<
           ARGO_OUTPUT_DIR: argoDir,
           BASE_URL: options.baseURL,
           ARGO_ASSET_URL: assetServer?.url ?? '',
+          ARGO_AUTO_BACKGROUND: options.autoBackground ? '1' : '',
+          ARGO_SCENE_DURATIONS_PATH: path.resolve(path.join('.argo', demoName, '.scene-durations.json')),
         },
       }, (error, stdout, stderr) => {
         if (error) {

@@ -81,6 +81,8 @@ describe('alignClips', () => {
     const result = alignClips(timing, [], 5000);
     expect(result.placements).toEqual([]);
     expect(result.samples.length).toBe(Math.round((5000 / 1000) * 24_000));
+    expect(result.requiredDurationMs).toBe(0);
+    expect(result.overflowMs).toBe(0);
     // All silence
     expect(result.samples.every((s) => s === 0)).toBe(true);
   });
@@ -114,5 +116,17 @@ describe('alignClips', () => {
       { scene: 'b', startMs: 3000, endMs: 4000 },
     ]);
     expect(result.placements.some((p) => p.scene === 'unknown')).toBe(false);
+  });
+
+  it('extends the output buffer when aligned audio runs past the video length', () => {
+    const timing: SceneTiming = { ending: 4500 };
+    const clips: ClipInfo[] = [makeClip('ending', 1000)];
+    const sampleRate = 24_000;
+
+    const result = alignClips(timing, clips, 5000, sampleRate);
+
+    expect(result.requiredDurationMs).toBe(5500);
+    expect(result.overflowMs).toBe(500);
+    expect(result.samples.length).toBe(Math.round((5500 / 1000) * sampleRate));
   });
 });

@@ -27,6 +27,7 @@ export interface LowerThirdCue {
   text: string;
   placement?: Zone;
   motion?: MotionPreset;
+  autoBackground?: boolean;
 }
 
 export interface HeadlineCardCue {
@@ -36,6 +37,7 @@ export interface HeadlineCardCue {
   body?: string;
   placement?: Zone;
   motion?: MotionPreset;
+  autoBackground?: boolean;
 }
 
 export interface CalloutCue {
@@ -43,6 +45,7 @@ export interface CalloutCue {
   text: string;
   placement?: Zone;
   motion?: MotionPreset;
+  autoBackground?: boolean;
 }
 
 export interface ImageCardCue {
@@ -52,6 +55,7 @@ export interface ImageCardCue {
   body?: string;
   placement?: Zone;
   motion?: MotionPreset;
+  autoBackground?: boolean;
 }
 
 export type OverlayCue = LowerThirdCue | HeadlineCardCue | CalloutCue | ImageCardCue;

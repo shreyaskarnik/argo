@@ -17,7 +17,7 @@ export {
 export { test, expect, demoType } from './fixtures.js';
 
 // Narration
-export { NarrationTimeline } from './narration.js';
+export { NarrationTimeline, type SceneDurationOptions } from './narration.js';
 
 // Captions
 export { showCaption, hideCaption, withCaption } from './captions.js';

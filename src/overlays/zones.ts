@@ -70,6 +70,56 @@ export async function injectIntoZone(
   }, [zoneId, contentHtml, baseStyles, animationCSS ?? ''] as const);
 }
 
+export type BackgroundTheme = 'dark' | 'light';
+
+/**
+ * Detect whether the background at a zone's position is dark or light.
+ * Samples the element at the zone coordinates, skipping fixed-position elements
+ * (navbars, toolbars) to read the actual page content background.
+ * Returns the *overlay* theme for contrast: dark bg → 'light' overlay, light bg → 'dark' overlay.
+ */
+export async function detectBackgroundTheme(page: Page, zone: Zone): Promise<BackgroundTheme> {
+  const pos = ZONE_POSITIONS[zone];
+  return page.evaluate((zonePos) => {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let x = vw / 2;
+    let y = vh / 2;
+
+    if (zonePos.left === '40px') x = 80;
+    else if (zonePos.right === '40px') x = vw - 80;
+    else if (zonePos.left === '50%') x = vw / 2;
+
+    if (zonePos.top === '40px') y = 80;
+    else if (zonePos.bottom === '60px') y = vh - 80;
+    else if (zonePos.top === '50%') y = vh / 2;
+
+    // Get all elements at this point, skip fixed-position ones (navs, toolbars)
+    const elements = document.elementsFromPoint(x, y);
+
+    for (const el of elements) {
+      const style = getComputedStyle(el);
+      // Skip fixed elements (navbars, overlays) — they don't represent page content
+      if (style.position === 'fixed' || style.position === 'sticky') continue;
+
+      const bg = style.backgroundColor;
+      const match = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+      if (match) {
+        const [, r, g, b, a] = match;
+        const alpha = a !== undefined ? parseFloat(a) : 1;
+        if (alpha > 0.1) {
+          const luminance = 0.299 * Number(r) + 0.587 * Number(g) + 0.114 * Number(b);
+          return luminance < 128 ? 'light' as const : 'dark' as const;
+        }
+      }
+    }
+
+    // Fall back to system theme
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return prefersDark ? 'light' as const : 'dark' as const;
+  }, pos);
+}
+
 /**
  * Remove the overlay in the specified zone, if any.
  */

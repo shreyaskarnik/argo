@@ -21,7 +21,7 @@
   },
   {
     "scene": "closing",
-    "text": "Install Argo, initialize your project, and ship your first demo video in minutes.",
+    "text": "Overlays automatically detect your page background and adjust their colors for contrast. Dark page? Light overlay. Light page? Dark overlay. No extra config needed.",
     "speed": 0.9
   },
   {

@@ -1,5 +1,6 @@
 import { test as base, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { readFileSync, existsSync } from 'node:fs';
 import { NarrationTimeline } from './narration.js';
 
 type TimelineFactory = (title: string) => NarrationTimeline;
@@ -31,9 +32,20 @@ export async function demoType(
   await page.locator(selector).pressSequentially(text, { delay });
 }
 
+function loadSceneDurations(): Record<string, number> | undefined {
+  const durationsPath = process.env.ARGO_SCENE_DURATIONS_PATH;
+  if (!durationsPath || !existsSync(durationsPath)) return undefined;
+  try {
+    return JSON.parse(readFileSync(durationsPath, 'utf-8'));
+  } catch {
+    return undefined;
+  }
+}
+
 export const test = base.extend<{ narration: NarrationTimeline }>({
   narration: async ({}, use, testInfo) => {
-    const timeline = new NarrationTimeline();
+    const durations = loadSceneDurations();
+    const timeline = new NarrationTimeline(durations);
     timeline.start();
     try {
       await use(timeline);

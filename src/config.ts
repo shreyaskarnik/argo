@@ -23,6 +23,10 @@ export interface ExportConfig {
   crf: number;
 }
 
+export interface OverlayConfig {
+  autoBackground: boolean;
+}
+
 export interface ArgoConfig {
   baseURL?: string;
   demosDir: string;
@@ -30,13 +34,15 @@ export interface ArgoConfig {
   tts: TTSConfig;
   video: VideoConfig;
   export: ExportConfig;
+  overlays: OverlayConfig;
 }
 
 export type UserConfig = Partial<
-  Omit<ArgoConfig, 'tts' | 'video' | 'export'> & {
+  Omit<ArgoConfig, 'tts' | 'video' | 'export' | 'overlays'> & {
     tts: Partial<TTSConfig>;
     video: Partial<VideoConfig>;
     export: Partial<ExportConfig>;
+    overlays: Partial<OverlayConfig>;
   }
 >;
 
@@ -48,6 +54,7 @@ const DEFAULTS: ArgoConfig = {
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
   video: { width: 1920, height: 1080, fps: 30 },
   export: { preset: 'slow', crf: 16 },
+  overlays: { autoBackground: false },
 };
 
 // ---- Functions ----
@@ -59,6 +66,7 @@ export function defineConfig(userConfig: UserConfig): ArgoConfig {
     tts: { ...DEFAULTS.tts, ...userConfig.tts },
     video: { ...DEFAULTS.video, ...userConfig.video },
     export: { ...DEFAULTS.export, ...userConfig.export },
+    overlays: { ...DEFAULTS.overlays, ...userConfig.overlays },
   };
 }
 

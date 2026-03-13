@@ -9,6 +9,11 @@ export interface ExportOptions {
   preset?: string;
   crf?: number;
   fps?: number;
+  tailPadMs?: number;
+}
+
+function formatSeconds(ms: number): string {
+  return (ms / 1000).toFixed(3).replace(/\.?0+$/, '');
 }
 
 /**
@@ -40,6 +45,7 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     preset = 'slow',
     crf = 16,
     fps,
+    tailPadMs,
   } = options;
 
   checkFfmpeg();
@@ -64,12 +70,22 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
   const args: string[] = [
     '-i', videoPath,
     '-i', audioPath,
+  ];
+
+  if (tailPadMs && tailPadMs > 0) {
+    args.push(
+      '-vf',
+      `tpad=stop_mode=clone:stop_duration=${formatSeconds(tailPadMs)}`,
+    );
+  }
+
+  args.push(
     '-c:v', 'libx264',
     '-preset', preset,
     '-crf', String(crf),
     '-c:a', 'aac',
     '-b:a', '192k',
-  ];
+  );
 
   if (fps !== undefined) {
     args.push('-r', String(fps));

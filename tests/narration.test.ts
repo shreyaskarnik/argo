@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { vi } from 'vitest';
 import { join } from 'node:path';
 import { mkdtemp, rm, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -116,5 +117,77 @@ describe('flush', () => {
 
     const info = await stat(outPath);
     expect(info.isFile()).toBe(true);
+  });
+});
+
+// ---------- durationFor ----------
+describe('durationFor', () => {
+  it('returns fallback when no durations loaded', () => {
+    const timeline = new NarrationTimeline();
+    expect(timeline.durationFor('missing')).toBe(3000);
+  });
+
+  it('returns custom fallback', () => {
+    const timeline = new NarrationTimeline();
+    expect(timeline.durationFor('missing', { fallbackMs: 5000 })).toBe(5000);
+  });
+
+  it('computes duration from clip length with default lead-in/out', () => {
+    const timeline = new NarrationTimeline({ hero: 4000 });
+    // 4000 * 1 + 200 + 400 = 4600
+    expect(timeline.durationFor('hero')).toBe(4600);
+  });
+
+  it('applies multiplier', () => {
+    const timeline = new NarrationTimeline({ hero: 4000 });
+    // 4000 * 1.2 + 200 + 400 = 5400
+    expect(timeline.durationFor('hero', { multiplier: 1.2 })).toBe(5400);
+  });
+
+  it('clamps to minMs', () => {
+    const timeline = new NarrationTimeline({ short: 500 });
+    // 500 * 1 + 200 + 400 = 1100, but min is 2200
+    expect(timeline.durationFor('short')).toBe(2200);
+  });
+
+  it('clamps to maxMs', () => {
+    const timeline = new NarrationTimeline({ long: 20000 });
+    // 20000 * 1 + 200 + 400 = 20600, but max is 8000
+    expect(timeline.durationFor('long')).toBe(8000);
+  });
+
+  it('respects custom min/max', () => {
+    const timeline = new NarrationTimeline({ scene: 500 });
+    // 500 + 200 + 400 = 1100, custom min 1000
+    expect(timeline.durationFor('scene', { minMs: 1000, maxMs: 2000 })).toBe(1100);
+  });
+
+  it('returns the remaining wait once a marked scene is already in progress', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+
+    const timeline = new NarrationTimeline({ hero: 4000 });
+    timeline.start();
+    timeline.mark('hero');
+
+    vi.advanceTimersByTime(1000);
+
+    expect(timeline.durationFor('hero')).toBe(3600);
+    vi.useRealTimers();
+  });
+
+  it('extends later scenes when earlier audio pushes the schedule back', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+
+    const timeline = new NarrationTimeline({ first: 4000, second: 500 });
+    timeline.start();
+    timeline.mark('first');
+
+    vi.advanceTimersByTime(1000);
+    timeline.mark('second');
+
+    expect(timeline.durationFor('second')).toBe(4000);
+    vi.useRealTimers();
   });
 });

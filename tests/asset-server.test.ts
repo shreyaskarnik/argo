@@ -4,7 +4,28 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-describe('startAssetServer', () => {
+async function canBindLocalhost(): Promise<boolean> {
+  const probeDir = mkdtempSync(join(tmpdir(), 'argo-asset-probe-'));
+  mkdirSync(join(probeDir, 'assets'), { recursive: true });
+
+  try {
+    const server = await startAssetServer(join(probeDir, 'assets'));
+    await server.close();
+    return true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('EPERM') || message.includes('EACCES')) {
+      return false;
+    }
+    throw error;
+  } finally {
+    rmSync(probeDir, { recursive: true, force: true });
+  }
+}
+
+const describeAssetServer = (await canBindLocalhost()) ? describe : describe.skip;
+
+describeAssetServer('startAssetServer', () => {
   let tmpDir: string;
   let close: (() => Promise<void>) | undefined;
 

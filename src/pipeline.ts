@@ -34,7 +34,7 @@ function getVideoDurationMs(videoPath: string): number {
 
 export async function runPipeline(
   demoName: string,
-  config: Pick<ArgoConfig, 'baseURL' | 'demosDir' | 'outputDir' | 'tts' | 'video' | 'export'>
+  config: Pick<ArgoConfig, 'baseURL' | 'demosDir' | 'outputDir' | 'tts' | 'video' | 'export' | 'overlays'>
 ): Promise<string> {
   if (!config.baseURL) {
     throw new Error(
@@ -66,12 +66,21 @@ export async function runPipeline(
     );
   }
 
+  // Write scene durations so demo scripts can use narration.durationFor()
+  const sceneDurations: Record<string, number> = {};
+  for (const cr of clipResults) {
+    sceneDurations[cr.scene] = cr.durationMs;
+  }
+  const sceneDurationsPath = join(argoDir, '.scene-durations.json');
+  writeFileSync(sceneDurationsPath, JSON.stringify(sceneDurations, null, 2), 'utf-8');
+
   // Step 2: Record browser demo
   console.log('Step 2/4: Recording browser demo...');
   const { timingPath } = await record(demoName, {
     demosDir: config.demosDir,
     baseURL: config.baseURL,
     video: { width: config.video.width, height: config.video.height },
+    autoBackground: config.overlays.autoBackground,
   });
 
   // Step 3: Align clips with timing
@@ -103,17 +112,27 @@ export async function runPipeline(
   const alignedWav = createWavBuffer(aligned.samples, 24_000);
   const alignedPath = join(argoDir, 'narration-aligned.wav');
   writeFileSync(alignedPath, alignedWav);
+  const tailPadMs = aligned.overflowMs > 0 ? aligned.overflowMs + 100 : undefined;
+
+  if (tailPadMs !== undefined) {
+    console.warn(
+      `Aligned narration runs ${aligned.overflowMs}ms past the recording. ` +
+      `Padding the final video frame to preserve the full audio.`
+    );
+  }
 
   // Step 4: Export final video
   console.log('Step 4/4: Exporting final video...');
-  const outputPath = await exportVideo({
+  const exportOptions: Parameters<typeof exportVideo>[0] = {
     demoName,
     argoDir: '.argo',
     outputDir: config.outputDir,
     preset: config.export.preset,
     crf: config.export.crf,
     fps: config.video.fps,
-  });
+  };
+  if (tailPadMs !== undefined) exportOptions.tailPadMs = tailPadMs;
+  const outputPath = await exportVideo(exportOptions);
 
   console.log(`Done! Video saved to: ${outputPath}`);
   return outputPath;

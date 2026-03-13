@@ -4,6 +4,7 @@
 
 import fs from 'node:fs';
 import type { TTSEngine } from './engine.js';
+import { parseWavHeader } from './engine.js';
 import { ClipCache, type ManifestEntry } from './cache.js';
 
 export interface GenerateClipsOptions {
@@ -17,6 +18,7 @@ export interface GenerateClipsOptions {
 export interface ClipResult {
   scene: string;
   clipPath: string;
+  durationMs: number;
 }
 
 export async function generateClips(options: GenerateClipsOptions): Promise<ClipResult[]> {
@@ -76,7 +78,9 @@ export async function generateClips(options: GenerateClipsOptions): Promise<Clip
       cache.cacheClip(demoName, manifestEntry, wavBuffer);
     }
 
-    results.push({ scene: manifestEntry.scene, clipPath });
+    const wavBuf = fs.readFileSync(clipPath);
+    const { durationMs } = parseWavHeader(wavBuf);
+    results.push({ scene: manifestEntry.scene, clipPath, durationMs });
   }
 
   return results;

@@ -16,6 +16,7 @@ const DEFAULTS: ArgoConfig = {
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
   video: { width: 1920, height: 1080, fps: 30 },
   export: { preset: 'slow', crf: 16 },
+  overlays: { autoBackground: false },
 };
 
 // ---------- defineConfig ----------

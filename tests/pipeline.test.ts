@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 vi.mock('../src/tts/generate.js', () => ({
@@ -41,13 +41,14 @@ const VIDEO_PATH = join(ARGO_DIR, 'video.webm');
 
 const mockEngine = { generate: vi.fn().mockResolvedValue(Buffer.from('fake')) };
 
-const defaultConfig: Pick<ArgoConfig, 'baseURL' | 'demosDir' | 'outputDir' | 'tts' | 'video' | 'export'> = {
+const defaultConfig: Pick<ArgoConfig, 'baseURL' | 'demosDir' | 'outputDir' | 'tts' | 'video' | 'export' | 'overlays'> = {
   baseURL: 'http://localhost:3000',
   demosDir: 'demos',
   outputDir: 'videos',
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0, engine: mockEngine },
   video: { width: 1920, height: 1080, fps: 30 },
   export: { preset: 'slow', crf: 16 },
+  overlays: { autoBackground: false },
 };
 
 function setupFixtures() {
@@ -70,8 +71,8 @@ beforeEach(() => {
   mockedExecFileSync.mockReturnValue('16.240\n');
   mockedCheckFfmpeg.mockReturnValue(true);
   mockedGenerateClips.mockResolvedValue([
-    { scene: 'intro', clipPath: join(ARGO_DIR, 'clips', 'intro.wav') },
-    { scene: 'done', clipPath: join(ARGO_DIR, 'clips', 'done.wav') },
+    { scene: 'intro', clipPath: join(ARGO_DIR, 'clips', 'intro.wav'), durationMs: 1000 },
+    { scene: 'done', clipPath: join(ARGO_DIR, 'clips', 'done.wav'), durationMs: 1000 },
   ]);
   mockedRecord.mockResolvedValue({ videoPath: VIDEO_PATH, timingPath: TIMING_PATH });
   mockedExportVideo.mockResolvedValue(`videos/${DEMO_NAME}.mp4`);
@@ -84,8 +85,8 @@ describe('runPipeline', () => {
     mockedGenerateClips.mockImplementation(async () => {
       callOrder.push('generateClips');
       return [
-        { scene: 'intro', clipPath: join(ARGO_DIR, 'clips', 'intro.wav') },
-        { scene: 'done', clipPath: join(ARGO_DIR, 'clips', 'done.wav') },
+        { scene: 'intro', clipPath: join(ARGO_DIR, 'clips', 'intro.wav'), durationMs: 1000 },
+        { scene: 'done', clipPath: join(ARGO_DIR, 'clips', 'done.wav'), durationMs: 1000 },
       ];
     });
     mockedRecord.mockImplementation(async () => { callOrder.push('record'); return { videoPath: VIDEO_PATH, timingPath: TIMING_PATH }; });
@@ -101,8 +102,8 @@ describe('runPipeline', () => {
     mockedGenerateClips.mockImplementation(async () => {
       callOrder.push('generateClips');
       return [
-        { scene: 'intro', clipPath: join(ARGO_DIR, 'clips', 'intro.wav') },
-        { scene: 'done', clipPath: join(ARGO_DIR, 'clips', 'done.wav') },
+        { scene: 'intro', clipPath: join(ARGO_DIR, 'clips', 'intro.wav'), durationMs: 1000 },
+        { scene: 'done', clipPath: join(ARGO_DIR, 'clips', 'done.wav'), durationMs: 1000 },
       ];
     });
     mockedRecord.mockImplementation(async () => { callOrder.push('record'); return { videoPath: VIDEO_PATH, timingPath: TIMING_PATH }; });
@@ -134,6 +135,7 @@ describe('runPipeline', () => {
       demosDir: 'demos',
       baseURL: 'http://localhost:3000',
       video: { width: 1920, height: 1080 },
+      autoBackground: false,
     });
   });
 
@@ -147,6 +149,28 @@ describe('runPipeline', () => {
       crf: 16,
       fps: 30,
     });
+  });
+
+  it('writes scene durations metadata for recording-time pacing', async () => {
+    mockedGenerateClips.mockResolvedValue([
+      { scene: 'intro', clipPath: join(ARGO_DIR, 'clips', 'intro.wav'), durationMs: 1200 },
+      { scene: 'done', clipPath: join(ARGO_DIR, 'clips', 'done.wav'), durationMs: 900 },
+    ]);
+
+    await runPipeline(DEMO_NAME, defaultConfig);
+
+    const metadata = JSON.parse(readFileSync(join(ARGO_DIR, '.scene-durations.json'), 'utf-8'));
+    expect(metadata).toEqual({ intro: 1200, done: 900 });
+  });
+
+  it('pads export when aligned audio outlasts the recording', async () => {
+    mockedExecFileSync.mockReturnValue('5.000\n');
+
+    await runPipeline(DEMO_NAME, defaultConfig);
+
+    expect(mockedExportVideo).toHaveBeenCalledWith(expect.objectContaining({
+      tailPadMs: 1100,
+    }));
   });
 
   it('writes narration-aligned.wav to .argo/<demo>/', async () => {
