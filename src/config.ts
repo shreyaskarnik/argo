@@ -83,7 +83,6 @@ export function demosProject(options: {
 }
 
 const CONFIG_FILENAMES = [
-  'argo.config.ts',
   'argo.config.js',
   'argo.config.mjs',
 ];

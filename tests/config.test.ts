@@ -135,10 +135,7 @@ describe('loadConfig', () => {
     expect(config.demosDir).toBe('demos');
   });
 
-  it('prioritises argo.config.ts over .js when both exist', async () => {
-    // argo.config.ts can't be directly imported at runtime without a loader,
-    // but the search order should prefer .ts. For this test we use .js to
-    // verify the search finds the first matching file.
+  it('finds argo.config.js first in search order', async () => {
     await writeFile(
       join(tmpDir, 'argo.config.js'),
       `export default { demosDir: 'from-js' };`,

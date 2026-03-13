@@ -35,15 +35,29 @@ const EXAMPLE_VOICEOVER = JSON.stringify(
   2,
 ) + '\n';
 
-const ARGO_CONFIG = `import { defineConfig } from 'argo';
-
-export default defineConfig({
+const ARGO_CONFIG = `export default {
   baseURL: 'http://localhost:3000',
   demosDir: 'demos/',
   outputDir: 'videos/',
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
   video: { width: 2560, height: 1440, fps: 30 },
   export: { preset: 'slow', crf: 16 },
+};
+`;
+
+const PLAYWRIGHT_CONFIG = `import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  projects: [
+    {
+      name: 'demos',
+      testDir: 'demos',
+      testMatch: '**/*.demo.ts',
+      use: {
+        video: 'on',
+      },
+    },
+  ],
 });
 `;
 
@@ -53,7 +67,8 @@ export async function init(cwd: string = process.cwd()): Promise<void> {
 
   await writeIfMissing(join(demosDir, 'example.demo.ts'), EXAMPLE_DEMO);
   await writeIfMissing(join(demosDir, 'example.voiceover.json'), EXAMPLE_VOICEOVER);
-  await writeIfMissing(join(cwd, 'argo.config.ts'), ARGO_CONFIG);
+  await writeIfMissing(join(cwd, 'argo.config.js'), ARGO_CONFIG);
+  await writeIfMissing(join(cwd, 'playwright.config.ts'), PLAYWRIGHT_CONFIG);
 
   console.log('\nArgo initialized! Next steps:');
   console.log('  1. Edit demos/example.demo.ts');

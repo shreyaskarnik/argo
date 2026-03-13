@@ -41,25 +41,24 @@ describe('init', () => {
     expect(parsed[0]).toHaveProperty('text');
   });
 
-  it('creates argo.config.ts with defineConfig', async () => {
+  it('creates argo.config.js with config', async () => {
     await init(dir);
-    const content = await readFile(join(dir, 'argo.config.ts'), 'utf-8');
-    expect(content).toContain("import { defineConfig } from 'argo'");
-    expect(content).toContain('defineConfig(');
+    const content = await readFile(join(dir, 'argo.config.js'), 'utf-8');
+    expect(content).toContain('export default');
     expect(content).toContain('baseURL');
   });
 
   it('does NOT overwrite existing files', async () => {
     await mkdir(join(dir, 'demos'), { recursive: true });
     await writeFile(join(dir, 'demos', 'example.demo.ts'), 'existing content');
-    await writeFile(join(dir, 'argo.config.ts'), 'existing config');
+    await writeFile(join(dir, 'argo.config.js'), 'existing config');
 
     await init(dir);
 
     const demo = await readFile(join(dir, 'demos', 'example.demo.ts'), 'utf-8');
     expect(demo).toBe('existing content');
 
-    const config = await readFile(join(dir, 'argo.config.ts'), 'utf-8');
+    const config = await readFile(join(dir, 'argo.config.js'), 'utf-8');
     expect(config).toBe('existing config');
   });
 });

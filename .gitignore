@@ -3,5 +3,6 @@ dist/
 .argo/
 videos/
 demos/
-argo.config.ts
+argo.config.*
+playwright.config.ts
 *.tsbuildinfo
