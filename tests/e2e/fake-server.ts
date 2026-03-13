@@ -21,18 +21,24 @@ export interface FakeServer {
 }
 
 export function startFakeServer(): Promise<FakeServer> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const server = http.createServer((_req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(HTML);
     });
 
+    const onError = (error: Error) => {
+      reject(error);
+    };
+
+    server.once('error', onError);
     server.listen(0, '127.0.0.1', () => {
+      server.off('error', onError);
       const { port } = server.address() as AddressInfo;
       resolve({
         url: `http://127.0.0.1:${port}`,
         port,
-        close: () => new Promise((res) => server.close(() => res())),
+        close: () => new Promise((res, rej) => server.close((error) => (error ? rej(error) : res()))),
       });
     });
   });

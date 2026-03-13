@@ -38,7 +38,7 @@ export async function runPipeline(
 ): Promise<string> {
   if (!config.baseURL) {
     throw new Error(
-      'baseURL is required but not set. Set it in argo.config.js or pass --base-url.'
+      'baseURL is required but not set. Set it in argo.config.js or pass --config.'
     );
   }
   if (!config.tts.engine) {

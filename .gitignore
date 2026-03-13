@@ -8,3 +8,4 @@ playwright.config.ts
 test-results/
 narration-*.json
 *.tsbuildinfo
+.DS_Store

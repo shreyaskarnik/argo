@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdirSync, readdirSync, copyFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdirSync, readdirSync, copyFileSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 export interface RecordOptions {
@@ -24,18 +24,50 @@ function findVideoInResults(testResultsDir: string): string | undefined {
   return undefined;
 }
 
+function createPlaywrightConfig(options: RecordOptions, outputDir: string): string {
+  const demosDir = path.resolve(options.demosDir);
+  const { width, height } = options.video;
+
+  return `import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  preserveOutput: 'always',
+  outputDir: ${JSON.stringify(outputDir)},
+  projects: [
+    {
+      name: 'demos',
+      testDir: ${JSON.stringify(demosDir)},
+      testMatch: '**/*.demo.ts',
+      use: {
+        baseURL: ${JSON.stringify(options.baseURL)},
+        viewport: { width: ${width}, height: ${height} },
+        video: {
+          mode: 'on',
+          size: { width: ${width}, height: ${height} },
+        },
+      },
+    },
+  ],
+});
+`;
+}
+
 export function record(demoName: string, options: RecordOptions): Promise<RecordResult> {
   const argoDir = path.join('.argo', demoName);
   mkdirSync(argoDir, { recursive: true });
 
   const videoPath = path.join(argoDir, 'video.webm');
   const timingPath = path.join(argoDir, '.timing.json');
+  const testResultsDir = path.resolve('test-results');
+  const recordConfigPath = path.join(argoDir, 'playwright.record.config.mjs');
+
+  writeFileSync(recordConfigPath, createPlaywrightConfig(options, testResultsDir), 'utf-8');
 
   // Clean test-results to avoid picking up stale videos
-  rmSync('test-results', { recursive: true, force: true });
+  rmSync(testResultsDir, { recursive: true, force: true });
 
   return new Promise((resolve, reject) => {
-    execFile('npx', ['playwright', 'test', '--grep', demoName, '--project', 'demos'], {
+    execFile('npx', ['playwright', 'test', '--config', recordConfigPath, '--grep', demoName, '--project', 'demos'], {
       env: {
         ...process.env,
         ARGO_DEMO_NAME: demoName,
@@ -50,7 +82,7 @@ export function record(demoName: string, options: RecordOptions): Promise<Record
       }
 
       // Copy the video from test-results/ to .argo/<demo>/video.webm
-      const found = findVideoInResults('test-results');
+      const found = findVideoInResults(testResultsDir);
       if (!found) {
         reject(new Error(
           `No video recording found in test-results/. ` +

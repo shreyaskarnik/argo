@@ -7,18 +7,33 @@ import { startFakeServer, type FakeServer } from './fake-server.js';
 
 const PROJECT_ROOT = resolve(import.meta.dirname, '../..');
 
-let server: FakeServer;
+async function canBindLocalhost(): Promise<boolean> {
+  try {
+    const probeServer = await startFakeServer();
+    await probeServer.close();
+    return true;
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException;
+    if (err.code === 'EPERM' || err.code === 'EACCES') {
+      return false;
+    }
+    throw error;
+  }
+}
 
-beforeAll(async () => {
-  server = await startFakeServer();
-});
+const describeE2E = (await canBindLocalhost()) ? describe : describe.skip;
 
-afterAll(async () => {
-  await server.close();
-});
-
-describe('E2E: argo record', () => {
+describeE2E('E2E: argo record', () => {
+  let server: FakeServer;
   let workDir: string;
+
+  beforeAll(async () => {
+    server = await startFakeServer();
+  }, 30_000);
+
+  afterAll(async () => {
+    await server.close();
+  });
 
   beforeEach(async () => {
     workDir = await mkdtemp(join(tmpdir(), 'argo-e2e-'));
