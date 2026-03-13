@@ -17,13 +17,13 @@ Write a demo script with Playwright. Add a voiceover manifest. Run one command. 
 
 ## Showcase
 
-<video src="videos/showcase.mp4" width="100%" controls autoplay muted></video>
+[Watch the demo video](https://gist.github.com/user-attachments/assets/41943819-a6c3-43ed-b275-28a6c4055f72)
 
 > *This demo was recorded by Argo, using Argo. Yes, really.*
 
 ## How it works
 
-```
+```bash
  TTS          Record        Align         Export
  ───          ──────        ─────         ──────
  Kokoro       Playwright    Place clips   ffmpeg
