@@ -1,5 +1,8 @@
 # CLAUDE.md
 
+## About
+Argo turns Playwright demo scripts into polished product demo videos with AI voiceover. Users write a Playwright test, add a voiceover JSON manifest, and run `argo pipeline` to get an MP4 with screen recording, overlays, and narration — all locally, no cloud services required.
+
 ## Build & Test
 - `npm run build` — TypeScript compilation
 - `npm test` — runs vitest
