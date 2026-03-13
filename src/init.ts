@@ -16,8 +16,8 @@ async function writeIfMissing(filePath: string, content: string): Promise<boolea
   }
 }
 
-const EXAMPLE_DEMO = `import { test } from 'argo';
-import { showCaption, withCaption } from 'argo';
+const EXAMPLE_DEMO = `import { test } from '@argo-video/cli';
+import { showCaption, withCaption } from '@argo-video/cli';
 
 test('example', async ({ page, narration }) => {
   await page.goto('/');

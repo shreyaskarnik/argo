@@ -25,8 +25,8 @@ describe('init', () => {
   it('creates example.demo.ts with correct content', async () => {
     await init(dir);
     const content = await readFile(join(dir, 'demos', 'example.demo.ts'), 'utf-8');
-    expect(content).toContain("import { test } from 'argo'");
-    expect(content).toContain("import { showCaption, withCaption } from 'argo'");
+    expect(content).toContain("import { test } from '@argo-video/cli'");
+    expect(content).toContain("import { showCaption, withCaption } from '@argo-video/cli'");
     expect(content).toContain("narration.mark('welcome')");
     expect(content).toContain('showCaption(page,');
     expect(content).toContain('withCaption(page,');
