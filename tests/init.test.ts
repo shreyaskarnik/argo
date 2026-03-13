@@ -42,6 +42,18 @@ describe('init', () => {
     expect(parsed[0]).toHaveProperty('text');
   });
 
+  it('creates example.overlays.json with valid JSON array', async () => {
+    await init(dir);
+    const content = await readFile(join(dir, 'demos', 'example.overlays.json'), 'utf-8');
+    const parsed = JSON.parse(content);
+    expect(Array.isArray(parsed)).toBe(true);
+    expect(parsed.length).toBe(2);
+    expect(parsed[0]).toHaveProperty('scene');
+    expect(parsed[0]).toHaveProperty('type');
+    expect(parsed[1].type).toBe('headline-card');
+    expect(parsed[1].placement).toBe('top-left');
+  });
+
   it('creates argo.config.js with config', async () => {
     await init(dir);
     const content = await readFile(join(dir, 'argo.config.js'), 'utf-8');

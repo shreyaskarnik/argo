@@ -45,6 +45,26 @@ const EXAMPLE_VOICEOVER = JSON.stringify(
   2,
 ) + '\n';
 
+const EXAMPLE_OVERLAYS = JSON.stringify(
+  [
+    {
+      scene: 'welcome',
+      type: 'lower-third',
+      text: 'Welcome to our app',
+    },
+    {
+      scene: 'action',
+      type: 'headline-card',
+      placement: 'top-left',
+      title: 'One-click setup',
+      body: 'Just press the button to get started.',
+      motion: 'slide-in',
+    },
+  ],
+  null,
+  2,
+) + '\n';
+
 const ARGO_CONFIG = `export default {
   baseURL: 'http://localhost:3000',
   demosDir: 'demos/',
@@ -83,6 +103,7 @@ export async function init(cwd: string = process.cwd()): Promise<void> {
 
   await writeIfMissing(join(demosDir, 'example.demo.ts'), EXAMPLE_DEMO);
   await writeIfMissing(join(demosDir, 'example.voiceover.json'), EXAMPLE_VOICEOVER);
+  await writeIfMissing(join(demosDir, 'example.overlays.json'), EXAMPLE_OVERLAYS);
   await writeIfMissing(join(cwd, 'argo.config.js'), ARGO_CONFIG);
   await writeIfMissing(join(cwd, 'playwright.config.ts'), PLAYWRIGHT_CONFIG);
 
