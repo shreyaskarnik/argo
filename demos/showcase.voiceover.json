@@ -22,6 +22,7 @@
   {
     "scene": "closing",
     "text": "Install Argo, initialize your project, and ship your first demo video in minutes. Oh, and this demo? It was recorded by Argo, using Argo.",
+    "voice": "am_michael",
     "speed": 0.9
   }
 ]
