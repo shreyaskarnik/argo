@@ -1,6 +1,8 @@
 import { execFile } from 'node:child_process';
 import { mkdirSync, readdirSync, copyFileSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { startAssetServer, type AssetServer } from './asset-server.js';
+import { loadOverlayManifest, hasImageAssets } from './overlays/manifest.js';
 
 export interface RecordOptions {
   demosDir: string;
@@ -52,7 +54,7 @@ export default defineConfig({
 `;
 }
 
-export function record(demoName: string, options: RecordOptions): Promise<RecordResult> {
+export async function record(demoName: string, options: RecordOptions): Promise<RecordResult> {
   const argoDir = path.join('.argo', demoName);
   mkdirSync(argoDir, { recursive: true });
 
@@ -66,42 +68,56 @@ export function record(demoName: string, options: RecordOptions): Promise<Record
   // Clean test-results to avoid picking up stale videos
   rmSync(testResultsDir, { recursive: true, force: true });
 
-  return new Promise((resolve, reject) => {
-    execFile('npx', ['playwright', 'test', '--config', recordConfigPath, '--grep', demoName, '--project', 'demos'], {
-      env: {
-        ...process.env,
-        ARGO_DEMO_NAME: demoName,
-        ARGO_OUTPUT_DIR: argoDir,
-        BASE_URL: options.baseURL,
-      },
-    }, (error, stdout, stderr) => {
-      if (error) {
-        const output = [stdout, stderr].filter(Boolean).join('\n');
-        reject(new Error(`Playwright recording failed:\n${output}`));
-        return;
-      }
+  // Start asset server if overlay manifest has image assets
+  let assetServer: AssetServer | undefined;
+  const overlayManifestPath = path.join(options.demosDir, `${demoName}.overlays.json`);
+  const overlayEntries = await loadOverlayManifest(overlayManifestPath);
+  if (overlayEntries && hasImageAssets(overlayEntries)) {
+    const assetDir = path.join(options.demosDir, 'assets');
+    assetServer = await startAssetServer(assetDir);
+  }
 
-      // Copy the video from test-results/ to .argo/<demo>/video.webm
-      const found = findVideoInResults(testResultsDir);
-      if (!found) {
-        reject(new Error(
-          `No video recording found in test-results/. ` +
-          `Ensure playwright.config.ts has video: 'on' or video: { mode: 'on' }.`
-        ));
-        return;
-      }
-      copyFileSync(found, videoPath);
+  try {
+    return await new Promise<RecordResult>((resolve, reject) => {
+      execFile('npx', ['playwright', 'test', '--config', recordConfigPath, '--grep', demoName, '--project', 'demos'], {
+        env: {
+          ...process.env,
+          ARGO_DEMO_NAME: demoName,
+          ARGO_OUTPUT_DIR: argoDir,
+          BASE_URL: options.baseURL,
+          ARGO_ASSET_URL: assetServer?.url ?? '',
+        },
+      }, (error, stdout, stderr) => {
+        if (error) {
+          const output = [stdout, stderr].filter(Boolean).join('\n');
+          reject(new Error(`Playwright recording failed:\n${output}`));
+          return;
+        }
 
-      // Verify timing file was written by the narration fixture
-      if (!existsSync(timingPath)) {
-        reject(new Error(
-          `No timing file found at ${timingPath}. ` +
-          `Ensure the demo uses the argo test fixture with narration.mark() calls.`
-        ));
-        return;
-      }
+        // Copy the video from test-results/ to .argo/<demo>/video.webm
+        const found = findVideoInResults(testResultsDir);
+        if (!found) {
+          reject(new Error(
+            `No video recording found in test-results/. ` +
+            `Ensure playwright.config.ts has video: 'on' or video: { mode: 'on' }.`
+          ));
+          return;
+        }
+        copyFileSync(found, videoPath);
 
-      resolve({ videoPath, timingPath });
+        // Verify timing file was written by the narration fixture
+        if (!existsSync(timingPath)) {
+          reject(new Error(
+            `No timing file found at ${timingPath}. ` +
+            `Ensure the demo uses the argo test fixture with narration.mark() calls.`
+          ));
+          return;
+        }
+
+        resolve({ videoPath, timingPath });
+      });
     });
-  });
+  } finally {
+    if (assetServer) await assetServer.close();
+  }
 }
