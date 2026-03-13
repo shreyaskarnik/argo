@@ -635,6 +635,7 @@
     <p class="hero-tagline">
       Turn <strong>Playwright scripts</strong> into polished demo videos
       with <strong>AI voiceover</strong>.
+      <br><span style="color: var(--text-muted); font-size: 0.85em;">Powered by Kokoro TTS</span>
     </p>
 
     <div class="terminal-box">
@@ -749,6 +750,18 @@
           <p class="feature-desc">
             AI-generated narration from a simple JSON manifest. Mark moments in your script, write your lines, and Argo synthesizes and syncs professional-quality speech automatically.
           </p>
+          <div style="background: #000; border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin: 12px 0 8px; font-family: var(--font-mono); font-size: 0.75em; line-height: 1.7; color: var(--text-muted); text-align: left; overflow-x: auto;">
+            <span style="color: #6b7280;">[</span><br>
+            &nbsp;&nbsp;<span style="color: #6b7280;">{</span><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #93c5fd;">"scene"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"intro"</span><span style="color: #6b7280;">,</span><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #93c5fd;">"text"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"Welcome to our app."</span><br>
+            &nbsp;&nbsp;<span style="color: #6b7280;">},</span><br>
+            &nbsp;&nbsp;<span style="color: #6b7280;">{</span><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #93c5fd;">"scene"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"feature"</span><span style="color: #6b7280;">,</span><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #93c5fd;">"text"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"This makes everything easier."</span><br>
+            &nbsp;&nbsp;<span style="color: #6b7280;">}</span><br>
+            <span style="color: #6b7280;">]</span>
+          </div>
           <span class="feature-tag">narration.mark()</span>
         </div>
 
