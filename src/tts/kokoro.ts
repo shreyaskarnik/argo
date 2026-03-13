@@ -1,24 +1,35 @@
 import type { TTSEngine, TTSEngineOptions } from './engine.js';
-import { createWavBuffer } from './engine.js';
 
 export class KokoroEngine implements TTSEngine {
-  private pipeline: any = null;
+  private tts: any = null;
+  private modelId: string;
+  private dtype: string;
 
-  private async getPipeline(): Promise<any> {
-    if (this.pipeline) return this.pipeline;
-    const { pipeline } = await import('@huggingface/transformers');
-    this.pipeline = await pipeline('text-to-speech', 'onnx-community/Kokoro-82M-v1.0-ONNX', { dtype: 'fp32' });
-    return this.pipeline;
+  constructor(options?: { modelId?: string; dtype?: string }) {
+    this.modelId = options?.modelId ?? 'onnx-community/Kokoro-82M-ONNX';
+    this.dtype = options?.dtype ?? 'fp32';
+  }
+
+  private async getTTS(): Promise<any> {
+    if (this.tts) return this.tts;
+    const { KokoroTTS } = await import('kokoro-js');
+    this.tts = await KokoroTTS.from_pretrained(this.modelId, {
+      dtype: this.dtype,
+    });
+    return this.tts;
   }
 
   async generate(text: string, options: TTSEngineOptions): Promise<Buffer> {
     if (!text?.trim()) throw new Error('TTS text must not be empty');
-    const tts = await this.getPipeline();
-    const result = await tts(text, {
+    const tts = await this.getTTS();
+    const audio = await tts.generate(text, {
       voice: options.voice ?? 'af_heart',
       speed: options.speed ?? 1.0,
-      ...(options.lang ? { language: options.lang } : {}),
     });
-    return createWavBuffer(result.audio as Float32Array, result.sampling_rate as number);
+    // audio.data is Float32Array, audio.sampling_rate is number
+    const samples = audio.data ?? audio.audio;
+    const sampleRate = audio.sampling_rate ?? 24000;
+    const { createWavBuffer } = await import('./engine.js');
+    return createWavBuffer(samples as Float32Array, sampleRate as number);
   }
 }
