@@ -1,4 +1,62 @@
-// Stub — will be implemented in Task 14.
-export async function init(): Promise<void> {
-  throw new Error('init is not yet implemented');
+import { mkdir, writeFile, access } from 'node:fs/promises';
+import { join } from 'node:path';
+
+async function writeIfMissing(filePath: string, content: string): Promise<boolean> {
+  try {
+    await access(filePath);
+    console.log(`  skip ${filePath} (already exists)`);
+    return false;
+  } catch {
+    await writeFile(filePath, content, 'utf-8');
+    console.log(`  create ${filePath}`);
+    return true;
+  }
+}
+
+const EXAMPLE_DEMO = `import { test, demoType } from 'argo';
+
+test('example', async ({ page, narration }) => {
+  await page.goto('/');
+  await narration.showCaption(page, 'welcome', 'Welcome to our app', 3000);
+  await narration.withCaption(page, 'action', 'Watch how easy it is', async () => {
+    await page.click('button');
+  });
+  narration.mark('done');
+});
+`;
+
+const EXAMPLE_VOICEOVER = JSON.stringify(
+  [
+    { scene: 'welcome', text: 'Welcome to our app — let me show you around.' },
+    { scene: 'action', text: 'It only takes one click to get started.' },
+    { scene: 'done', text: "And that's it. You're all set.", voice: 'af_heart' },
+  ],
+  null,
+  2,
+) + '\n';
+
+const ARGO_CONFIG = `import { defineConfig } from 'argo';
+
+export default defineConfig({
+  baseURL: 'http://localhost:3000',
+  demosDir: 'demos/',
+  outputDir: 'videos/',
+  tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
+  video: { width: 2560, height: 1440, fps: 30 },
+  export: { preset: 'slow', crf: 16 },
+});
+`;
+
+export async function init(cwd: string = process.cwd()): Promise<void> {
+  const demosDir = join(cwd, 'demos');
+  await mkdir(demosDir, { recursive: true });
+
+  await writeIfMissing(join(demosDir, 'example.demo.ts'), EXAMPLE_DEMO);
+  await writeIfMissing(join(demosDir, 'example.voiceover.json'), EXAMPLE_VOICEOVER);
+  await writeIfMissing(join(cwd, 'argo.config.ts'), ARGO_CONFIG);
+
+  console.log('\nArgo initialized! Next steps:');
+  console.log('  1. Edit demos/example.demo.ts');
+  console.log('  2. Run: npx argo record example');
+  console.log('  3. Run: npx argo pipeline example');
 }

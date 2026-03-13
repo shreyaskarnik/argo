@@ -1,5 +1,6 @@
 // Argo — Playwright demo recording with AI voiceover
-// Public API exports will be added as modules are implemented.
+
+// Config
 export {
   defineConfig,
   loadConfig,
@@ -11,3 +12,18 @@ export {
   type VideoConfig,
   type ExportConfig,
 } from './config.js';
+
+// Fixtures
+export { test, expect, demoType } from './fixtures.js';
+
+// Narration
+export { NarrationTimeline } from './narration.js';
+
+// Captions
+export { showCaption, hideCaption, withCaption } from './captions.js';
+
+// TTS
+export { type TTSEngineOptions } from './tts/engine.js';
+
+// Init
+export { init } from './init.js';
