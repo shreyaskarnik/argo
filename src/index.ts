@@ -22,6 +22,18 @@ export { NarrationTimeline } from './narration.js';
 // Captions
 export { showCaption, hideCaption, withCaption } from './captions.js';
 
+// Overlays
+export {
+  showOverlay,
+  hideOverlay,
+  withOverlay,
+  type OverlayCue,
+  type OverlayManifestEntry,
+  type Zone,
+  type TemplateType,
+  type MotionPreset,
+} from './overlays/index.js';
+
 // TTS
 export { type TTSEngineOptions } from './tts/engine.js';
 
