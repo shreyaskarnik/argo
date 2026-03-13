@@ -38,7 +38,11 @@ export const test = base.extend<{ narration: NarrationTimeline }>({
     try {
       await use(timeline);
     } finally {
-      await timeline.flush(`narration-${testInfo.title}.json`);
+      const argoDir = process.env.ARGO_OUTPUT_DIR;
+      const outputPath = argoDir
+        ? `${argoDir}/.timing.json`
+        : `narration-${testInfo.title}.json`;
+      await timeline.flush(outputPath);
     }
   },
 });

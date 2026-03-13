@@ -25,10 +25,11 @@ describe('init', () => {
   it('creates example.demo.ts with correct content', async () => {
     await init(dir);
     const content = await readFile(join(dir, 'demos', 'example.demo.ts'), 'utf-8');
-    expect(content).toContain("import { test, demoType } from 'argo'");
-    expect(content).toContain('narration.showCaption');
-    expect(content).toContain('narration.withCaption');
-    expect(content).toContain("narration.mark('done')");
+    expect(content).toContain("import { test } from 'argo'");
+    expect(content).toContain("import { showCaption, withCaption } from 'argo'");
+    expect(content).toContain("narration.mark('welcome')");
+    expect(content).toContain('showCaption(page,');
+    expect(content).toContain('withCaption(page,');
   });
 
   it('creates example.voiceover.json with valid JSON array', async () => {
