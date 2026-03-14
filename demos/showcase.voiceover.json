@@ -1,27 +1,27 @@
 [
   {
     "scene": "hero",
-    "text": "Meet Argo — the tool that turns Playwright scripts into polished product demo videos, complete with AI voiceover.",
+    "text": "Meet Argo — the tool that turns Playwright scripts into polished product demo videos, complete with A.I. voiceover.",
     "speed": 0.9
   },
   {
     "scene": "how-it-works",
-    "text": "The workflow is simple. Write a demo script using the Playwright API you already know. Argo records the browser, then exports a finished video.",
+    "text": "The workflow is three steps. Write, record, export. Watch how Argo zooms into each step to guide your eye — that's the new camera language.",
     "speed": 0.9
   },
   {
     "scene": "features",
-    "text": "Add overlays like lower-thirds and headline cards. Argo generates voiceover narration from a simple JSON manifest.",
+    "text": "Overlays appear on screen while camera effects like dim-around highlight what matters. Overlays and camera work together, independently.",
     "speed": 0.9
   },
   {
     "scene": "code",
-    "text": "Your demo scripts are just Playwright tests with a few extra helpers. If you know Playwright, you already know Argo.",
+    "text": "A focus ring pulses around the code block. Spotlight, focus ring, dim-around, and zoom-to are all one-liners in your demo script.",
     "speed": 0.9
   },
   {
     "scene": "closing",
-    "text": "Overlays automatically detect your page background and adjust their colors for contrast. Dark page? Light overlay. Light page? Dark overlay. No extra config needed.",
+    "text": "Overlays auto-detect your page theme. Argo also generates subtitles, chapter markers, and a scene timing report alongside every video.",
     "speed": 0.9
   },
   {

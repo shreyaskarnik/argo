@@ -190,6 +190,8 @@ TTS runs locally via Kokoro — no API keys needed. Clips are content-addressed 
 
 The voiceover `text` is only spoken, never displayed — overlay text in the demo script is what viewers see. So you can spell words phonetically in the manifest to fix TTS pronunciation without affecting visuals.
 
+**Important:** Phonetic spellings are for voiceover manifest text only. Overlay text in demo scripts is visible to viewers, so always use normal human-facing spelling there.
+
 | Written | Phonetic for TTS |
 |---------|-----------------|
 | `SaaS` | `sass` |

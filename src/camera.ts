@@ -196,9 +196,16 @@ export async function dimAround(
         (s as HTMLElement).style.transition = `opacity ${fadeOut}ms ease-out`;
       });
       originals.forEach(({ el, opacity }) => {
-        el.style.opacity = opacity || '1';
+        el.style.opacity = opacity || '';
       });
-      setTimeout(() => marker.remove(), fadeOut);
+      // Fully restore original styles after fade-out completes
+      setTimeout(() => {
+        originals.forEach(({ el, opacity, transition }) => {
+          el.style.opacity = opacity;
+          el.style.transition = transition;
+        });
+        marker.remove();
+      }, fadeOut);
     }, duration);
   }, { selector, duration, fadeIn, fadeOut, dimOpacity, attr: CAMERA_ATTR }, duration + fadeOut, wait);
 }
@@ -219,36 +226,52 @@ export async function zoomTo(
     if (!target) return;
     const rect = target.getBoundingClientRect();
 
-    const doc = document.documentElement;
+    // Wrap page content in a zoom container so Argo overlays (which are
+    // direct children of body with position:fixed) are NOT affected.
+    const WRAPPER_ID = 'argo-zoom-wrapper';
+    let wrapper = document.getElementById(WRAPPER_ID);
+    if (!wrapper) {
+      wrapper = document.createElement('div');
+      wrapper.id = WRAPPER_ID;
+      wrapper.style.cssText = 'transform-origin: 0 0; will-change: transform;';
+      // Move all body children except Argo elements into the wrapper
+      const children = Array.from(document.body.children).filter(
+        c => !c.hasAttribute(attr) && !c.id?.startsWith('argo-zone-') && c.id !== WRAPPER_ID
+      );
+      children.forEach(c => wrapper!.appendChild(c));
+      document.body.insertBefore(wrapper, document.body.firstChild);
+    }
+
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
     const viewCenterX = window.innerWidth / 2;
     const viewCenterY = window.innerHeight / 2;
-
     const translateX = viewCenterX - centerX;
     const translateY = viewCenterY - centerY;
 
-    // Save original and mark for cleanup
+    // Mark for cleanup
     const marker = document.createElement('div');
     marker.setAttribute(attr, 'zoom-to');
     marker.style.display = 'none';
-    (marker as any).__zoomRestore = {
-      transform: doc.style.transform,
-      transformOrigin: doc.style.transformOrigin,
-      transition: doc.style.transition,
-    };
+    (marker as any).__zoomRestore = { wrapperId: WRAPPER_ID };
     document.body.appendChild(marker);
 
-    doc.style.transformOrigin = `${centerX}px ${centerY}px`;
-    doc.style.transition = `transform ${fadeIn}ms ease-out`;
-    doc.style.transform = `scale(${scale}) translate(${translateX / scale}px, ${translateY / scale}px)`;
+    wrapper.style.transformOrigin = `${centerX}px ${centerY}px`;
+    wrapper.style.transition = `transform ${fadeIn}ms ease-out`;
+    wrapper.style.transform = `scale(${scale}) translate(${translateX / scale}px, ${translateY / scale}px)`;
 
     setTimeout(() => {
-      doc.style.transition = `transform ${fadeOut}ms ease-out`;
-      doc.style.transform = '';
+      if (!wrapper) return;
+      wrapper.style.transition = `transform ${fadeOut}ms ease-out`;
+      wrapper.style.transform = '';
       setTimeout(() => {
-        doc.style.transformOrigin = '';
-        doc.style.transition = '';
+        // Unwrap: move children back to body and remove wrapper
+        const w = document.getElementById(WRAPPER_ID);
+        if (w) {
+          const kids = Array.from(w.children);
+          kids.forEach(c => document.body.insertBefore(c, w));
+          w.remove();
+        }
         marker.remove();
       }, fadeOut);
     }, duration);
@@ -265,10 +288,12 @@ export async function resetCamera(page: Page): Promise<void> {
         // Restore zoom-to transform
         if ((el as any).__zoomRestore) {
           const r = (el as any).__zoomRestore;
-          const doc = document.documentElement;
-          doc.style.transform = r.transform;
-          doc.style.transformOrigin = r.transformOrigin;
-          doc.style.transition = r.transition;
+          const w = document.getElementById(r.wrapperId);
+          if (w) {
+            const kids = Array.from(w.children);
+            kids.forEach(c => document.body.insertBefore(c, w));
+            w.remove();
+          }
         }
         el.remove();
       });
