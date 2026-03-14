@@ -58,7 +58,9 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 
 - Order: TTS → Record → Align → Export (not Record first)
 - `argo tts generate` takes a file path (`demos/name.voiceover.json`), not a bare demo name
-- `argo record/export/pipeline` take bare demo names (e.g., `argo pipeline example`)
+- `argo record/export/pipeline/validate` take bare demo names (e.g., `argo pipeline example`)
+- `argo validate <demo>` checks scene name consistency between script, voiceover, and overlay manifests (no TTS/recording)
+- `--base-url <url>` flag on `record` and `pipeline` overrides `config.baseURL`
 - README config/CLI/API snippets must stay in sync with code changes (check after modifying config schema, CLI options, or scaffold templates)
 - Demo names are validated at the CLI boundary: only `[a-zA-Z0-9][a-zA-Z0-9_-]*` allowed. This prevents path traversal — maintain this validation if adding new commands that accept demo names.
 - `tts generate` derives demoName via `basename()` from the manifest path — do not use `/`-only regex (breaks on Windows paths)
@@ -110,9 +112,9 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 
 ## Known Issues
 
-- `demoType(page, selector, text)` takes a CSS selector, not a label — users expect `getByLabel` semantics. Consider accepting a Locator directly.
+- ~~`demoType` selector gotcha~~ — FIXED: `demoType(page, selectorOrLocator, text)` now accepts a CSS selector string or a Playwright Locator directly.
 - `deviceScaleFactor: 2` is broken with webkit — viewport renders at 1/4 of the frame. Stick to `deviceScaleFactor: 1` until fixed.
-- `argo init` scaffolds `argo.config.js` which causes Node ESM warnings in projects without `"type": "module"`. Should scaffold `.mjs` by default.
+- ~~`argo init` ESM warnings~~ — FIXED: now scaffolds `argo.config.mjs` with `defineConfig()`.
 
 ## Security Invariants
 

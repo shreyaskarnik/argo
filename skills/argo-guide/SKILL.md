@@ -93,7 +93,7 @@ test('my-demo', async ({ page, narration }) => {
 | `showOverlay(page, scene, cue, durationMs)` | Show overlay for N ms, then auto-remove. |
 | `withOverlay(page, scene, cue, action)` | Show overlay during an async action, auto-remove when done (even on throw). |
 | `hideOverlay(page, zone?)` | Manually remove overlay from a zone (or all zones). |
-| `demoType(page, selector, text, delay?)` | Type text character-by-character (60ms default delay) for a realistic typing effect. **Gotcha**: `selector` is a CSS selector (e.g., `'input[type="email"]'`), not a label string. Use `page.getByLabel('Email').click()` first to focus, then `demoType(page, 'input[type="email"]', ...)`. |
+| `demoType(page, selectorOrLocator, text, delay?)` | Type text character-by-character (60ms default delay). Accepts a CSS selector string OR a Playwright Locator: `demoType(page, page.getByLabel('Email'), 'test@example.com')`. |
 | `showConfetti(page, opts?)` | Burst confetti animation for mic-drop moments. **Non-blocking by default** — fires the animation and returns immediately, safe to call without `await`. Options: `duration` (3000ms), `pieces` (150), `spread` (`'burst'` / `'rain'`), `colors` (hex array), `fadeOut` (800ms), `wait` (false). Set `wait: true` to block until animation completes. |
 | `page.waitForTimeout(ms)` | Add deliberate pauses for pacing. |
 
@@ -211,7 +211,7 @@ The voiceover `text` is only spoken, never displayed — overlay text in the dem
 
 ## Configuration
 
-File: `argo.config.js` (or `.ts` / `.mjs`) — ES module default export.
+File: `argo.config.mjs` (use `.mjs` to avoid ESM warnings in non-module projects).
 
 ```javascript
 import { defineConfig } from '@argo-video/cli';
@@ -226,7 +226,7 @@ export default defineConfig({
     height: 1080,
     fps: 30,
     browser: 'webkit',        // webkit > firefox > chromium on macOS for video quality
-    deviceScaleFactor: 2,     // 2x resolution capture, downscaled with lanczos on export
+    // deviceScaleFactor: 2,  // 2x capture + lanczos downscale (known issue with webkit)
   },
   export: {
     preset: 'slow',           // ffmpeg preset: slower = smaller file
@@ -234,7 +234,8 @@ export default defineConfig({
     thumbnailPath: 'assets/logo-thumb.png',  // optional MP4 cover art (PNG)
   },
   overlays: {
-    autoBackground: false,    // set true for global auto-theme detection
+    autoBackground: true,     // auto-detect dark/light page for overlay contrast
+    // defaultPlacement: 'top-right',  // default zone when cue omits placement
   },
 });
 ```
@@ -263,6 +264,12 @@ Use `.mjs` for the config file in projects without `"type": "module"` in their `
 ```bash
 npx argo pipeline <name>              # e.g., npx argo pipeline showcase
 npx argo pipeline <name> --browser webkit  # override browser
+npx argo pipeline <name> --base-url http://localhost:4000  # override baseURL
+```
+
+### Validate (dry run, no TTS/recording)
+```bash
+npx argo validate <name>    # checks scene name consistency across script + manifests
 ```
 
 ### Individual steps (for debugging)
@@ -272,7 +279,7 @@ npx argo tts generate demos/<name>.voiceover.json
 
 # Step 2: Record — takes a bare demo name
 npx argo record <name>
-npx argo record <name> --browser webkit
+npx argo record <name> --browser webkit --base-url http://localhost:4000
 
 # Step 3+4: Export (align + encode) — takes a bare demo name
 npx argo export <name>
@@ -280,7 +287,7 @@ npx argo export <name>
 
 ### Scaffold
 ```bash
-npx argo init    # creates example demo, config, playwright config
+npx argo init    # creates example demo, config (.mjs), playwright config
 ```
 
 ### Pipeline order

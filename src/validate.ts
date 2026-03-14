@@ -25,8 +25,8 @@ export function validateDemo(options: ValidateOptions): ValidateResult {
 
   const scriptContent = readFileSync(scriptPath, 'utf-8');
 
-  // Check import
-  if (!scriptContent.includes("from '@argo-video/cli'")) {
+  // Check import (single or double quotes)
+  if (!scriptContent.includes("@argo-video/cli")) {
     errors.push(
       `Demo script does not import from '@argo-video/cli'. ` +
       `Use: import { test } from '@argo-video/cli'`

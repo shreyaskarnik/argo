@@ -116,17 +116,27 @@ Each `scene` in the manifest maps to a `narration.mark()` call in the script. Ar
 
 ## Configuration
 
-### `argo.config.js`
+### `argo.config.mjs`
 
 ```js
-export default {
+import { defineConfig } from '@argo-video/cli';
+
+export default defineConfig({
   baseURL: 'http://localhost:3000',
-  demosDir: 'demos/',
-  outputDir: 'videos/',
+  demosDir: 'demos',
+  outputDir: 'videos',
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
-  video: { width: 1920, height: 1080, fps: 30, browser: 'chromium', deviceScaleFactor: 1 },
-  export: { preset: 'slow', crf: 16, thumbnailPath: 'assets/logo-thumb.png' },
-};
+  video: {
+    width: 1920, height: 1080, fps: 30,
+    browser: 'webkit',           // webkit > firefox > chromium on macOS
+    // deviceScaleFactor: 2,     // enable after webkit 2x fix
+  },
+  export: { preset: 'slow', crf: 16 },
+  overlays: {
+    autoBackground: true,
+    // defaultPlacement: 'top-right',
+  },
+});
 ```
 
 > **Tip:** Use `browser: 'webkit'` for sharper video on macOS. Chromium has a [known video capture quality issue](https://github.com/microsoft/playwright/issues/31424). Set `deviceScaleFactor: 2` for retina-quality recordings (captured at 2x, downscaled with lanczos in export).
@@ -137,7 +147,7 @@ Argo scaffolds this for you via `argo init`. The key settings:
 
 ```ts
 import { defineConfig } from '@playwright/test';
-import config from './argo.config.js';
+import config from './argo.config.mjs';
 
 const scale = Math.max(1, Math.round(config.video?.deviceScaleFactor ?? 1));
 const width = config.video?.width ?? 1920;
@@ -168,10 +178,12 @@ argo record <demo>                 Record browser session
 argo tts generate <manifest>       Generate TTS clips from manifest
 argo export <demo>                 Merge video + audio to MP4
 argo pipeline <demo>               Run all steps end-to-end
+argo validate <demo>               Check scene name consistency (no TTS/recording)
 argo --config <path> <command>     Use a custom config file
 
 Options:
   --browser <engine>               chromium | webkit | firefox (overrides config)
+  --base-url <url>                 Override baseURL from config
 ```
 
 ## API
@@ -190,7 +202,7 @@ import { defineConfig, demosProject } from '@argo-video/cli';
 |--------|-------------|
 | `test` | Playwright `test` with `narration` fixture injected |
 | `expect` | Re-exported from Playwright |
-| `demoType(page, selector, text, delay?)` | Type text character-by-character (cinematic) |
+| `demoType(page, selectorOrLocator, text, delay?)` | Type character-by-character — accepts CSS selector or Playwright Locator |
 | `showOverlay(page, scene, cue, durationMs)` | Show a templated overlay (lower-third, headline-card, callout, image-card) |
 | `withOverlay(page, scene, cue, action)` | Show overlay during an async action |
 | `hideOverlay(page, zone?)` | Remove overlay from a zone |
