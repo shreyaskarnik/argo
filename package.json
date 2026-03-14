@@ -1,6 +1,6 @@
 {
   "name": "@argo-video/cli",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Turn Playwright demo scripts into polished product demo videos with AI voiceover",
   "type": "module",
   "main": "./dist/index.js",
