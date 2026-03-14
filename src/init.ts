@@ -78,7 +78,7 @@ const ARGO_CONFIG = `export default {
 const PLAYWRIGHT_CONFIG = `import { defineConfig } from '@playwright/test';
 import config from './argo.config.js';
 
-const scale = config.video?.deviceScaleFactor ?? 1;
+const scale = Math.max(1, Math.round(config.video?.deviceScaleFactor ?? 1));
 const width = config.video?.width ?? 1920;
 const height = config.video?.height ?? 1080;
 

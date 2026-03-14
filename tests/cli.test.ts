@@ -98,9 +98,17 @@ describe('CLI', () => {
       await run('export', 'onboarding');
 
       expect(mockedLoadConfig).toHaveBeenCalledWith(process.cwd(), undefined);
-      expect(mockedExportVideo).toHaveBeenCalledWith(
-        expect.objectContaining({ demoName: 'onboarding' }),
-      );
+      expect(mockedExportVideo).toHaveBeenCalledWith({
+        demoName: 'onboarding',
+        argoDir: '.argo',
+        outputDir: 'videos',
+        preset: 'slow',
+        crf: 16,
+        fps: 30,
+        outputWidth: 1920,
+        outputHeight: 1080,
+        deviceScaleFactor: 1,
+      });
     });
   });
 

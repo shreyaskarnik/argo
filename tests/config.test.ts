@@ -49,6 +49,14 @@ describe('defineConfig', () => {
     expect(config.video.fps).toBe(30);
   });
 
+  it('normalizes deviceScaleFactor to a positive integer', () => {
+    const rounded = defineConfig({ video: { deviceScaleFactor: 1.6 } });
+    const clamped = defineConfig({ video: { deviceScaleFactor: 0.4 } });
+
+    expect(rounded.video.deviceScaleFactor).toBe(2);
+    expect(clamped.video.deviceScaleFactor).toBe(1);
+  });
+
   it('deep-merges nested export config', () => {
     const config = defineConfig({ export: { crf: 23 } });
     expect(config.export.preset).toBe('slow');
@@ -89,6 +97,26 @@ describe('demosProject', () => {
   it('uses a custom demosDir as testDir', () => {
     const project = demosProject({ baseURL: 'http://localhost:4000', demosDir: 'my-demos' });
     expect(project.testDir).toBe('my-demos');
+  });
+
+  it('normalizes scale and applies custom browser and capture size', () => {
+    const project = demosProject({
+      baseURL: 'http://localhost:4000',
+      browser: 'webkit',
+      deviceScaleFactor: 1.6,
+      video: { width: 1440, height: 900 },
+    });
+
+    expect(project.use).toEqual({
+      browserName: 'webkit',
+      baseURL: 'http://localhost:4000',
+      viewport: { width: 1440, height: 900 },
+      deviceScaleFactor: 2,
+      video: {
+        mode: 'on',
+        size: { width: 2880, height: 1800 },
+      },
+    });
   });
 });
 

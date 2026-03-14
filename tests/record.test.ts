@@ -84,4 +84,34 @@ describe('record', () => {
       expect.any(Function),
     );
   });
+
+  it('normalizes deviceScaleFactor in generated Playwright config', async () => {
+    execFileMock.mockImplementation((_cmd, _args, options, callback) => {
+      const testResultsDir = resolve(tempDir, 'test-results');
+      const argoOutputDir = options.env.ARGO_OUTPUT_DIR as string;
+
+      mkdirSync(join(testResultsDir, 'demo-run'), { recursive: true });
+      writeFileSync(join(testResultsDir, 'demo-run', 'video.webm'), 'video');
+      mkdirSync(resolve(tempDir, argoOutputDir), { recursive: true });
+      writeFileSync(resolve(tempDir, argoOutputDir, '.timing.json'), '{}');
+
+      callback(null, '', '');
+      return {} as never;
+    });
+
+    await record('demo', {
+      demosDir: 'custom-demos',
+      baseURL: 'http://localhost:4321',
+      video: { width: 1280, height: 720 },
+      browser: 'webkit',
+      deviceScaleFactor: 1.6,
+    });
+
+    const configPath = join(tempDir, '.argo', 'demo', 'playwright.record.config.mjs');
+    const config = readFileSync(configPath, 'utf-8');
+
+    expect(config).toContain("browserName: \"webkit\"");
+    expect(config).toContain('deviceScaleFactor: 2');
+    expect(config).toContain('size: { width: 2560, height: 1440 }');
+  });
 });

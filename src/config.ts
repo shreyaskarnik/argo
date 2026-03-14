@@ -63,12 +63,23 @@ const DEFAULTS: ArgoConfig = {
 
 // ---- Functions ----
 
+export function normalizeDeviceScaleFactor(rawScale?: number): number {
+  const scale = typeof rawScale === 'number' && Number.isFinite(rawScale) ? rawScale : 1;
+  return Math.max(1, Math.round(scale));
+}
+
 export function defineConfig(userConfig: UserConfig): ArgoConfig {
+  const video = {
+    ...DEFAULTS.video,
+    ...userConfig.video,
+  };
+  video.deviceScaleFactor = normalizeDeviceScaleFactor(video.deviceScaleFactor);
+
   return {
     ...DEFAULTS,
     ...userConfig,
     tts: { ...DEFAULTS.tts, ...userConfig.tts },
-    video: { ...DEFAULTS.video, ...userConfig.video },
+    video,
     export: { ...DEFAULTS.export, ...userConfig.export },
     overlays: { ...DEFAULTS.overlays, ...userConfig.overlays },
   };
@@ -81,7 +92,7 @@ export function demosProject(options: {
   deviceScaleFactor?: number;
   video?: { width: number; height: number };
 }) {
-  const scale = options.deviceScaleFactor ?? 1;
+  const scale = normalizeDeviceScaleFactor(options.deviceScaleFactor);
   const width = options.video?.width ?? 1920;
   const height = options.video?.height ?? 1080;
   return {

@@ -61,6 +61,17 @@ describe('init', () => {
     expect(content).toContain('baseURL');
   });
 
+  it('creates playwright.config.ts wired to argo.config.js quality settings', async () => {
+    await init(dir);
+    const content = await readFile(join(dir, 'playwright.config.ts'), 'utf-8');
+
+    expect(content).toContain("import config from './argo.config.js'");
+    expect(content).toContain('Math.max(1, Math.round(config.video?.deviceScaleFactor ?? 1))');
+    expect(content).toContain("browserName: config.video?.browser ?? 'chromium'");
+    expect(content).toContain('deviceScaleFactor: scale');
+    expect(content).toContain('size: { width: width * scale, height: height * scale }');
+  });
+
   it('does NOT overwrite existing files', async () => {
     await mkdir(join(dir, 'demos'), { recursive: true });
     await writeFile(join(dir, 'demos', 'example.demo.ts'), 'existing content');

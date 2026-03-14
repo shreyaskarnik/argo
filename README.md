@@ -17,7 +17,7 @@ Write a demo script with Playwright. Add a voiceover manifest. Run one command. 
 
 ## Showcase
 
-[Watch the demo video](https://gist.github.com/user-attachments/assets/f808ff36-6175-4771-93c5-6d2448074e2a)
+[Watch the demo video](https://gist.github.com/user-attachments/assets/1344780c-75e4-40fc-ab4a-c9e546f8c2ea)
 
 > *This demo was recorded by Argo, using Argo. Yes, really.*
 
@@ -136,7 +136,7 @@ Argo scaffolds this for you via `argo init`. The key settings:
 import { defineConfig } from '@playwright/test';
 import config from './argo.config.js';
 
-const scale = config.video?.deviceScaleFactor ?? 1;
+const scale = Math.max(1, Math.round(config.video?.deviceScaleFactor ?? 1));
 const width = config.video?.width ?? 1920;
 const height = config.video?.height ?? 1080;
 

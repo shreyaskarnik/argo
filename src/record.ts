@@ -3,7 +3,7 @@ import { mkdirSync, readdirSync, copyFileSync, existsSync, rmSync, writeFileSync
 import path from 'node:path';
 import { startAssetServer, type AssetServer } from './asset-server.js';
 import { loadOverlayManifest, hasImageAssets } from './overlays/manifest.js';
-import type { BrowserEngine } from './config.js';
+import { normalizeDeviceScaleFactor, type BrowserEngine } from './config.js';
 
 export interface RecordOptions {
   demosDir: string;
@@ -34,8 +34,7 @@ function createPlaywrightConfig(options: RecordOptions, outputDir: string): stri
   const demosDir = path.resolve(options.demosDir);
   const { width, height } = options.video;
   const browser = options.browser ?? 'chromium';
-  const rawScale = options.deviceScaleFactor ?? 1;
-  const deviceScaleFactor = Math.max(1, Math.round(rawScale));
+  const deviceScaleFactor = normalizeDeviceScaleFactor(options.deviceScaleFactor);
 
   // When using a non-default scale factor, record at the scaled resolution
   // so Playwright captures every physical pixel. The export step will
