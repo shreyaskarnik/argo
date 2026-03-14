@@ -2,6 +2,8 @@
  * TTS Engine interface and WAV utilities for Argo.
  */
 
+import * as childProcess from 'node:child_process';
+
 export interface TTSEngineOptions {
   voice?: string;
   speed?: number;
@@ -110,6 +112,12 @@ export function parseWavHeader(wav: Buffer): WavHeader {
     throw new Error('No data chunk found in WAV file');
   }
 
+  // When ffmpeg pipes WAV to stdout, it can't seek back to write the final
+  // data size, so it writes 0xFFFFFFFF. Use actual buffer length instead.
+  if (dataSize === 0xFFFFFFFF || dataSize > wav.length - dataOffset) {
+    dataSize = wav.length - dataOffset;
+  }
+
   const bytesPerSample = bitsPerSample / 8;
   const totalSamples = dataSize / (bytesPerSample * numChannels);
   const durationMs = (totalSamples / sampleRate) * 1000;
@@ -130,7 +138,7 @@ export function parseWavHeader(wav: Buffer): WavHeader {
  * (mono, Float32, 24kHz) using ffmpeg.
  */
 export function convertToWav(audioBuffer: Buffer): Buffer {
-  const { execFileSync } = require('node:child_process');
+  const { execFileSync } = childProcess;
   const result = execFileSync('ffmpeg', [
     '-i', 'pipe:0',
     '-f', 'wav',
