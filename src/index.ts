@@ -37,6 +37,19 @@ export {
 // Effects
 export { showConfetti, type ConfettiOptions } from './effects.js';
 
+// Camera
+export {
+  spotlight,
+  focusRing,
+  dimAround,
+  zoomTo,
+  resetCamera,
+  type SpotlightOptions,
+  type FocusRingOptions,
+  type DimAroundOptions,
+  type ZoomToOptions,
+} from './camera.js';
+
 // TTS
 export { type TTSEngineOptions } from './tts/engine.js';
 
