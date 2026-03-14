@@ -25,6 +25,7 @@ Argo turns Playwright demo scripts into polished product demo videos with AI voi
 ## Git Conventions
 
 - `demos/` directory is gitignored — use `git add -f demos/<file>` for demo source files
+- `videos/` directory is also gitignored — use `git add -f videos/<file>` for tracked video artifacts
 - GPG signing may fail in CLI environments — use `git -c commit.gpgsign=false commit` if needed
 
 ## Architecture
@@ -34,7 +35,7 @@ The system is a 4-step pipeline: **TTS → Record → Align → Export**
 - **TTS** (`src/tts/`): Generates voice clips from JSON manifests using Kokoro TTS. Clips are content-addressed cached (SHA256 of scene+text+voice+speed) in `.argo/<demo>/clips/`.
 - **Record** (`src/record.ts`): Runs Playwright demo script, captures video (WebM) and timing marks (`.timing.json`). Generates a dynamic Playwright config on-the-fly.
 - **Align** (`src/tts/align.ts`): Places audio clips at scene timestamps from timing data. Prevents overlap with 100ms gaps. Mixes into single WAV (Float32, 24kHz).
-- **Export** (`src/export.ts`): Merges video + aligned audio via ffmpeg into final MP4.
+- **Export** (`src/export.ts`): Merges video + aligned audio via ffmpeg into final MP4. Supports optional MP4 thumbnail embedding via `export.thumbnailPath` config (ffmpeg attached_pic stream). CRITICAL: `-shortest` must be skipped when thumbnail is present — PNG has 0 duration and truncates the entire output.
 
 Pipeline orchestration: `src/pipeline.ts` → CLI entry: `src/cli.ts` (Commander.js)
 
@@ -53,6 +54,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - Order: TTS → Record → Align → Export (not Record first)
 - `argo tts generate` takes a file path (`demos/name.voiceover.json`), not a bare demo name
 - `argo record/export/pipeline` take bare demo names (e.g., `argo pipeline example`)
+- README config/CLI/API snippets must stay in sync with code changes (check after modifying config schema, CLI options, or scaffold templates)
 
 ## Demo Authoring
 
@@ -61,7 +63,8 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - Overlay manifests: `demos/<name>.overlays.json`
 - TTS engine: Kokoro (local, no API keys). Voices: `af_heart` (female default), `am_michael` (male)
 - Long demos need `test.setTimeout()` — Playwright default is 30s
-- Browser default is `chromium`. Use `--browser webkit` for sharper video — Chromium has a known issue with video capture quality (see [playwright#31424](https://github.com/microsoft/playwright/issues/31424)). WebKit uses native macOS text rendering and produces noticeably better output.
+- Showcase demo (`demos/showcase.demo.ts`) requires a local HTTP server serving `demos/`: `python3 -m http.server 8976 --directory demos` then `BASE_URL=http://127.0.0.1:8976 npx tsx bin/argo.js pipeline showcase --browser webkit`
+- Browser default is `chromium`. Video quality ranking on macOS: **webkit > firefox > chromium**. Chromium has a known video capture quality issue (see [playwright#31424](https://github.com/microsoft/playwright/issues/31424)). Use `--browser webkit` for best results.
 - `deviceScaleFactor: 2` captures at 2x resolution; export downscales with lanczos. Value is rounded to integer (min 1).
 
 ## Scene Durations & Dynamic Timing
@@ -81,3 +84,10 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - Uses `elementsFromPoint()` at zone coordinates, skipping `position: fixed/sticky` elements (e.g., navbars)
 - Dark background → light overlay theme; light background → dark overlay theme
 - Enable per-cue (`autoBackground: true` on overlay options) or globally via `overlays.autoBackground` in config
+
+## Thumbnail
+
+- `export.thumbnailPath` in config points to a PNG embedded as MP4 cover art
+- Generator script: `scripts/generate_logo_thumbnail.py` (requires Pillow)
+- Source mark: `assets/logo-mark-source.png` — cropped ASCII art only (no text)
+- Regenerate: `python3 scripts/generate_logo_thumbnail.py` → writes `assets/logo-thumb.png`
