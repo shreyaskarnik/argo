@@ -64,22 +64,38 @@ A demo is two files: a **script** and a **voiceover manifest**.
 
 ```ts
 import { test } from '@argo-video/cli';
-import { showCaption, withCaption } from '@argo-video/cli';
+import { showOverlay, withOverlay } from '@argo-video/cli';
 
 test('my-feature', async ({ page, narration }) => {
   await page.goto('/');
 
   narration.mark('intro');
-  await showCaption(page, 'intro', 'Welcome to our product', 3000);
+  await showOverlay(page, 'intro', {
+    type: 'lower-third',
+    text: 'Welcome to our product',
+    placement: 'bottom-center',
+    motion: 'fade-in',
+    autoBackground: true,
+  }, narration.durationFor('intro'));
 
   narration.mark('action');
-  await withCaption(page, 'action', 'Watch this', async () => {
+  await withOverlay(page, 'action', {
+    type: 'headline-card',
+    title: 'Watch this',
+    placement: 'top-right',
+    motion: 'slide-in',
+  }, async () => {
     await page.click('#get-started');
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(narration.durationFor('action'));
   });
 
   narration.mark('done');
-  await showCaption(page, 'done', 'That\'s it!', 2000);
+  await showOverlay(page, 'done', {
+    type: 'callout',
+    text: "That's it!",
+    placement: 'top-left',
+    motion: 'fade-in',
+  }, narration.durationFor('done'));
 });
 ```
 
@@ -105,10 +121,12 @@ export default {
   demosDir: 'demos/',
   outputDir: 'videos/',
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
-  video: { width: 1920, height: 1080, fps: 30 },
+  video: { width: 1920, height: 1080, fps: 30, browser: 'chromium', deviceScaleFactor: 1 },
   export: { preset: 'slow', crf: 16 },
 };
 ```
+
+> **Tip:** Use `browser: 'webkit'` for sharper video on macOS. Chromium has a [known video capture quality issue](https://github.com/microsoft/playwright/issues/31424). Set `deviceScaleFactor: 2` for retina-quality recordings (captured at 2x, downscaled with lanczos in export).
 
 ### `playwright.config.ts`
 
@@ -116,6 +134,11 @@ Argo scaffolds this for you via `argo init`. The key settings:
 
 ```ts
 import { defineConfig } from '@playwright/test';
+import config from './argo.config.js';
+
+const scale = config.video?.deviceScaleFactor ?? 1;
+const width = config.video?.width ?? 1920;
+const height = config.video?.height ?? 1080;
 
 export default defineConfig({
   preserveOutput: 'always',
@@ -124,9 +147,11 @@ export default defineConfig({
     testDir: 'demos',
     testMatch: '**/*.demo.ts',
     use: {
-      baseURL: process.env.BASE_URL || 'http://localhost:3000',
-      viewport: { width: 1920, height: 1080 },
-      video: { mode: 'on', size: { width: 1920, height: 1080 } },
+      browserName: config.video?.browser ?? 'chromium',
+      baseURL: process.env.BASE_URL || config.baseURL || 'http://localhost:3000',
+      viewport: { width, height },
+      deviceScaleFactor: scale,
+      video: { mode: 'on', size: { width: width * scale, height: height * scale } },
     },
   }],
 });
@@ -141,6 +166,9 @@ argo tts generate <manifest>       Generate TTS clips from manifest
 argo export <demo>                 Merge video + audio to MP4
 argo pipeline <demo>               Run all steps end-to-end
 argo --config <path> <command>     Use a custom config file
+
+Options:
+  --browser <engine>               chromium | webkit | firefox (overrides config)
 ```
 
 ## API
@@ -149,6 +177,7 @@ Argo exports Playwright fixtures and helpers for use in demo scripts:
 
 ```ts
 import { test, expect, demoType } from '@argo-video/cli';
+import { showOverlay, hideOverlay, withOverlay } from '@argo-video/cli';
 import { showCaption, hideCaption, withCaption } from '@argo-video/cli';
 import { defineConfig, demosProject } from '@argo-video/cli';
 ```
@@ -158,9 +187,14 @@ import { defineConfig, demosProject } from '@argo-video/cli';
 | `test` | Playwright `test` with `narration` fixture injected |
 | `expect` | Re-exported from Playwright |
 | `demoType(page, selector, text, delay?)` | Type text character-by-character (cinematic) |
-| `showCaption(page, scene, text, durationMs)` | Show a caption overlay for a duration |
+| `showOverlay(page, scene, cue, durationMs)` | Show a templated overlay (lower-third, headline-card, callout, image-card) |
+| `withOverlay(page, scene, cue, action)` | Show overlay during an async action |
+| `hideOverlay(page, zone?)` | Remove overlay from a zone |
+| `showCaption(page, scene, text, durationMs)` | Show a simple text caption |
 | `withCaption(page, scene, text, action)` | Show caption during an async action |
-| `hideCaption(page)` | Remove caption overlay |
+| `hideCaption(page)` | Remove caption |
+| `narration.mark(scene)` | Record a scene timestamp |
+| `narration.durationFor(scene, opts?)` | Compute hold duration from TTS clip length |
 | `defineConfig(userConfig)` | Create config with defaults |
 | `demosProject(options)` | Create Playwright project entry |
 
