@@ -183,6 +183,27 @@ File: `demos/<name>.voiceover.json` — JSON array of entries.
 
 TTS runs locally via Kokoro — no API keys needed. Clips are content-addressed cached in `.argo/<demo>/clips/` by SHA256 of `{scene, text, voice, speed}`. Clear the cache (`rm -rf .argo/<demo>/clips`) if voiceover text changes and stale clips persist.
 
+### Phonetic Spelling for TTS Pronunciation
+
+The voiceover `text` is only spoken, never displayed — overlay text in the demo script is what viewers see. So you can spell words phonetically in the manifest to fix TTS pronunciation without affecting visuals.
+
+| Written | Phonetic for TTS |
+|---------|-----------------|
+| `SaaS` | `sass` |
+| `PostgreSQL` | `post-gress Q L` |
+| `OAuth` | `oh-auth` |
+| `API` | `A P I` |
+| `kubectl` | `cube control` |
+| `nginx` | `engine X` |
+| `CI/CD` | `C I C D` |
+| `.env` | `dot env` |
+
+**Patterns:**
+1. **Acronyms** — spell out with spaces: `CI/CD` → `C I C D`
+2. **Portmanteaus** — hyphenate syllables: `Kubernetes` → `koo-ber-net-eez`
+3. **Elongated letters** — reduce repeated chars: `IaaS` → `ee-ass`
+4. **Silent/odd spellings** — write how it sounds: `sudo` → `sue-doo`
+
 ---
 
 ## Configuration
