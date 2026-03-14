@@ -30,6 +30,7 @@ export interface ExportConfig {
 
 export interface OverlayConfig {
   autoBackground: boolean;
+  defaultPlacement?: 'bottom-center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
 }
 
 export interface ArgoConfig {

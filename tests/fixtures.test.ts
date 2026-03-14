@@ -71,4 +71,15 @@ describe('demoType', () => {
 
     expect(pressSequentially).toHaveBeenCalledWith('hello', { delay: 120 });
   });
+
+  it('accepts a Locator object directly', async () => {
+    const pressSequentially = vi.fn().mockResolvedValue(undefined);
+    const locatorObj = { pressSequentially };
+    const page = { locator: vi.fn() } as any;
+
+    await demoType(page, locatorObj as any, 'hello');
+
+    expect(page.locator).not.toHaveBeenCalled();
+    expect(pressSequentially).toHaveBeenCalledWith('hello', { delay: 60 });
+  });
 });

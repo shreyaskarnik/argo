@@ -26,10 +26,11 @@ describe('init', () => {
     await init(dir);
     const content = await readFile(join(dir, 'demos', 'example.demo.ts'), 'utf-8');
     expect(content).toContain("import { test } from '@argo-video/cli'");
-    expect(content).toContain("import { showCaption, withCaption } from '@argo-video/cli'");
+    expect(content).toContain("import { showOverlay, withOverlay } from '@argo-video/cli'");
     expect(content).toContain("narration.mark('welcome')");
-    expect(content).toContain('showCaption(page,');
-    expect(content).toContain('withCaption(page,');
+    expect(content).toContain('showOverlay(page,');
+    expect(content).toContain('withOverlay(page,');
+    expect(content).toContain('narration.durationFor(');
   });
 
   it('creates example.voiceover.json with valid JSON array', async () => {
@@ -54,18 +55,21 @@ describe('init', () => {
     expect(parsed[1].placement).toBe('top-left');
   });
 
-  it('creates argo.config.js with config', async () => {
+  it('creates argo.config.mjs with defineConfig and comments', async () => {
     await init(dir);
-    const content = await readFile(join(dir, 'argo.config.js'), 'utf-8');
-    expect(content).toContain('export default');
+    const content = await readFile(join(dir, 'argo.config.mjs'), 'utf-8');
+    expect(content).toContain("import { defineConfig } from '@argo-video/cli'");
+    expect(content).toContain('export default defineConfig(');
     expect(content).toContain('baseURL');
+    expect(content).toContain('// deviceScaleFactor: 2,');
+    expect(content).toContain('autoBackground: true');
   });
 
-  it('creates playwright.config.ts wired to argo.config.js quality settings', async () => {
+  it('creates playwright.config.ts wired to argo.config.mjs', async () => {
     await init(dir);
     const content = await readFile(join(dir, 'playwright.config.ts'), 'utf-8');
 
-    expect(content).toContain("import config from './argo.config.js'");
+    expect(content).toContain("import config from './argo.config.mjs'");
     expect(content).toContain('Math.max(1, Math.round(config.video?.deviceScaleFactor ?? 1))');
     expect(content).toContain("browserName: config.video?.browser ?? 'chromium'");
     expect(content).toContain('deviceScaleFactor: scale');
@@ -75,14 +79,14 @@ describe('init', () => {
   it('does NOT overwrite existing files', async () => {
     await mkdir(join(dir, 'demos'), { recursive: true });
     await writeFile(join(dir, 'demos', 'example.demo.ts'), 'existing content');
-    await writeFile(join(dir, 'argo.config.js'), 'existing config');
+    await writeFile(join(dir, 'argo.config.mjs'), 'existing config');
 
     await init(dir);
 
     const demo = await readFile(join(dir, 'demos', 'example.demo.ts'), 'utf-8');
     expect(demo).toBe('existing content');
 
-    const config = await readFile(join(dir, 'argo.config.js'), 'utf-8');
+    const config = await readFile(join(dir, 'argo.config.mjs'), 'utf-8');
     expect(config).toBe('existing config');
   });
 });

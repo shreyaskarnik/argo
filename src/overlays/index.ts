@@ -13,6 +13,14 @@ function getConfigAutoBackground(): boolean {
   return process.env.ARGO_AUTO_BACKGROUND === '1';
 }
 
+function getConfigDefaultPlacement(): Zone | undefined {
+  const val = process.env.ARGO_DEFAULT_PLACEMENT;
+  if (val && ['bottom-center', 'top-left', 'top-right', 'bottom-left', 'bottom-right', 'center'].includes(val)) {
+    return val as Zone;
+  }
+  return undefined;
+}
+
 async function resolveTheme(
   page: Page,
   cue: OverlayCue,
@@ -31,7 +39,7 @@ export async function showOverlay(
   durationMs: number,
   options?: { autoBackground?: boolean },
 ): Promise<void> {
-  const zone: Zone = cue.placement ?? 'bottom-center';
+  const zone: Zone = cue.placement ?? getConfigDefaultPlacement() ?? 'bottom-center';
   const motion = cue.motion ?? 'none';
   const theme = await resolveTheme(page, cue, zone, options?.autoBackground);
   const { contentHtml, styles } = renderTemplate(cue, theme);
@@ -58,7 +66,7 @@ export async function withOverlay(
   action: () => Promise<void>,
   options?: { autoBackground?: boolean },
 ): Promise<void> {
-  const zone: Zone = cue.placement ?? 'bottom-center';
+  const zone: Zone = cue.placement ?? getConfigDefaultPlacement() ?? 'bottom-center';
   const motion = cue.motion ?? 'none';
   const theme = await resolveTheme(page, cue, zone, options?.autoBackground);
   const { contentHtml, styles } = renderTemplate(cue, theme);

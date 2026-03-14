@@ -6,6 +6,7 @@ import { generateClips } from './tts/generate.js';
 import { exportVideo } from './export.js';
 import { runPipeline } from './pipeline.js';
 import { init } from './init.js';
+import { validateDemo } from './validate.js';
 
 function validateDemoName(name: string): string {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(name)) {
@@ -36,20 +37,24 @@ export function createProgram(): Command {
     .command('record <demo>')
     .description('Record a demo using Playwright')
     .addOption(new Option('--browser <engine>', 'browser engine').choices(['chromium', 'webkit', 'firefox']))
-    .action(async (demo: string, cmdOpts: { browser?: string }) => {
+    .option('--base-url <url>', 'override baseURL from config')
+    .action(async (demo: string, cmdOpts: { browser?: string; baseUrl?: string }) => {
       validateDemoName(demo);
       const configPath = program.opts().config;
       const config = await loadConfig(process.cwd(), configPath);
-      if (!config.baseURL) {
-        throw new Error('baseURL is required but not set. Set it in argo.config.js or pass --config.');
+      const baseURL = cmdOpts.baseUrl ?? config.baseURL;
+      if (!baseURL) {
+        throw new Error('baseURL is required but not set. Set it in argo.config.js, pass --config, or use --base-url.');
       }
       const browser = (cmdOpts.browser as BrowserEngine) ?? config.video.browser;
       await record(demo, {
         demosDir: config.demosDir,
-        baseURL: config.baseURL,
+        baseURL,
         video: { width: config.video.width, height: config.video.height },
         browser,
         deviceScaleFactor: config.video.deviceScaleFactor,
+        autoBackground: config.overlays?.autoBackground,
+        defaultPlacement: config.overlays?.defaultPlacement,
       });
     });
 
@@ -97,14 +102,44 @@ export function createProgram(): Command {
     .command('pipeline <demo>')
     .description('Run the full pipeline: TTS → record → export')
     .addOption(new Option('--browser <engine>', 'browser engine').choices(['chromium', 'webkit', 'firefox']))
-    .action(async (demo: string, cmdOpts: { browser?: string }) => {
+    .option('--base-url <url>', 'override baseURL from config')
+    .action(async (demo: string, cmdOpts: { browser?: string; baseUrl?: string }) => {
       validateDemoName(demo);
       const configPath = program.opts().config;
       const loaded = await ensureTTSEngine(await loadConfig(process.cwd(), configPath));
-      const config = cmdOpts.browser
+      let config = cmdOpts.browser
         ? { ...loaded, video: { ...loaded.video, browser: cmdOpts.browser as BrowserEngine } }
         : loaded;
+      if (cmdOpts.baseUrl) {
+        config = { ...config, baseURL: cmdOpts.baseUrl };
+      }
       await runPipeline(demo, config);
+    });
+
+  program
+    .command('validate <demo>')
+    .description('Validate demo script and manifests without running the pipeline')
+    .action(async (demo: string) => {
+      validateDemoName(demo);
+      const configPath = program.opts().config;
+      const config = await loadConfig(process.cwd(), configPath);
+      const result = validateDemo({ demoName: demo, demosDir: config.demosDir });
+
+      for (const err of result.errors) {
+        console.error(`  ERROR: ${err}`);
+      }
+      for (const warn of result.warnings) {
+        console.warn(`  WARN: ${warn}`);
+      }
+
+      if (result.errors.length === 0 && result.warnings.length === 0) {
+        console.log(`  ${demo}: all checks passed`);
+      } else if (result.errors.length === 0) {
+        console.log(`\n  ${demo}: passed with ${result.warnings.length} warning(s)`);
+      } else {
+        console.error(`\n  ${demo}: ${result.errors.length} error(s), ${result.warnings.length} warning(s)`);
+        process.exitCode = 1;
+      }
     });
 
   program

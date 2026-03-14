@@ -25,11 +25,14 @@ export function createNarrationFixture(factory: TimelineFactory = defaultFactory
 
 export async function demoType(
   page: Page,
-  selector: string,
+  selectorOrLocator: string | { pressSequentially: (text: string, options?: { delay?: number }) => Promise<void> },
   text: string,
   delay = 60,
 ): Promise<void> {
-  await page.locator(selector).pressSequentially(text, { delay });
+  const locator = typeof selectorOrLocator === 'string'
+    ? page.locator(selectorOrLocator)
+    : selectorOrLocator;
+  await locator.pressSequentially(text, { delay });
 }
 
 function loadSceneDurations(): Record<string, number> | undefined {

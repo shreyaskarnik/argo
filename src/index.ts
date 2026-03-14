@@ -40,5 +40,8 @@ export { showConfetti, type ConfettiOptions } from './effects.js';
 // TTS
 export { type TTSEngineOptions } from './tts/engine.js';
 
+// Validate
+export { validateDemo, type ValidateOptions, type ValidateResult } from './validate.js';
+
 // Init
 export { init } from './init.js';

@@ -50,7 +50,7 @@ export async function runPipeline(
   const argoDir = join('.argo', demoName);
 
   // Step 1: Generate TTS clips
-  console.log('Step 1/4: Generating TTS clips...');
+  console.log('★ Brewing voiceover clips...');
   const clipResults = await generateClips({
     manifestPath: `${config.demosDir}/${demoName}.voiceover.json`,
     demoName,
@@ -75,7 +75,7 @@ export async function runPipeline(
   writeFileSync(sceneDurationsPath, JSON.stringify(sceneDurations, null, 2), 'utf-8');
 
   // Step 2: Record browser demo
-  console.log('Step 2/4: Recording browser demo...');
+  console.log('★ Rolling camera...');
   const { timingPath } = await record(demoName, {
     demosDir: config.demosDir,
     baseURL: config.baseURL,
@@ -83,10 +83,11 @@ export async function runPipeline(
     browser: config.video.browser,
     deviceScaleFactor: config.video.deviceScaleFactor,
     autoBackground: config.overlays.autoBackground,
+    defaultPlacement: config.overlays.defaultPlacement,
   });
 
   // Step 3: Align clips with timing
-  console.log('Step 3/4: Aligning narration with video...');
+  console.log('★ Mixing the soundtrack...');
   let timing: SceneTiming;
   try {
     timing = JSON.parse(readFileSync(timingPath, 'utf-8'));
@@ -132,7 +133,7 @@ export async function runPipeline(
   }
 
   // Step 4: Export final video
-  console.log('Step 4/4: Exporting final video...');
+  console.log('★ Cutting the final take...');
   const exportOptions: Parameters<typeof exportVideo>[0] = {
     demoName,
     argoDir: '.argo',
@@ -148,6 +149,6 @@ export async function runPipeline(
   if (tailPadMs !== undefined) exportOptions.tailPadMs = tailPadMs;
   const outputPath = await exportVideo(exportOptions);
 
-  console.log(`Done! Video saved to: ${outputPath}`);
+  console.log(`✓ That's a wrap! Video saved to: ${outputPath}`);
   return outputPath;
 }

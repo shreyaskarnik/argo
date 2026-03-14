@@ -12,6 +12,7 @@ export interface RecordOptions {
   browser?: BrowserEngine;
   deviceScaleFactor?: number;
   autoBackground?: boolean;
+  defaultPlacement?: string;
 }
 
 export interface RecordResult {
@@ -108,6 +109,7 @@ export async function record(demoName: string, options: RecordOptions): Promise<
           BASE_URL: options.baseURL,
           ARGO_ASSET_URL: assetServer?.url ?? '',
           ARGO_AUTO_BACKGROUND: options.autoBackground ? '1' : '',
+          ARGO_DEFAULT_PLACEMENT: options.defaultPlacement ?? '',
           ARGO_SCENE_DURATIONS_PATH: path.resolve(path.join('.argo', demoName, '.scene-durations.json')),
         },
       }, (error, stdout, stderr) => {

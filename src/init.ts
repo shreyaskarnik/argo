@@ -17,21 +17,38 @@ async function writeIfMissing(filePath: string, content: string): Promise<boolea
 }
 
 const EXAMPLE_DEMO = `import { test } from '@argo-video/cli';
-import { showCaption, withCaption } from '@argo-video/cli';
+import { showOverlay, withOverlay } from '@argo-video/cli';
 
 test('example', async ({ page, narration }) => {
   await page.goto('/');
 
   narration.mark('welcome');
-  await showCaption(page, 'welcome', 'Welcome to our app', 3000);
+  await showOverlay(page, 'welcome', {
+    type: 'lower-third',
+    text: 'Welcome to our app',
+    motion: 'fade-in',
+    autoBackground: true,
+  }, narration.durationFor('welcome'));
 
   narration.mark('action');
-  await withCaption(page, 'action', 'Watch how easy it is', async () => {
+  await withOverlay(page, 'action', {
+    type: 'headline-card',
+    title: 'Watch this',
+    placement: 'top-right',
+    motion: 'slide-in',
+    autoBackground: true,
+  }, async () => {
     await page.click('button');
+    await page.waitForTimeout(narration.durationFor('action'));
   });
 
   narration.mark('done');
-  await showCaption(page, 'done', 'All done!', 2000);
+  await showOverlay(page, 'done', {
+    type: 'callout',
+    text: 'All done!',
+    motion: 'fade-in',
+    autoBackground: true,
+  }, narration.durationFor('done'));
 });
 `;
 
@@ -65,18 +82,36 @@ const EXAMPLE_OVERLAYS = JSON.stringify(
   2,
 ) + '\n';
 
-const ARGO_CONFIG = `export default {
+const ARGO_CONFIG = `import { defineConfig } from '@argo-video/cli';
+
+export default defineConfig({
   baseURL: 'http://localhost:3000',
-  demosDir: 'demos/',
-  outputDir: 'videos/',
-  tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
-  video: { width: 1920, height: 1080, fps: 30, browser: 'chromium', deviceScaleFactor: 1 },
-  export: { preset: 'slow', crf: 16, thumbnailPath: 'assets/logo-thumb.png' },
-};
+  demosDir: 'demos',
+  outputDir: 'videos',
+  tts: {
+    defaultVoice: 'af_heart',
+    defaultSpeed: 1.0,
+  },
+  video: {
+    width: 1920,
+    height: 1080,
+    fps: 30,
+    browser: 'webkit',         // webkit > firefox > chromium for video quality on macOS
+    // deviceScaleFactor: 2,   // 2x capture + lanczos downscale (known issue with webkit — enable after fix)
+  },
+  export: {
+    preset: 'slow',            // slower = smaller file, higher quality
+    crf: 16,                   // 16-28 range (lower = higher quality)
+  },
+  overlays: {
+    autoBackground: true,      // auto-detect dark/light page for overlay contrast
+    // defaultPlacement: 'top-right',  // default zone when cue omits placement
+  },
+});
 `;
 
 const PLAYWRIGHT_CONFIG = `import { defineConfig } from '@playwright/test';
-import config from './argo.config.js';
+import config from './argo.config.mjs';
 
 const scale = Math.max(1, Math.round(config.video?.deviceScaleFactor ?? 1));
 const width = config.video?.width ?? 1920;
@@ -111,7 +146,7 @@ export async function init(cwd: string = process.cwd()): Promise<void> {
   await writeIfMissing(join(demosDir, 'example.demo.ts'), EXAMPLE_DEMO);
   await writeIfMissing(join(demosDir, 'example.voiceover.json'), EXAMPLE_VOICEOVER);
   await writeIfMissing(join(demosDir, 'example.overlays.json'), EXAMPLE_OVERLAYS);
-  await writeIfMissing(join(cwd, 'argo.config.js'), ARGO_CONFIG);
+  await writeIfMissing(join(cwd, 'argo.config.mjs'), ARGO_CONFIG);
   await writeIfMissing(join(cwd, 'playwright.config.ts'), PLAYWRIGHT_CONFIG);
 
   console.log('\nArgo initialized! Next steps:');
