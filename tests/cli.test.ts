@@ -44,7 +44,7 @@ const defaultConfig = {
   demosDir: 'demos',
   outputDir: 'videos',
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
-  video: { width: 1920, height: 1080, fps: 30 },
+  video: { width: 1920, height: 1080, fps: 30, browser: 'chromium', deviceScaleFactor: 1 },
   export: { preset: 'slow', crf: 16 },
 };
 

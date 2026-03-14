@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { loadConfig, type ArgoConfig } from './config.js';
+import { loadConfig, type ArgoConfig, type BrowserEngine } from './config.js';
 import { record } from './record.js';
 import { generateClips } from './tts/generate.js';
 import { exportVideo } from './export.js';
@@ -25,16 +25,20 @@ export function createProgram(): Command {
   program
     .command('record <demo>')
     .description('Record a demo using Playwright')
-    .action(async (demo: string) => {
+    .option('--browser <engine>', 'browser engine: chromium, webkit, or firefox')
+    .action(async (demo: string, cmdOpts: { browser?: string }) => {
       const configPath = program.opts().config;
       const config = await loadConfig(process.cwd(), configPath);
       if (!config.baseURL) {
         throw new Error('baseURL is required but not set. Set it in argo.config.js or pass --config.');
       }
+      const browser = (cmdOpts.browser as BrowserEngine) ?? config.video.browser;
       await record(demo, {
         demosDir: config.demosDir,
         baseURL: config.baseURL,
         video: { width: config.video.width, height: config.video.height },
+        browser,
+        deviceScaleFactor: config.video.deviceScaleFactor,
       });
     });
 
@@ -76,9 +80,13 @@ export function createProgram(): Command {
   program
     .command('pipeline <demo>')
     .description('Run the full pipeline: TTS → record → export')
-    .action(async (demo: string) => {
+    .option('--browser <engine>', 'browser engine: chromium, webkit, or firefox')
+    .action(async (demo: string, cmdOpts: { browser?: string }) => {
       const configPath = program.opts().config;
       const config = await ensureTTSEngine(await loadConfig(process.cwd(), configPath));
+      if (cmdOpts.browser) {
+        config.video.browser = cmdOpts.browser as BrowserEngine;
+      }
       await runPipeline(demo, config);
     });
 

@@ -10,6 +10,12 @@ export interface ExportOptions {
   crf?: number;
   fps?: number;
   tailPadMs?: number;
+  /** Logical output width (e.g. 1920). Used with deviceScaleFactor for downscaling. */
+  outputWidth?: number;
+  /** Logical output height (e.g. 1080). Used with deviceScaleFactor for downscaling. */
+  outputHeight?: number;
+  /** When > 1, recording was captured at scaled resolution and needs lanczos downscale. */
+  deviceScaleFactor?: number;
 }
 
 function formatSeconds(ms: number): string {
@@ -46,6 +52,9 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     crf = 16,
     fps,
     tailPadMs,
+    outputWidth,
+    outputHeight,
+    deviceScaleFactor = 1,
   } = options;
 
   checkFfmpeg();
@@ -72,11 +81,16 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     '-i', audioPath,
   ];
 
+  // Build video filter chain
+  const vFilters: string[] = [];
   if (tailPadMs && tailPadMs > 0) {
-    args.push(
-      '-vf',
-      `tpad=stop_mode=clone:stop_duration=${formatSeconds(tailPadMs)}`,
-    );
+    vFilters.push(`tpad=stop_mode=clone:stop_duration=${formatSeconds(tailPadMs)}`);
+  }
+  if (deviceScaleFactor > 1 && outputWidth && outputHeight) {
+    vFilters.push(`scale=${outputWidth}:${outputHeight}:flags=lanczos`);
+  }
+  if (vFilters.length > 0) {
+    args.push('-vf', vFilters.join(','));
   }
 
   args.push(

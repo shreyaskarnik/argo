@@ -12,10 +12,14 @@ export interface TTSConfig {
   engine?: TTSEngine;
 }
 
+export type BrowserEngine = 'chromium' | 'webkit' | 'firefox';
+
 export interface VideoConfig {
   width: number;
   height: number;
   fps: number;
+  browser: BrowserEngine;
+  deviceScaleFactor: number;
 }
 
 export interface ExportConfig {
@@ -52,7 +56,7 @@ const DEFAULTS: ArgoConfig = {
   demosDir: 'demos',
   outputDir: 'videos',
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
-  video: { width: 1920, height: 1080, fps: 30 },
+  video: { width: 1920, height: 1080, fps: 30, browser: 'chromium' as BrowserEngine, deviceScaleFactor: 1 },
   export: { preset: 'slow', crf: 16 },
   overlays: { autoBackground: false },
 };

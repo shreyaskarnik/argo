@@ -3,11 +3,14 @@ import { mkdirSync, readdirSync, copyFileSync, existsSync, rmSync, writeFileSync
 import path from 'node:path';
 import { startAssetServer, type AssetServer } from './asset-server.js';
 import { loadOverlayManifest, hasImageAssets } from './overlays/manifest.js';
+import type { BrowserEngine } from './config.js';
 
 export interface RecordOptions {
   demosDir: string;
   baseURL: string;
   video: { width: number; height: number };
+  browser?: BrowserEngine;
+  deviceScaleFactor?: number;
   autoBackground?: boolean;
 }
 
@@ -30,6 +33,14 @@ function findVideoInResults(testResultsDir: string): string | undefined {
 function createPlaywrightConfig(options: RecordOptions, outputDir: string): string {
   const demosDir = path.resolve(options.demosDir);
   const { width, height } = options.video;
+  const browser = options.browser ?? 'chromium';
+  const deviceScaleFactor = options.deviceScaleFactor ?? 1;
+
+  // When using a non-default scale factor, record at the scaled resolution
+  // so Playwright captures every physical pixel. The export step will
+  // downscale back to the logical resolution with a high-quality filter.
+  const captureWidth = width * deviceScaleFactor;
+  const captureHeight = height * deviceScaleFactor;
 
   return `import { defineConfig } from '@playwright/test';
 
@@ -42,11 +53,13 @@ export default defineConfig({
       testDir: ${JSON.stringify(demosDir)},
       testMatch: '**/*.demo.ts',
       use: {
+        browserName: ${JSON.stringify(browser)},
         baseURL: ${JSON.stringify(options.baseURL)},
         viewport: { width: ${width}, height: ${height} },
+        deviceScaleFactor: ${deviceScaleFactor},
         video: {
           mode: 'on',
-          size: { width: ${width}, height: ${height} },
+          size: { width: ${captureWidth}, height: ${captureHeight} },
         },
       },
     },
