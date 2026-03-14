@@ -1,0 +1,23 @@
+[
+  {
+    "scene": "hero",
+    "text": "Meet Argo — the tool that turns Playwright scripts into polished product demo videos, complete with A I voiceover.",
+    "speed": 0.95
+  },
+  {
+    "scene": "how-it-works",
+    "text": "The workflow is simple. Write a demo script using the Playwright A P I you already know. Argo records the browser, then exports a finished video.",
+    "speed": 0.95
+  },
+  {
+    "scene": "features",
+    "text": "Add overlays like lower-thirds and headline cards. Argo generates voiceover narration from a simple JSON manifest.",
+    "speed": 0.95
+  },
+  {
+    "scene": "closing",
+    "text": "Get started in seconds. Install Argo, run init, and you're ready to record your first demo.",
+    "voice": "am_michael",
+    "speed": 0.9
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "name": "argo-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "python3 -m http.server 8080",
+    "demo": "npx argo pipeline hello-world",
+    "demo:validate": "npx argo validate hello-world"
+  },
+  "devDependencies": {
+    "@argo-video/cli": "latest",
+    "@playwright/test": "^1.50.0",
+    "playwright": "^1.50.0"
+  }
+}

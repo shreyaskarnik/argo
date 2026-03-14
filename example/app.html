@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920" />
+  <title>Argo — Turn Playwright scripts into polished demo videos</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0a0a0a;
+      --bg-card: #111111;
+      --bg-card-hover: #161616;
+      --border: #1f1f1f;
+      --border-accent: #2a2a2a;
+      --text: #e0e0e0;
+      --text-muted: #888888;
+      --text-dim: #555555;
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.15);
+      --accent-teal: #06b6d4;
+      --terminal-bg: #000000;
+      --terminal-green: #4ade80;
+      --terminal-white: #f0f0f0;
+      --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', 'Cascadia Code', 'Consolas', 'Monaco', monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    }
+
+    :root.light {
+      --bg: #f5f5f5;
+      --bg-card: #ffffff;
+      --bg-card-hover: #fafafa;
+      --border: #e0e0e0;
+      --border-accent: #d0d0d0;
+      --text: #1a1a1a;
+      --text-muted: #666666;
+      --text-dim: #999999;
+      --terminal-bg: #ffffff;
+      --terminal-green: #16a34a;
+      --terminal-white: #1a1a1a;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      font-size: 16px;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ─── NAVIGATION ─── */
+
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 80px;
+      background: rgba(10, 10, 10, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      font-family: var(--font-mono);
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 48px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      letter-spacing: 0.04em;
+      transition: color 0.2s ease;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+    }
+
+    /* ─── HERO ─── */
+
+    #hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 120px 80px 80px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #hero::before {
+      content: '';
+      position: absolute;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(ellipse, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    #hero::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border-accent), transparent);
+    }
+
+    .hero-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--accent);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+      opacity: 0.9;
+    }
+
+    .hero-title {
+      font-size: 8rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      margin-bottom: 32px;
+      background: linear-gradient(135deg, #ffffff 30%, #a0a0a0 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-tagline {
+      font-size: 1.5rem;
+      color: var(--text-muted);
+      max-width: 700px;
+      margin-bottom: 60px;
+      line-height: 1.5;
+      font-weight: 400;
+    }
+
+    .hero-tagline strong {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .terminal-box {
+      background: var(--terminal-bg);
+      border: 1px solid #1e1e1e;
+      border-radius: 10px;
+      padding: 0;
+      width: 560px;
+      margin-bottom: 56px;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.03),
+        0 20px 60px rgba(0,0,0,0.6),
+        0 0 40px rgba(59, 130, 246, 0.04);
+      overflow: hidden;
+    }
+
+    .terminal-bar {
+      background: #111111;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid #1a1a1a;
+    }
+
+    .terminal-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .terminal-dot.red   { background: #ff5f57; }
+    .terminal-dot.yellow { background: #ffbd2e; }
+    .terminal-dot.green { background: #28c840; }
+
+    .terminal-label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      margin-left: auto;
+      letter-spacing: 0.04em;
+    }
+
+    .terminal-body {
+      padding: 24px 28px;
+      text-align: left;
+    }
+
+    .terminal-line {
+      font-family: var(--font-mono);
+      font-size: 1.05rem;
+      color: var(--terminal-white);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .terminal-prompt {
+      color: var(--terminal-green);
+      user-select: none;
+    }
+
+    .terminal-cmd {
+      color: var(--terminal-white);
+    }
+
+    .terminal-cmd .cmd-name {
+      color: var(--accent-teal);
+    }
+
+    .terminal-cmd .cmd-sub {
+      color: #a78bfa;
+    }
+
+    .terminal-cmd .cmd-arg {
+      color: var(--terminal-green);
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1.1em;
+      background: var(--terminal-green);
+      vertical-align: middle;
+      margin-left: 2px;
+      animation: blink 1.1s step-end infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0; }
+    }
+
+    .hero-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--accent);
+      color: #ffffff;
+      text-decoration: none;
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 16px 40px;
+      border-radius: 8px;
+      letter-spacing: 0.01em;
+      transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+      box-shadow: 0 0 0 0 var(--accent-glow);
+    }
+
+    .hero-cta:hover {
+      background: #2563eb;
+      box-shadow: 0 0 30px rgba(59, 130, 246, 0.35);
+      transform: translateY(-1px);
+    }
+
+    .hero-cta svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    /* ─── SECTION SHARED ─── */
+
+    section {
+      padding: 120px 80px;
+      position: relative;
+    }
+
+    .section-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--accent);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: 3rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      margin-bottom: 20px;
+      line-height: 1.1;
+    }
+
+    .section-subtitle {
+      font-size: 1.125rem;
+      color: var(--text-muted);
+      max-width: 560px;
+      line-height: 1.6;
+      margin-bottom: 80px;
+    }
+
+    /* ─── HOW IT WORKS ─── */
+
+    #how-it-works {
+      background: var(--bg);
+    }
+
+    #how-it-works::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border-accent), transparent);
+    }
+
+    .steps-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 2px;
+      background: var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .step {
+      background: var(--bg-card);
+      padding: 64px 56px;
+      position: relative;
+    }
+
+    .step-number {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      letter-spacing: 0.1em;
+      margin-bottom: 24px;
+    }
+
+    .step-icon {
+      font-size: 3rem;
+      margin-bottom: 24px;
+      display: block;
+    }
+
+    .step-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .step-desc {
+      font-size: 1rem;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    .step-connector {
+      position: absolute;
+      right: -20px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 10;
+      width: 40px;
+      height: 40px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-accent);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-size: 1rem;
+    }
+
+    /* ─── FEATURES ─── */
+
+    #features {
+      background: var(--bg);
+    }
+
+    #features::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border-accent), transparent);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 24px;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 48px 44px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.25s ease, background 0.25s ease;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-teal));
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+
+    .feature-card:hover {
+      border-color: var(--border-accent);
+      background: var(--bg-card-hover);
+    }
+
+    .feature-card:hover::before {
+      opacity: 1;
+    }
+
+    .feature-icon-wrap {
+      width: 52px;
+      height: 52px;
+      background: var(--accent-glow);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 28px;
+      font-size: 1.4rem;
+    }
+
+    .feature-name {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 14px;
+      letter-spacing: -0.02em;
+    }
+
+    .feature-desc {
+      font-size: 0.975rem;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    .feature-tag {
+      display: inline-block;
+      margin-top: 28px;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--accent);
+      background: var(--accent-glow);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      padding: 4px 12px;
+      border-radius: 4px;
+      letter-spacing: 0.06em;
+    }
+
+    /* ─── CODE EXAMPLE ─── */
+
+    #code-example {
+      background: var(--bg);
+    }
+
+    #code-example::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border-accent), transparent);
+    }
+
+    .code-wrap {
+      background: #080808;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.02),
+        0 40px 80px rgba(0,0,0,0.5);
+    }
+
+    .code-bar {
+      background: #0e0e0e;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .code-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .code-dot.red    { background: #ff5f57; }
+    .code-dot.yellow { background: #ffbd2e; }
+    .code-dot.green  { background: #28c840; }
+
+    .code-filename {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-left: 12px;
+    }
+
+    .code-body {
+      padding: 40px 48px;
+      overflow-x: auto;
+    }
+
+    pre {
+      margin: 0;
+    }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 1rem;
+      line-height: 1.8;
+      display: block;
+    }
+
+    /* syntax colors */
+    .syn-kw     { color: #a78bfa; }   /* keyword: import, from, async, await, const */
+    .syn-fn     { color: #60a5fa; }   /* function names */
+    .syn-str    { color: #4ade80; }   /* strings */
+    .syn-num    { color: #fb923c; }   /* numbers */
+    .syn-obj    { color: #f0f0f0; }   /* plain identifiers */
+    .syn-prop   { color: #93c5fd; }   /* property names */
+    .syn-cmt    { color: #4b5563; font-style: italic; }  /* comments */
+    .syn-punc   { color: #6b7280; }   /* punctuation/brackets */
+    .syn-pkg    { color: #34d399; }   /* package paths */
+
+    /* ─── FOOTER ─── */
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 48px 80px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .footer-logo {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .footer-copy {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 32px;
+      list-style: none;
+    }
+
+    .footer-links a {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    .footer-links a:hover {
+      color: var(--text-muted);
+    }
+
+    /* ─── THEME TOGGLE ─── */
+
+    .theme-toggle {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      line-height: 1;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--border-accent);
+      color: var(--text);
+    }
+
+    .theme-toggle .icon-sun { display: none; }
+    .theme-toggle .icon-moon { display: inline; }
+    :root.light .theme-toggle .icon-sun { display: inline; }
+    :root.light .theme-toggle .icon-moon { display: none; }
+
+    :root.light .hero-title {
+      background: linear-gradient(135deg, #1a1a1a 30%, #555 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+
+    :root.light .code-wrap { background: #f8f8f8; }
+    :root.light .code-bar { background: #f0f0f0; }
+    :root.light .syn-obj { color: #1a1a1a; }
+    :root.light .syn-punc { color: #888; }
+
+    /* smooth transitions for theme switch */
+    body, nav, section, .step, .feature-card, .terminal-box,
+    .code-wrap, .code-bar, footer, .theme-toggle {
+      transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a href="#hero" class="nav-logo">argo</a>
+    <ul class="nav-links">
+      <li><a href="#how-it-works">How it works</a></li>
+      <li><a href="#features">Features</a></li>
+      <li><a href="#code-example">Code</a></li>
+    </ul>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle light/dark theme">
+      <span class="icon-moon">&#9790;</span>
+      <span class="icon-sun">&#9788;</span>
+    </button>
+    <script>
+      document.getElementById('theme-toggle').addEventListener('click', () => {
+        document.documentElement.classList.toggle('light');
+      });
+    </script>
+  </nav>
+
+  <!-- ─── HERO ─── -->
+  <section id="hero">
+    <p class="hero-eyebrow">
+      <svg class="playwright-logo" width="24" height="24" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-right: 8px;">
+        <path d="M136.444 221.556C123.558 225.213 115.104 231.625 109.535 238.032C114.869 233.364 122.014 229.08 131.652 226.348C141.51 223.554 149.92 223.574 156.869 224.915V219.481C150.941 218.939 144.145 219.371 136.444 221.556ZM108.946 175.876L61.0895 188.484C61.0895 188.484 61.9617 189.716 63.5767 191.36L104.153 180.668C104.153 180.668 103.578 188.077 98.5847 194.705C108.03 187.559 108.946 175.876 108.946 175.876ZM149.005 288.347C81.6582 306.486 46.0272 228.438 35.2396 187.928C30.2556 169.229 28.0799 155.067 27.5 145.928C27.4377 144.979 27.4665 144.179 27.5336 143.446C24.04 143.657 22.3674 145.473 22.7077 150.721C23.2876 159.855 25.4633 174.016 30.4473 192.721C41.2301 233.225 76.8659 311.273 144.213 293.134C158.872 289.185 169.885 281.992 178.152 272.81C170.532 279.692 160.995 285.112 149.005 288.347ZM161.661 128.11V132.903H188.077C187.535 131.206 186.989 129.677 186.447 128.11H161.661Z" fill="#2D4552"/>
+        <path d="M193.981 167.584C205.861 170.958 212.144 179.287 215.465 186.658L228.711 190.42C228.711 190.42 226.904 164.623 203.57 157.995C181.741 151.793 168.308 170.124 166.674 172.496C173.024 167.972 182.297 164.268 193.981 167.584ZM299.422 186.777C277.573 180.547 264.145 198.916 262.535 201.255C268.89 196.736 278.158 193.031 289.837 196.362C301.698 199.741 307.976 208.06 311.307 215.436L324.572 219.212C324.572 219.212 322.736 193.41 299.422 186.777ZM286.262 254.795L176.072 223.99C176.072 223.99 177.265 230.038 181.842 237.869L274.617 263.805C282.255 259.386 286.262 254.795 286.262 254.795ZM209.867 321.102C122.618 297.71 133.166 186.543 147.284 133.865C153.097 112.156 159.073 96.0203 164.029 85.204C161.072 84.5953 158.623 86.1529 156.203 91.0746C150.941 101.747 144.212 119.124 137.7 143.45C123.586 196.127 113.038 307.29 200.283 330.682C241.406 341.699 273.442 324.955 297.323 298.659C274.655 319.19 245.714 330.701 209.867 321.102Z" fill="#2D4552"/>
+        <path d="M161.661 262.296V239.863L99.3324 257.537C99.3324 257.537 103.938 230.777 136.444 221.556C146.302 218.762 154.713 218.781 161.661 220.123V128.11H192.869C189.471 117.61 186.184 109.526 183.423 103.909C178.856 94.612 174.174 100.775 163.545 109.665C156.059 115.919 137.139 129.261 108.668 136.933C80.1966 144.61 57.179 142.574 47.5752 140.911C33.9601 138.562 26.8387 135.572 27.5049 145.928C28.0847 155.062 30.2605 169.224 35.2445 187.928C46.0272 228.433 81.663 306.481 149.01 288.342C166.602 283.602 179.019 274.233 187.626 262.291H161.661V262.296ZM61.0848 188.484L108.946 175.876C108.946 175.876 107.551 194.288 89.6087 199.018C71.6614 203.743 61.0848 188.484 61.0848 188.484Z" fill="#E2574C"/>
+        <path d="M341.786 129.174C329.345 131.355 299.498 134.072 262.612 124.185C225.716 114.304 201.236 97.0224 191.537 88.8994C177.788 77.3834 171.74 69.3802 165.788 81.4857C160.526 92.163 153.797 109.54 147.284 133.866C133.171 186.543 122.623 297.706 209.867 321.098C297.093 344.47 343.53 242.92 357.644 190.238C364.157 165.917 367.013 147.5 367.799 135.625C368.695 122.173 359.455 126.078 341.786 129.174ZM166.497 172.756C166.497 172.756 180.246 151.372 203.565 158C226.899 164.628 228.706 190.425 228.706 190.425L166.497 172.756ZM223.42 268.713C182.403 256.698 176.077 223.99 176.077 223.99L286.262 254.796C286.262 254.791 264.021 280.578 223.42 268.713ZM262.377 201.495C262.377 201.495 276.107 180.126 299.422 186.773C322.736 193.411 324.572 219.208 324.572 219.208L262.377 201.495Z" fill="#2EAD33"/>
+        <path d="M139.88 246.04L99.3324 257.532C99.3324 257.532 103.737 232.44 133.607 222.496L110.647 136.33L108.663 136.933C80.1918 144.611 57.1742 142.574 47.5704 140.911C33.9554 138.563 26.834 135.572 27.5001 145.929C28.08 155.063 30.2557 169.224 35.2397 187.929C46.0225 228.433 81.6583 306.481 149.005 288.342L150.989 287.719L139.88 246.04ZM61.0848 188.485L108.946 175.876C108.946 175.876 107.551 194.288 89.6087 199.018C71.6615 203.743 61.0848 188.485 61.0848 188.485Z" fill="#D65348"/>
+        <path d="M225.27 269.163L223.415 268.712C182.398 256.698 176.072 223.99 176.072 223.99L232.89 239.872L262.971 124.281L262.607 124.185C225.711 114.304 201.232 97.0224 191.532 88.8994C177.783 77.3834 171.735 69.3802 165.783 81.4857C160.526 92.163 153.797 109.54 147.284 133.866C133.171 186.543 122.623 297.706 209.867 321.097L211.655 321.5L225.27 269.163ZM166.497 172.756C166.497 172.756 180.246 151.372 203.565 158C226.899 164.628 228.706 190.425 228.706 190.425L166.497 172.756Z" fill="#1D8D22"/>
+        <path d="M141.946 245.451L131.072 248.537C133.641 263.019 138.169 276.917 145.276 289.195C146.513 288.922 147.74 288.687 149 288.342C152.302 287.451 155.364 286.348 158.312 285.145C150.371 273.361 145.118 259.789 141.946 245.451ZM137.7 143.451C132.112 164.307 127.113 194.326 128.489 224.436C130.952 223.367 133.554 222.371 136.444 221.551L138.457 221.101C136.003 188.939 141.308 156.165 147.284 133.866C148.799 128.225 150.318 122.978 151.832 118.085C149.393 119.637 146.767 121.228 143.776 122.867C141.759 129.093 139.722 135.898 137.7 143.451Z" fill="#C04B41"/>
+      </svg>
+      Playwright &rarr; Demo Video
+    </p>
+    <h1 class="hero-title">Argo</h1>
+    <p class="hero-tagline">
+      Turn <strong>Playwright scripts</strong> into polished demo videos
+      with <strong>AI voiceover</strong>.
+      <br><span style="color: var(--text-muted); font-size: 0.85em;">Powered by Kokoro TTS</span>
+    </p>
+
+    <div class="terminal-box">
+      <div class="terminal-bar">
+        <span class="terminal-dot red"></span>
+        <span class="terminal-dot yellow"></span>
+        <span class="terminal-dot green"></span>
+        <span class="terminal-label">terminal</span>
+      </div>
+      <div class="terminal-body">
+        <div class="terminal-line">
+          <span class="terminal-prompt">$</span>
+          <span class="terminal-cmd">
+            <span class="cmd-name">npx</span>
+            <span> </span>
+            <span class="cmd-sub">@argo-video/cli</span>
+            <span> </span>
+            <span class="cmd-sub">pipeline</span>
+            <span> </span>
+            <span class="cmd-arg">my-demo</span>
+          </span>
+          <span class="cursor"></span>
+        </div>
+      </div>
+    </div>
+
+    <a href="#features" class="hero-cta">
+      Get Started
+      <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4 10h12M10 4l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+  </section>
+
+  <!-- ─── HOW IT WORKS ─── -->
+  <section id="how-it-works">
+    <div class="section-inner">
+      <p class="section-label">The process</p>
+      <h2 class="section-title">Three steps. One command.</h2>
+      <p class="section-subtitle">
+        Argo turns your existing Playwright tests into cinematic product demos — no screen-recording software required.
+      </p>
+
+      <div class="steps-grid">
+        <div class="step">
+          <p class="step-number">01 &mdash; WRITE</p>
+          <span class="step-icon">&#9998;&#65039;</span>
+          <h3 class="step-title">
+            <svg width="20" height="20" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-right: 6px;">
+              <path d="M161.661 262.296V239.863L99.3324 257.537C99.3324 257.537 103.938 230.777 136.444 221.556C146.302 218.762 154.713 218.781 161.661 220.123V128.11H192.869C189.471 117.61 186.184 109.526 183.423 103.909C178.856 94.612 174.174 100.775 163.545 109.665C156.059 115.919 137.139 129.261 108.668 136.933C80.1966 144.61 57.179 142.574 47.5752 140.911C33.9601 138.562 26.8387 135.572 27.5049 145.928C28.0847 155.062 30.2605 169.224 35.2445 187.928C46.0272 228.433 81.663 306.481 149.01 288.342C166.602 283.602 179.019 274.233 187.626 262.291H161.661V262.296ZM61.0848 188.484L108.946 175.876C108.946 175.876 107.551 194.288 89.6087 199.018C71.6614 203.743 61.0848 188.484 61.0848 188.484Z" fill="#E2574C"/>
+              <path d="M341.786 129.174C329.345 131.355 299.498 134.072 262.612 124.185C225.716 114.304 201.236 97.0224 191.537 88.8994C177.788 77.3834 171.74 69.3802 165.788 81.4857C160.526 92.163 153.797 109.54 147.284 133.866C133.171 186.543 122.623 297.706 209.867 321.098C297.093 344.47 343.53 242.92 357.644 190.238C364.157 165.917 367.013 147.5 367.799 135.625C368.695 122.173 359.455 126.078 341.786 129.174ZM166.497 172.756C166.497 172.756 180.246 151.372 203.565 158C226.899 164.628 228.706 190.425 228.706 190.425L166.497 172.756ZM223.42 268.713C182.403 256.698 176.077 223.99 176.077 223.99L286.262 254.796C286.262 254.791 264.021 280.578 223.42 268.713ZM262.377 201.495C262.377 201.495 276.107 180.126 299.422 186.773C322.736 193.411 324.572 219.208 324.572 219.208L262.377 201.495Z" fill="#2EAD33"/>
+            </svg>
+            Write a demo script
+          </h3>
+          <p class="step-desc">
+            Author your demo as a Playwright test using the familiar
+            <code style="color: var(--accent); background: var(--accent-glow); padding: 2px 6px; border-radius: 4px; font-size: 0.9em;">@argo-video/cli</code>
+            API. Add overlay markers and narration cues alongside your
+            normal page interactions — no new tools to learn.
+          </p>
+        </div>
+
+        <div class="step">
+          <p class="step-number">02 &mdash; RECORD</p>
+          <span class="step-icon">&#127909;</span>
+          <h3 class="step-title">Record the browser</h3>
+          <p class="step-desc">
+            Argo launches a headless Chromium at 1920&times;1080 and
+            captures your script frame-by-frame. Overlays are composited
+            live into the recording — what you script is exactly what
+            viewers see.
+          </p>
+        </div>
+
+        <div class="step">
+          <p class="step-number">03 &mdash; EXPORT</p>
+          <span class="step-icon">&#128190;</span>
+          <h3 class="step-title">Export the video</h3>
+          <p class="step-desc">
+            AI narration is generated from your JSON manifest and mixed
+            into the final MP4. One pipeline command handles recording,
+            voiceover synthesis, and FFmpeg export — ready to ship.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── FEATURES ─── -->
+  <section id="features">
+    <div class="section-inner">
+      <p class="section-label">Features</p>
+      <h2 class="section-title">Everything you need.</h2>
+      <p class="section-subtitle">
+        Professional output without the production overhead. Argo handles the complexity so you can focus on the demo.
+      </p>
+
+      <div class="features-grid">
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">&#127381;</div>
+          <h3 class="feature-name">Overlays</h3>
+          <p class="feature-desc">
+            Lower-thirds, headline cards, callouts — add professional overlays to your recordings with a single API call. Fully typed, timing-aware, and composited directly into the video.
+          </p>
+          <span class="feature-tag">showOverlay()</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">&#127908;</div>
+          <h3 class="feature-name">Voiceover</h3>
+          <p class="feature-desc">
+            AI-generated narration from a simple JSON manifest. Mark moments in your script, write your lines, and Argo synthesizes and syncs professional-quality speech automatically.
+          </p>
+          <div style="background: #000; border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin: 12px 0 8px; font-family: var(--font-mono); font-size: 0.75em; line-height: 1.7; color: var(--text-muted); text-align: left; overflow-x: auto;">
+            <span style="color: #6b7280;">[</span><br>
+            &nbsp;&nbsp;<span style="color: #6b7280;">{</span><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #93c5fd;">"scene"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"intro"</span><span style="color: #6b7280;">,</span><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #93c5fd;">"text"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"Welcome to our app."</span><br>
+            &nbsp;&nbsp;<span style="color: #6b7280;">},</span><br>
+            &nbsp;&nbsp;<span style="color: #6b7280;">{</span><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #93c5fd;">"scene"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"feature"</span><span style="color: #6b7280;">,</span><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #93c5fd;">"text"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"This makes everything easier."</span><br>
+            &nbsp;&nbsp;<span style="color: #6b7280;">}</span><br>
+            <span style="color: #6b7280;">]</span>
+          </div>
+          <span class="feature-tag">narration.mark()</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">&#9881;&#65039;</div>
+          <h3 class="feature-name">Pipeline</h3>
+          <p class="feature-desc">
+            One command. Record, narrate, and export — end to end. The Argo pipeline orchestrates Playwright, FFmpeg, and AI speech into a single reproducible, scriptable workflow.
+          </p>
+          <span class="feature-tag">npx @argo-video/cli pipeline</span>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── CODE EXAMPLE ─── -->
+  <section id="code-example">
+    <div class="section-inner">
+      <p class="section-label">Example</p>
+      <h2 class="section-title">See the script.</h2>
+      <p class="section-subtitle">
+        A complete demo script — from import to overlay — in under fifteen lines.
+      </p>
+
+      <div class="code-wrap">
+        <div class="code-bar">
+          <span class="code-dot red"></span>
+          <span class="code-dot yellow"></span>
+          <span class="code-dot green"></span>
+          <span class="code-filename">demos/my-demo.ts</span>
+        </div>
+        <div class="code-body">
+          <pre><code><span class="syn-kw">import</span> <span class="syn-punc">{ </span><span class="syn-obj">test</span><span class="syn-punc"> }</span> <span class="syn-kw">from</span> <span class="syn-str">'<span class="syn-pkg">@argo-video/cli</span>'</span><span class="syn-punc">;</span>
+<span class="syn-kw">import</span> <span class="syn-punc">{ </span><span class="syn-obj">showOverlay</span><span class="syn-punc"> }</span> <span class="syn-kw">from</span> <span class="syn-str">'<span class="syn-pkg">@argo-video/cli</span>'</span><span class="syn-punc">;</span>
+
+<span class="syn-fn">test</span><span class="syn-punc">(</span><span class="syn-str">'my-demo'</span><span class="syn-punc">, </span><span class="syn-kw">async</span> <span class="syn-punc">({ </span><span class="syn-obj">page</span><span class="syn-punc">, </span><span class="syn-obj">narration</span><span class="syn-punc"> }) =&gt; {</span>
+  <span class="syn-kw">await</span> <span class="syn-obj">page</span><span class="syn-punc">.</span><span class="syn-fn">goto</span><span class="syn-punc">(</span><span class="syn-str">'/'</span><span class="syn-punc">);</span>
+
+  <span class="syn-obj">narration</span><span class="syn-punc">.</span><span class="syn-fn">mark</span><span class="syn-punc">(</span><span class="syn-str">'intro'</span><span class="syn-punc">);</span>
+  <span class="syn-kw">await</span> <span class="syn-fn">showOverlay</span><span class="syn-punc">(</span><span class="syn-obj">page</span><span class="syn-punc">, </span><span class="syn-str">'intro'</span><span class="syn-punc">, {</span>
+    <span class="syn-prop">type</span><span class="syn-punc">: </span><span class="syn-str">'lower-third'</span><span class="syn-punc">,</span>
+    <span class="syn-prop">text</span><span class="syn-punc">: </span><span class="syn-str">'Welcome to our app'</span><span class="syn-punc">,</span>
+  <span class="syn-punc">}, </span><span class="syn-num">3000</span><span class="syn-punc">);</span>
+<span class="syn-punc">});</span>
+</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── FOOTER ─── -->
+  <footer>
+    <span class="footer-logo">argo</span>
+    <ul class="footer-links">
+      <li><a href="#hero">Home</a></li>
+      <li><a href="#how-it-works">How it works</a></li>
+      <li><a href="#features">Features</a></li>
+      <li><a href="#code-example">Code</a></li>
+    </ul>
+    <span class="footer-copy" style="display: flex; align-items: center; gap: 8px;">
+      <span style="color: var(--accent); font-size: 0.9em;">&#x1f3ac;</span>
+      <span>This demo was recorded by Argo, using Argo. Yes, really.</span>
+    </span>
+  </footer>
+
+</body>
+</html>
