@@ -192,7 +192,7 @@ import { defineConfig, demosProject } from '@argo-video/cli';
 | `showOverlay(page, scene, cue, durationMs)` | Show a templated overlay (lower-third, headline-card, callout, image-card) |
 | `withOverlay(page, scene, cue, action)` | Show overlay during an async action |
 | `hideOverlay(page, zone?)` | Remove overlay from a zone |
-| `showConfetti(page, opts?)` | Burst confetti animation (`spread: 'burst' \| 'rain'`) |
+| `showConfetti(page, opts?)` | Non-blocking confetti animation (`spread: 'burst' \| 'rain'`, `wait: true` to block) |
 | `showCaption(page, scene, text, durationMs)` | Show a simple text caption |
 | `withCaption(page, scene, text, action)` | Show caption during an async action |
 | `hideCaption(page)` | Remove caption |

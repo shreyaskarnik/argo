@@ -30,6 +30,7 @@ export async function showConfetti(
   const fadeOut = opts?.fadeOut ?? 800;
   const wait = opts?.wait ?? false;
 
+  try {
   await page.evaluate(
     ({ pieces, spread, colors, duration, fadeOut, id }) => {
       // Remove any existing confetti
@@ -142,5 +143,9 @@ export async function showConfetti(
 
   if (wait) {
     await page.waitForTimeout(duration + fadeOut);
+  }
+  } catch {
+    // Swallow errors (page/context disposal) so fire-and-forget callers
+    // never see an unhandled rejection.
   }
 }
