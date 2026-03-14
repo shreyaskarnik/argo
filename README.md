@@ -222,6 +222,17 @@ choco install ffmpeg       # Windows
 
 4. **Export** — ffmpeg combines the screen recording (WebM) with the aligned narration (WAV) into an H.264 MP4.
 
+## LLM Skill
+
+Argo ships as a **Claude Code skill** so LLMs can create demo videos autonomously. Install it as a plugin:
+
+```bash
+# In Claude Code
+/plugin marketplace add shreyaskarnik/argo
+```
+
+The skill teaches Claude how to write demo scripts, voiceover manifests, overlay cues, and run the pipeline — no manual guidance needed.
+
 ## License
 
 MIT
