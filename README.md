@@ -11,6 +11,8 @@
 
 # @argo-video/cli
 
+[![npm version](https://img.shields.io/npm/v/@argo-video/cli)](https://www.npmjs.com/package/@argo-video/cli)
+
 **Turn Playwright demo scripts into polished product demo videos with AI voiceover.**
 
 Write a demo script with Playwright. Add a voiceover manifest. Run one command. Get an MP4 with overlays and narration.
