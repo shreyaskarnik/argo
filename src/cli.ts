@@ -1,4 +1,4 @@
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import { loadConfig, type ArgoConfig, type BrowserEngine } from './config.js';
 import { record } from './record.js';
 import { generateClips } from './tts/generate.js';
@@ -25,7 +25,7 @@ export function createProgram(): Command {
   program
     .command('record <demo>')
     .description('Record a demo using Playwright')
-    .option('--browser <engine>', 'browser engine: chromium, webkit, or firefox')
+    .addOption(new Option('--browser <engine>', 'browser engine').choices(['chromium', 'webkit', 'firefox']))
     .action(async (demo: string, cmdOpts: { browser?: string }) => {
       const configPath = program.opts().config;
       const config = await loadConfig(process.cwd(), configPath);
@@ -80,13 +80,13 @@ export function createProgram(): Command {
   program
     .command('pipeline <demo>')
     .description('Run the full pipeline: TTS → record → export')
-    .option('--browser <engine>', 'browser engine: chromium, webkit, or firefox')
+    .addOption(new Option('--browser <engine>', 'browser engine').choices(['chromium', 'webkit', 'firefox']))
     .action(async (demo: string, cmdOpts: { browser?: string }) => {
       const configPath = program.opts().config;
-      const config = await ensureTTSEngine(await loadConfig(process.cwd(), configPath));
-      if (cmdOpts.browser) {
-        config.video.browser = cmdOpts.browser as BrowserEngine;
-      }
+      const loaded = await ensureTTSEngine(await loadConfig(process.cwd(), configPath));
+      const config = cmdOpts.browser
+        ? { ...loaded, video: { ...loaded.video, browser: cmdOpts.browser as BrowserEngine } }
+        : loaded;
       await runPipeline(demo, config);
     });
 

@@ -100,6 +100,33 @@ describe('exportVideo', () => {
     expect(args).toContain('tpad=stop_mode=clone:stop_duration=1.25');
   });
 
+  it('adds lanczos downscale filter when deviceScaleFactor > 1', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      outputWidth: 1920, outputHeight: 1080, deviceScaleFactor: 2,
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    expect(args).toContain('-vf');
+    expect(args).toContain('scale=1920:1080:flags=lanczos');
+  });
+
+  it('combines tpad and downscale filters in one -vf chain', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      tailPadMs: 500, outputWidth: 1920, outputHeight: 1080, deviceScaleFactor: 2,
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const vfIdx = (args as string[]).indexOf('-vf');
+    expect(vfIdx).toBeGreaterThan(-1);
+    expect((args as string[])[vfIdx + 1]).toBe(
+      'tpad=stop_mode=clone:stop_duration=0.5,scale=1920:1080:flags=lanczos'
+    );
+  });
+
   it('throws on missing video.webm', async () => {
     mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
     mockedExistsSync.mockImplementation((p) => {
