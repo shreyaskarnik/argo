@@ -74,6 +74,9 @@ export function createProgram(): Command {
         preset: config.export.preset,
         crf: config.export.crf,
         fps: config.video.fps,
+        outputWidth: config.video.width,
+        outputHeight: config.video.height,
+        deviceScaleFactor: config.video.deviceScaleFactor,
       });
     });
 

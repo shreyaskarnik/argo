@@ -77,14 +77,26 @@ export function defineConfig(userConfig: UserConfig): ArgoConfig {
 export function demosProject(options: {
   baseURL: string;
   demosDir?: string;
+  browser?: BrowserEngine;
+  deviceScaleFactor?: number;
+  video?: { width: number; height: number };
 }) {
+  const scale = options.deviceScaleFactor ?? 1;
+  const width = options.video?.width ?? 1920;
+  const height = options.video?.height ?? 1080;
   return {
     name: 'demos',
     testDir: options.demosDir ?? 'demos',
     testMatch: '**/*.demo.ts',
     use: {
+      browserName: options.browser ?? 'chromium',
       baseURL: options.baseURL,
-      video: 'on' as const,
+      viewport: { width, height },
+      deviceScaleFactor: scale,
+      video: {
+        mode: 'on' as const,
+        size: { width: width * scale, height: height * scale },
+      },
     },
   };
 }

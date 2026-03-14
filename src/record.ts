@@ -34,7 +34,8 @@ function createPlaywrightConfig(options: RecordOptions, outputDir: string): stri
   const demosDir = path.resolve(options.demosDir);
   const { width, height } = options.video;
   const browser = options.browser ?? 'chromium';
-  const deviceScaleFactor = options.deviceScaleFactor ?? 1;
+  const rawScale = options.deviceScaleFactor ?? 1;
+  const deviceScaleFactor = Math.max(1, Math.round(rawScale));
 
   // When using a non-default scale factor, record at the scaled resolution
   // so Playwright captures every physical pixel. The export step will

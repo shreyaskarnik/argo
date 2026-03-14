@@ -61,6 +61,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - Overlay manifests: `demos/<name>.overlays.json`
 - TTS engine: Kokoro (local, no API keys). Voices: `af_heart` (female default), `am_michael` (male)
 - Long demos need `test.setTimeout()` — Playwright default is 30s
+- Browser default is `chromium`. Use `--browser webkit` for sharper video — Chromium has a known issue with video capture quality (see [playwright#31424](https://github.com/microsoft/playwright/issues/31424)). WebKit uses native macOS text rendering and produces noticeably better output.
 
 ## Scene Durations & Dynamic Timing
 

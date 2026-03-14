@@ -74,8 +74,14 @@ describe('demosProject', () => {
       testDir: 'demos',
       testMatch: '**/*.demo.ts',
       use: {
+        browserName: 'chromium',
         baseURL: 'http://localhost:4000',
-        video: 'on',
+        viewport: { width: 1920, height: 1080 },
+        deviceScaleFactor: 1,
+        video: {
+          mode: 'on',
+          size: { width: 1920, height: 1080 },
+        },
       },
     });
   });

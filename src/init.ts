@@ -76,6 +76,11 @@ const ARGO_CONFIG = `export default {
 `;
 
 const PLAYWRIGHT_CONFIG = `import { defineConfig } from '@playwright/test';
+import config from './argo.config.js';
+
+const scale = config.video?.deviceScaleFactor ?? 1;
+const width = config.video?.width ?? 1920;
+const height = config.video?.height ?? 1080;
 
 export default defineConfig({
   preserveOutput: 'always',
@@ -85,11 +90,13 @@ export default defineConfig({
       testDir: 'demos',
       testMatch: '**/*.demo.ts',
       use: {
-        baseURL: process.env.BASE_URL || 'http://localhost:3000',
-        viewport: { width: 1920, height: 1080 },
+        browserName: config.video?.browser ?? 'chromium',
+        baseURL: process.env.BASE_URL || config.baseURL || 'http://localhost:3000',
+        viewport: { width, height },
+        deviceScaleFactor: scale,
         video: {
           mode: 'on',
-          size: { width: 1920, height: 1080 },
+          size: { width: width * scale, height: height * scale },
         },
       },
     },
