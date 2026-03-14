@@ -21,6 +21,7 @@ Argo turns Playwright demo scripts into polished product demo videos with AI voi
 - Package: `@argo-video/cli` (npm org: `@argo-video`)
 - Publishing is automated via GitHub Actions OIDC trusted publishing (no NPM_TOKEN needed)
 - To release: bump version in package.json, tag, create GitHub release → workflow handles the rest
+- IMPORTANT: The `exports` map in package.json must include a `"default"` condition alongside `"import"` — without it, consuming projects that lack `"type": "module"` fail with `No "exports" main defined`
 
 ## Git Conventions
 
@@ -91,3 +92,10 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - Generator script: `scripts/generate_logo_thumbnail.py` (requires Pillow)
 - Source mark: `assets/logo-mark-source.png` — cropped ASCII art only (no text)
 - Regenerate: `python3 scripts/generate_logo_thumbnail.py` → writes `assets/logo-thumb.png`
+
+## LLM Skill
+
+- Argo ships as a Claude Code plugin/skill at `skills/argo-guide/SKILL.md`
+- Marketplace config: `.claude-plugin/marketplace.json`
+- Install via: `/plugin marketplace add shreyaskarnik/argo`
+- When modifying CLI commands, config schema, overlay API, or fixture exports, update the skill alongside README
