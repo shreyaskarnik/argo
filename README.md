@@ -179,6 +179,7 @@ Argo exports Playwright fixtures and helpers for use in demo scripts:
 ```ts
 import { test, expect, demoType } from '@argo-video/cli';
 import { showOverlay, hideOverlay, withOverlay } from '@argo-video/cli';
+import { showConfetti } from '@argo-video/cli';
 import { showCaption, hideCaption, withCaption } from '@argo-video/cli';
 import { defineConfig, demosProject } from '@argo-video/cli';
 ```
@@ -191,6 +192,7 @@ import { defineConfig, demosProject } from '@argo-video/cli';
 | `showOverlay(page, scene, cue, durationMs)` | Show a templated overlay (lower-third, headline-card, callout, image-card) |
 | `withOverlay(page, scene, cue, action)` | Show overlay during an async action |
 | `hideOverlay(page, zone?)` | Remove overlay from a zone |
+| `showConfetti(page, opts?)` | Burst confetti animation (`spread: 'burst' \| 'rain'`) |
 | `showCaption(page, scene, text, durationMs)` | Show a simple text caption |
 | `withCaption(page, scene, text, action)` | Show caption during an async action |
 | `hideCaption(page)` | Remove caption |

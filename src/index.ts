@@ -34,6 +34,9 @@ export {
   type MotionPreset,
 } from './overlays/index.js';
 
+// Effects
+export { showConfetti, type ConfettiOptions } from './effects.js';
+
 // TTS
 export { type TTSEngineOptions } from './tts/engine.js';
 
