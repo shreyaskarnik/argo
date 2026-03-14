@@ -126,6 +126,23 @@ export function parseWavHeader(wav: Buffer): WavHeader {
 }
 
 /**
+ * Convert arbitrary audio (MP3, OGG, PCM, etc.) to Argo's WAV format
+ * (mono, Float32, 24kHz) using ffmpeg.
+ */
+export function convertToWav(audioBuffer: Buffer): Buffer {
+  const { execFileSync } = require('node:child_process');
+  const result = execFileSync('ffmpeg', [
+    '-i', 'pipe:0',
+    '-f', 'wav',
+    '-acodec', 'pcm_f32le',
+    '-ac', '1',
+    '-ar', '24000',
+    'pipe:1',
+  ], { input: audioBuffer, stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 50 * 1024 * 1024 });
+  return result;
+}
+
+/**
  * Creates a mock TTS engine that produces silent WAV buffers of the given
  * duration and records all calls for test assertions.
  */

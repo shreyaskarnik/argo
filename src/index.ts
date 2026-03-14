@@ -52,6 +52,7 @@ export {
 
 // TTS
 export { type TTSEngineOptions } from './tts/engine.js';
+export { engines } from './tts/engines/index.js';
 
 // Subtitles
 export { generateSrt, generateVtt } from './subtitles.js';
