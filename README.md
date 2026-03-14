@@ -230,7 +230,23 @@ choco install ffmpeg       # Windows
 
 ## How the pipeline works
 
-1. **TTS** — Kokoro (via `kokoro-js`) generates WAV clips from the voiceover manifest. Clips are cached by content hash in `.argo/<demo>/clips/` so regeneration is instant if text hasn't changed. Uncached clips generate in parallel.
+1. **TTS** — Generates WAV clips from the voiceover manifest. Kokoro is the default (local, free), but you can swap in OpenAI, ElevenLabs, Gemini, Sarvam, or mlx-audio via `engines.*` factories. Clips are cached by content hash in `.argo/<demo>/clips/`.
+
+   ```js
+   import { defineConfig, engines } from '@argo-video/cli';
+   export default defineConfig({
+     tts: { engine: engines.openai({ model: 'tts-1-hd' }) },
+   });
+   ```
+
+   | Engine | Install | API Key |
+   |--------|---------|---------|
+   | `engines.kokoro()` | built-in | none (local) |
+   | `engines.openai()` | `npm i openai` | `OPENAI_API_KEY` |
+   | `engines.elevenlabs()` | `npm i elevenlabs` | `ELEVENLABS_API_KEY` |
+   | `engines.gemini()` | `npm i @google/genai` | `GEMINI_API_KEY` |
+   | `engines.sarvam()` | none (fetch) | `SARVAM_API_KEY` |
+   | `engines.mlxAudio()` | `pip install f5-tts-mlx` | none (local) |
 
 2. **Record** — Playwright runs the demo script in a real browser. The `narration` fixture records timestamps for each `mark()` call. Video is captured at native resolution.
 

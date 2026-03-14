@@ -9,14 +9,14 @@ test('showcase', async ({ page, narration }) => {
 
   // Scene 1: Hero — spotlight the terminal command
   narration.mark('hero');
-  spotlight(page, '.terminal-box', { duration: 4000, padding: 16 });
+  spotlight(page, '#hero-command', { duration: 4000, padding: 16 });
   await showOverlay(page, 'hero', {
     type: 'lower-third',
     text: 'Argo — Demo videos, automated',
     placement: 'top-left',
     motion: 'fade-in',
     autoBackground: true,
-  }, narration.durationFor('hero', { maxMs: 6000 }));
+  }, narration.durationFor('hero', { maxMs: 7000 }));
 
   // Scene 2: How it works — zoom into each step
   narration.mark('how-it-works');
@@ -30,38 +30,42 @@ test('showcase', async ({ page, narration }) => {
     motion: 'slide-in',
     autoBackground: true,
   }, async () => {
-    // Highlight each step in sequence
-    await zoomTo(page, '.step:nth-child(1)', { scale: 1.3, duration: 2000, wait: true });
-    await zoomTo(page, '.step:nth-child(2)', { scale: 1.3, duration: 2000, wait: true });
-    await zoomTo(page, '.step:nth-child(3)', { scale: 1.3, duration: 2000, wait: true });
+    await zoomTo(page, '#step-write', { scale: 1.22, duration: 1700, wait: true });
+    await zoomTo(page, '#step-record', { scale: 1.22, duration: 1700, wait: true });
+    await zoomTo(page, '#step-export', { scale: 1.22, duration: 1700, wait: true });
     await resetCamera(page);
   });
 
-  // Scene 3: Features — dim around each feature card
+  // Scene 3: Features — show overlays and camera effects working together
   narration.mark('features');
   await page.locator('#features').scrollIntoViewIfNeeded();
   await page.waitForTimeout(600);
-  dimAround(page, '.feature-card:nth-child(1)', { duration: 3000 });
-  await showOverlay(page, 'features', {
+  await withOverlay(page, 'features', {
     type: 'callout',
     text: 'Overlays, voiceover, camera effects, and more',
     placement: 'top-left',
     motion: 'fade-in',
     autoBackground: true,
-  }, narration.durationFor('features', { maxMs: 5500 }));
+  }, async () => {
+    await dimAround(page, '#feature-overlays', { duration: 1400, wait: true });
+    await dimAround(page, '#feature-camera', { duration: 1400, wait: true });
+    await focusRing(page, '#voiceover-snippet', { color: '#8b5cf6', duration: 1600, wait: true });
+    await resetCamera(page);
+  });
 
   // Scene 4: Code — focus ring on the code block
   narration.mark('code');
   await page.locator('#code-example').scrollIntoViewIfNeeded();
   await page.waitForTimeout(600);
-  focusRing(page, '#code-example pre', { color: '#06b6d4', duration: 4000 });
-  await showOverlay(page, 'code', {
+  await withOverlay(page, 'code', {
     type: 'lower-third',
     text: 'Familiar Playwright API — nothing new to learn',
     placement: 'top-left',
     motion: 'fade-in',
     autoBackground: true,
-  }, narration.durationFor('code', { maxMs: 6000 }));
+  }, async () => {
+    await focusRing(page, '#demo-script-code', { color: '#06b6d4', duration: 2800, wait: true });
+  });
 
   // Scene 5: Toggle to light mode — spotlight the toggle button
   narration.mark('closing');

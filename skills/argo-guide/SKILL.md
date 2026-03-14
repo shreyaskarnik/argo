@@ -184,7 +184,35 @@ File: `demos/<name>.voiceover.json` — JSON array of entries.
 | `voice` | no | `af_heart` | Kokoro voice: `af_heart` (female), `am_michael` (male) |
 | `speed` | no | `1.0` | Playback speed (0.9 = slightly slower, good for narration) |
 
-TTS runs locally via Kokoro — no API keys needed. Clips are content-addressed cached in `.argo/<demo>/clips/` by SHA256 of `{scene, text, voice, speed}`. Clear the cache (`rm -rf .argo/<demo>/clips`) if voiceover text changes and stale clips persist.
+TTS runs locally via Kokoro by default — no API keys needed. Clips are content-addressed cached in `.argo/<demo>/clips/` by SHA256 of `{scene, text, voice, speed}`. Clear the cache (`rm -rf .argo/<demo>/clips`) if voiceover text changes and stale clips persist.
+
+### TTS Engine Selection
+
+Argo supports 6 TTS engines via typed factory functions. Set the engine in config:
+
+```javascript
+import { defineConfig, engines } from '@argo-video/cli';
+
+export default defineConfig({
+  tts: {
+    engine: engines.openai({ model: 'tts-1-hd' }),  // swap engine here
+    defaultVoice: 'alloy',
+  },
+});
+```
+
+| Engine | Type | Install | Voices |
+|--------|------|---------|--------|
+| `engines.kokoro()` | local | built-in | `af_heart`, `am_michael` |
+| `engines.openai()` | cloud | `npm i openai` | `alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer` |
+| `engines.elevenlabs()` | cloud | `npm i elevenlabs` | ElevenLabs voice IDs |
+| `engines.gemini()` | cloud | `npm i @google/genai` | Gemini voice names |
+| `engines.sarvam()` | cloud | none (fetch) | `meera` + Indian language voices |
+| `engines.mlxAudio()` | local | `pip install f5-tts-mlx` | model-dependent (Apple Silicon) |
+
+Cloud engines read API keys from environment variables (`OPENAI_API_KEY`, `ELEVENLABS_API_KEY`, `GEMINI_API_KEY`, `SARVAM_API_KEY`) or accept `apiKey` in the factory options.
+
+Custom engines: implement the `TTSEngine` interface and pass to `tts.engine` in config.
 
 ### Phonetic Spelling for TTS Pronunciation
 
