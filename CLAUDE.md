@@ -46,6 +46,10 @@ Injected into the browser during recording via `page.evaluate()`. Uses a zone-ba
 
 Overlay cues use discriminated unions — each template type has its own TypeScript type with `type` as the discriminant field.
 
+### Effects (`src/effects.ts`)
+
+`showConfetti(page, opts?)` — non-blocking by default (fire-and-forget safe). Injects a canvas-based confetti animation via `page.evaluate()`. Two spread modes: `burst` (Raycast-style, center-top fan) and `rain` (full-width fall). Set `wait: true` to block until animation completes. Errors from page/context disposal are swallowed; all other errors surface as warnings.
+
 ### Playwright Integration (`src/fixtures.ts`)
 
 Custom `test` fixture extends Playwright's `test` with a `narration` fixture that records `Date.now()` timestamps for each `mark()` call, flushed to `.timing.json` after test completion.
@@ -56,6 +60,8 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - `argo tts generate` takes a file path (`demos/name.voiceover.json`), not a bare demo name
 - `argo record/export/pipeline` take bare demo names (e.g., `argo pipeline example`)
 - README config/CLI/API snippets must stay in sync with code changes (check after modifying config schema, CLI options, or scaffold templates)
+- Demo names are validated at the CLI boundary: only `[a-zA-Z0-9][a-zA-Z0-9_-]*` allowed. This prevents path traversal — maintain this validation if adding new commands that accept demo names.
+- `tts generate` derives demoName via `basename()` from the manifest path — do not use `/`-only regex (breaks on Windows paths)
 
 ## Demo Authoring
 
@@ -100,6 +106,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - Marketplace config: `.claude-plugin/marketplace.json`
 - Install via: `/plugin marketplace add shreyaskarnik/argo`
 - When modifying CLI commands, config schema, overlay API, or fixture exports, update the skill alongside README
+- Cross-client discovery: `.agents/skills/argo-guide` symlink follows the Agent Skills spec so non-Claude LLM clients auto-discover the skill
 
 ## Known Issues
 
