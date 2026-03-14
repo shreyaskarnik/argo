@@ -323,3 +323,28 @@ project/
 ├── argo.config.js               # Configuration
 └── playwright.config.ts         # Playwright config (auto-generated or scaffolded)
 ```
+
+### Gitignore
+
+Add `.argo/` and `videos/` to `.gitignore` — they contain large generated artifacts (WAV clips, WebM recordings, mixed audio). When setting up a new project, ensure these lines are present:
+
+```
+.argo/
+videos/
+test-results/
+```
+
+### Cleanup
+
+To free disk space or force a full re-run:
+
+```bash
+# Remove all pipeline artifacts for a specific demo
+rm -rf .argo/<name>/
+
+# Remove only cached TTS clips (forces re-generation)
+rm -rf .argo/<name>/clips/
+
+# Remove everything
+rm -rf .argo/
+```
