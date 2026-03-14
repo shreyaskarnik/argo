@@ -100,3 +100,9 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - Marketplace config: `.claude-plugin/marketplace.json`
 - Install via: `/plugin marketplace add shreyaskarnik/argo`
 - When modifying CLI commands, config schema, overlay API, or fixture exports, update the skill alongside README
+
+## Known Issues
+
+- `demoType(page, selector, text)` takes a CSS selector, not a label — users expect `getByLabel` semantics. Consider accepting a Locator directly.
+- `deviceScaleFactor: 2` is broken with webkit — viewport renders at 1/4 of the frame. Stick to `deviceScaleFactor: 1` until fixed.
+- `argo init` scaffolds `argo.config.js` which causes Node ESM warnings in projects without `"type": "module"`. Should scaffold `.mjs` by default.

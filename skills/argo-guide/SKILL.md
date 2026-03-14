@@ -93,7 +93,7 @@ test('my-demo', async ({ page, narration }) => {
 | `showOverlay(page, scene, cue, durationMs)` | Show overlay for N ms, then auto-remove. |
 | `withOverlay(page, scene, cue, action)` | Show overlay during an async action, auto-remove when done (even on throw). |
 | `hideOverlay(page, zone?)` | Manually remove overlay from a zone (or all zones). |
-| `demoType(page, selector, text, delay?)` | Type text character-by-character (60ms default delay) for a realistic typing effect. |
+| `demoType(page, selector, text, delay?)` | Type text character-by-character (60ms default delay) for a realistic typing effect. **Gotcha**: `selector` is a CSS selector (e.g., `'input[type="email"]'`), not a label string. Use `page.getByLabel('Email').click()` first to focus, then `demoType(page, 'input[type="email"]', ...)`. |
 | `page.waitForTimeout(ms)` | Add deliberate pauses for pacing. |
 
 ### Dynamic Scene Durations with `durationFor()`
@@ -149,6 +149,8 @@ Every cue must include a `type` field. Common options shared by all: `placement`
 `bottom-center` (default) | `top-left` | `top-right` | `bottom-left` | `bottom-right` | `center`
 
 Only one overlay per zone at a time. Different zones can show overlays simultaneously.
+
+**Placement tip**: If the app has a left sidebar or nav, prefer `top-right` / `bottom-right` for overlays on dashboard-style pages to avoid covering navigation. Use `top-left` for pages with right-heavy content or clean layouts.
 
 ### Motion Presets
 
@@ -245,6 +247,12 @@ On macOS, video capture quality varies by browser engine: **webkit > firefox > c
 ### High-DPI Recording
 
 Set `video.deviceScaleFactor: 2` to capture at 2x resolution. The export step automatically downscales to the logical resolution using a lanczos filter, producing sharper final output.
+
+**Known issue**: `deviceScaleFactor: 2` may cause rendering issues with webkit (viewport at 1/4 of the frame). Stick to `deviceScaleFactor: 1` until this is fixed.
+
+### Config File Extension
+
+Use `.mjs` for the config file in projects without `"type": "module"` in their `package.json` to avoid Node ESM warnings. The `argo init` scaffold generates `.js` by default — rename to `argo.config.mjs` if you see `MODULE_TYPELESS_PACKAGE_JSON` warnings.
 
 ---
 
