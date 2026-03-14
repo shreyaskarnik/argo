@@ -208,7 +208,7 @@ export default defineConfig({
 | `engines.elevenlabs()` | cloud | `npm i elevenlabs` | ElevenLabs voice IDs |
 | `engines.gemini()` | cloud | `npm i @google/genai` | Gemini voice names |
 | `engines.sarvam()` | cloud | none (fetch) | `meera` + Indian language voices |
-| `engines.mlxAudio()` | local | `pip install f5-tts-mlx` | model-dependent (Apple Silicon) |
+| `engines.mlxAudio()` | local | `pip install mlx-audio` | model-dependent (Apple Silicon) |
 
 Cloud engines read API keys from environment variables (`OPENAI_API_KEY`, `ELEVENLABS_API_KEY`, `GEMINI_API_KEY`, `SARVAM_API_KEY`) or accept `apiKey` in the factory options.
 
@@ -330,7 +330,7 @@ After a successful run, the pipeline produces:
 - `videos/<name>.vtt` — WebVTT subtitle file
 - `.argo/<name>/scene-report.json` — scene timing report (durations, overflow)
 
-TTS clips generate in parallel for faster builds. Subtitles are derived from voiceover manifest text + alignment placements.
+TTS clips are cached by content hash for faster rebuilds. Subtitles are derived from voiceover manifest text + alignment placements.
 
 ---
 

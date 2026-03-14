@@ -246,7 +246,7 @@ choco install ffmpeg       # Windows
    | `engines.elevenlabs()` | `npm i elevenlabs` | `ELEVENLABS_API_KEY` |
    | `engines.gemini()` | `npm i @google/genai` | `GEMINI_API_KEY` |
    | `engines.sarvam()` | none (fetch) | `SARVAM_API_KEY` |
-   | `engines.mlxAudio()` | `pip install f5-tts-mlx` | none (local) |
+   | `engines.mlxAudio()` | `pip install mlx-audio` | none (local) |
 
 2. **Record** — Playwright runs the demo script in a real browser. The `narration` fixture records timestamps for each `mark()` call. Video is captured at native resolution.
 

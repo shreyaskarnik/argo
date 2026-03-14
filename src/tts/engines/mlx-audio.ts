@@ -1,74 +1,55 @@
 import type { TTSEngine, TTSEngineOptions } from '../engine.js';
 
 export interface MlxAudioEngineOptions {
+  /** mlx-audio server URL. Default: http://localhost:8000 */
+  baseUrl?: string;
+  /** Model ID passed to the server. Default: mlx-community/Spark-TTS-0.5B-bf16 */
   model?: string;
-  pythonPath?: string;
 }
 
 export class MlxAudioEngine implements TTSEngine {
+  private baseUrl: string;
   private model: string;
-  private pythonPath: string;
 
   constructor(options?: MlxAudioEngineOptions) {
-    this.model = options?.model ?? 'mlx-community/Kokoro-82M-bf16';
-    this.pythonPath = options?.pythonPath ?? 'python3';
+    this.baseUrl = options?.baseUrl ?? 'http://localhost:8000';
+    this.model = options?.model ?? 'mlx-community/Spark-TTS-0.5B-bf16';
   }
 
   async generate(text: string, options: TTSEngineOptions): Promise<Buffer> {
     if (!text?.trim()) throw new Error('TTS text must not be empty');
 
-    const { execFileSync } = await import('node:child_process');
-    const { readFileSync, readdirSync, rmSync, mkdtempSync } = await import('node:fs');
-    const { join } = await import('node:path');
-    const { tmpdir } = await import('node:os');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 180_000);
 
-    const tmpDir = mkdtempSync(join(tmpdir(), 'argo-mlx-'));
-
+    let response;
     try {
-      const args = [
-        '-m', 'mlx_audio.tts.generate',
-        '--model', this.model,
-        '--text', text,
-        '--output_path', tmpDir,
-        '--file_prefix', 'argo',
-        '--audio_format', 'wav',
-        '--lang_code', 'a',
-      ];
-
-      if (options.voice) {
-        args.push('--voice', options.voice);
-      }
-      if (options.speed) {
-        args.push('--speed', String(options.speed));
-      }
-
-      execFileSync(this.pythonPath, args, { stdio: 'pipe', timeout: 120_000 });
-
-      // Find the generated WAV file
-      const files = readdirSync(tmpDir).filter(f => f.endsWith('.wav'));
-      if (files.length === 0) {
-        throw new Error('mlx-audio did not produce a WAV file');
-      }
-
-      const wavBuffer = readFileSync(join(tmpDir, files[0]));
-
-      // Convert to Argo WAV format (mono Float32 24kHz)
-      const { convertToWav } = await import('../engine.js');
-      return convertToWav(wavBuffer);
-    } catch (err) {
-      const msg = (err as Error).message;
-      if (msg.includes('ENOENT') || msg.includes('not found')) {
-        throw new Error(
-          "mlx-audio TTS requires the 'mlx-audio' Python package. " +
-          'Install it with: pip install mlx-audio'
-        );
-      }
-      throw new Error(
-        `mlx-audio TTS failed for text "${text.substring(0, 80)}...". ` +
-        `Original error: ${msg}`
-      );
+      response = await fetch(`${this.baseUrl}/v1/audio/speech`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: this.model,
+          input: text,
+          voice: options.voice ?? 'af_heart',
+        }),
+        signal: controller.signal,
+      });
     } finally {
-      try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+      clearTimeout(timeout);
     }
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(
+        `mlx-audio server error ${response.status}: ${body}. ` +
+        `Ensure the server is running: python3 -m mlx_audio.server --model ${this.model}`
+      );
+    }
+
+    const audioBuffer = Buffer.from(await response.arrayBuffer());
+
+    // Convert to Argo WAV format (mono Float32 24kHz)
+    const { convertToWav } = await import('../engine.js');
+    return convertToWav(audioBuffer);
   }
 }

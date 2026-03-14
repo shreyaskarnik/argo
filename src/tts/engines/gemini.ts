@@ -10,14 +10,19 @@ export class GeminiEngine implements TTSEngine {
   private model: string;
 
   constructor(options?: GeminiEngineOptions) {
-    this.apiKey = options?.apiKey ?? process.env.GEMINI_API_KEY ?? '';
+    this.apiKey = options?.apiKey ?? '';
     this.model = options?.model ?? 'gemini-2.5-flash';
-    if (!this.apiKey) {
+  }
+
+  private resolveApiKey(): string {
+    const key = this.apiKey || process.env.GEMINI_API_KEY || '';
+    if (!key) {
       throw new Error(
         'Gemini TTS engine requires an API key. ' +
         'Set GEMINI_API_KEY environment variable or pass apiKey option.'
       );
     }
+    return key;
   }
 
   async generate(text: string, options: TTSEngineOptions): Promise<Buffer> {
@@ -33,7 +38,7 @@ export class GeminiEngine implements TTSEngine {
       );
     }
 
-    const ai = new GoogleGenAI({ apiKey: this.apiKey });
+    const ai = new GoogleGenAI({ apiKey: this.resolveApiKey() });
     const response = await ai.models.generateContent({
       model: this.model,
       contents: [{ role: 'user', parts: [{ text: `Please read the following text aloud: ${text}` }] }],

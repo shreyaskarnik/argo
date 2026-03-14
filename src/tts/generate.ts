@@ -63,6 +63,7 @@ export async function generateClips(options: GenerateClipsOptions): Promise<Clip
       text: r.text as string,
       voice: (r.voice as string | undefined) ?? defaults?.voice,
       speed: (r.speed as number | undefined) ?? defaults?.speed,
+      lang: r.lang as string | undefined,
     };
     return { entry, clipPath: cache.getClipPath(demoName, entry) };
   });
@@ -75,6 +76,7 @@ export async function generateClips(options: GenerateClipsOptions): Promise<Clip
     const wavBuffer = await engine.generate(entry.text, {
       voice: entry.voice,
       speed: entry.speed,
+      lang: entry.lang,
     });
     cache.cacheClip(demoName, entry, wavBuffer);
   }

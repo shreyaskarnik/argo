@@ -14,16 +14,21 @@ export class ElevenLabsEngine implements TTSEngine {
   private similarityBoost: number;
 
   constructor(options?: ElevenLabsEngineOptions) {
-    this.apiKey = options?.apiKey ?? process.env.ELEVENLABS_API_KEY ?? '';
+    this.apiKey = options?.apiKey ?? '';
     this.model = options?.model ?? 'eleven_monolingual_v1';
     this.stability = options?.stability ?? 0.5;
     this.similarityBoost = options?.similarityBoost ?? 0.75;
-    if (!this.apiKey) {
+  }
+
+  private resolveApiKey(): string {
+    const key = this.apiKey || process.env.ELEVENLABS_API_KEY || '';
+    if (!key) {
       throw new Error(
         'ElevenLabs TTS engine requires an API key. ' +
         'Set ELEVENLABS_API_KEY environment variable or pass apiKey option.'
       );
     }
+    return key;
   }
 
   async generate(text: string, options: TTSEngineOptions): Promise<Buffer> {
@@ -39,7 +44,7 @@ export class ElevenLabsEngine implements TTSEngine {
       );
     }
 
-    const client = new ElevenLabsClient({ apiKey: this.apiKey });
+    const client = new ElevenLabsClient({ apiKey: this.resolveApiKey() });
     const audioStream = await client.textToSpeech.convert(
       options.voice ?? '21m00Tcm4TlvDq8ikWAM', // Rachel default
       {

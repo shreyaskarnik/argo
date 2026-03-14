@@ -11,6 +11,7 @@ export interface ManifestEntry {
   text: string;
   voice?: string;
   speed?: number;
+  lang?: string;
 }
 
 export class ClipCache {
@@ -56,10 +57,10 @@ export class ClipCache {
   }
 
   private computeHash(entry: ManifestEntry): string {
-    const { scene, text, voice, speed } = entry;
+    const { scene, text, voice, speed, lang } = entry;
     return crypto
       .createHash('sha256')
-      .update(JSON.stringify({ scene, text, voice, speed }))
+      .update(JSON.stringify({ scene, text, voice, speed, lang }))
       .digest('hex');
   }
 }

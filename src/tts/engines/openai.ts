@@ -10,14 +10,19 @@ export class OpenAIEngine implements TTSEngine {
   private model: string;
 
   constructor(options?: OpenAIEngineOptions) {
-    this.apiKey = options?.apiKey ?? process.env.OPENAI_API_KEY ?? '';
+    this.apiKey = options?.apiKey ?? '';
     this.model = options?.model ?? 'tts-1';
-    if (!this.apiKey) {
+  }
+
+  private resolveApiKey(): string {
+    const key = this.apiKey || process.env.OPENAI_API_KEY || '';
+    if (!key) {
       throw new Error(
         'OpenAI TTS engine requires an API key. ' +
         'Set OPENAI_API_KEY environment variable or pass apiKey option.'
       );
     }
+    return key;
   }
 
   async generate(text: string, options: TTSEngineOptions): Promise<Buffer> {
@@ -33,7 +38,7 @@ export class OpenAIEngine implements TTSEngine {
       );
     }
 
-    const client = new OpenAI({ apiKey: this.apiKey });
+    const client = new OpenAI({ apiKey: this.resolveApiKey() });
     const response = await client.audio.speech.create({
       model: this.model,
       voice: options.voice ?? 'alloy',

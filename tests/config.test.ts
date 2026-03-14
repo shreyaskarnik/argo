@@ -9,6 +9,7 @@ import {
   type ArgoConfig,
   type TTSEngine,
 } from '../src/config.js';
+import { engines } from '../src/tts/engines/index.js';
 
 const DEFAULTS: ArgoConfig = {
   demosDir: 'demos',
@@ -70,6 +71,12 @@ describe('defineConfig', () => {
     const config = defineConfig({ tts: { engine } });
     expect(config.tts.engine).toBe(engine);
     expect(config.tts.defaultVoice).toBe('af_heart');
+  });
+
+  it('allows cloud TTS engines to be configured without API keys at config time', () => {
+    expect(() => defineConfig({ tts: { engine: engines.openai() } })).not.toThrow();
+    expect(() => defineConfig({ tts: { engine: engines.elevenlabs() } })).not.toThrow();
+    expect(() => defineConfig({ tts: { engine: engines.gemini() } })).not.toThrow();
   });
 });
 
