@@ -6,6 +6,9 @@ import { record } from './record.js';
 import { alignClips, type ClipInfo, type SceneTiming } from './tts/align.js';
 import { parseWavHeader, createWavBuffer } from './tts/engine.js';
 import { exportVideo, checkFfmpeg } from './export.js';
+import { generateSrt, generateVtt } from './subtitles.js';
+import { generateChapterMetadata } from './chapters.js';
+import { buildSceneReport, formatSceneReport } from './report.js';
 import type { ArgoConfig } from './config.js';
 
 function getVideoDurationMs(videoPath: string): number {
@@ -132,6 +135,29 @@ export async function runPipeline(
     );
   }
 
+  // Build scene text map for subtitles
+  const manifestPath = `${config.demosDir}/${demoName}.voiceover.json`;
+  const sceneTexts: Record<string, string> = {};
+  try {
+    const manifestContent = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+    for (const entry of manifestContent) {
+      if (entry.scene && entry.text) sceneTexts[entry.scene] = entry.text;
+    }
+
+    // Generate subtitles
+    const srt = generateSrt(aligned.placements, sceneTexts);
+    const vtt = generateVtt(aligned.placements, sceneTexts);
+    writeFileSync(join(config.outputDir, `${demoName}.srt`), srt, 'utf-8');
+    writeFileSync(join(config.outputDir, `${demoName}.vtt`), vtt, 'utf-8');
+  } catch {
+    // Subtitles are best-effort — don't fail the pipeline
+  }
+
+  // Generate chapter metadata for ffmpeg
+  const chapterMetadataPath = join(argoDir, 'chapters.txt');
+  const chapterMetadata = generateChapterMetadata(aligned.placements, Math.max(totalDurationMs, aligned.requiredDurationMs));
+  writeFileSync(chapterMetadataPath, chapterMetadata, 'utf-8');
+
   // Step 4: Export final video
   console.log('★ Cutting the final take...');
   const exportOptions: Parameters<typeof exportVideo>[0] = {
@@ -145,10 +171,16 @@ export async function runPipeline(
     outputHeight: config.video.height,
     deviceScaleFactor: config.video.deviceScaleFactor,
     thumbnailPath: config.export.thumbnailPath,
+    chapterMetadataPath,
   };
   if (tailPadMs !== undefined) exportOptions.tailPadMs = tailPadMs;
   const outputPath = await exportVideo(exportOptions);
 
-  console.log(`✓ That's a wrap! Video saved to: ${outputPath}`);
+  // Scene report
+  const report = buildSceneReport(demoName, aligned.placements, aligned.overflowMs, totalDurationMs, outputPath);
+  writeFileSync(join(argoDir, 'scene-report.json'), JSON.stringify(report, null, 2), 'utf-8');
+  console.log(formatSceneReport(report));
+
+  console.log(`\n✓ That's a wrap! Video saved to: ${outputPath}`);
   return outputPath;
 }

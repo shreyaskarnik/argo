@@ -54,34 +54,37 @@ export async function generateClips(options: GenerateClipsOptions): Promise<Clip
   }
 
   const cache = new ClipCache(projectRoot);
-  const results: ClipResult[] = [];
 
-  for (const raw of rawEntries) {
+  // Build manifest entries with defaults
+  const entries: { entry: ManifestEntry; clipPath: string }[] = rawEntries.map((raw) => {
     const r = raw as Record<string, unknown>;
-
-    // 4. Build ManifestEntry with defaults
-    const manifestEntry: ManifestEntry = {
+    const entry: ManifestEntry = {
       scene: r.scene as string,
       text: r.text as string,
       voice: (r.voice as string | undefined) ?? defaults?.voice,
       speed: (r.speed as number | undefined) ?? defaults?.speed,
     };
+    return { entry, clipPath: cache.getClipPath(demoName, entry) };
+  });
 
-    const clipPath = cache.getClipPath(demoName, manifestEntry);
-
-    // 5/6. Check cache or generate
-    if (!cache.isCached(demoName, manifestEntry)) {
-      const wavBuffer = await engine.generate(manifestEntry.text, {
-        voice: manifestEntry.voice,
-        speed: manifestEntry.speed,
-      });
-      cache.cacheClip(demoName, manifestEntry, wavBuffer);
-    }
-
-    const wavBuf = fs.readFileSync(clipPath);
-    const { durationMs } = parseWavHeader(wavBuf);
-    results.push({ scene: manifestEntry.scene, clipPath, durationMs });
+  // Generate uncached clips in parallel
+  const uncached = entries.filter(({ entry }) => !cache.isCached(demoName, entry));
+  if (uncached.length > 0) {
+    await Promise.all(
+      uncached.map(async ({ entry }) => {
+        const wavBuffer = await engine.generate(entry.text, {
+          voice: entry.voice,
+          speed: entry.speed,
+        });
+        cache.cacheClip(demoName, entry, wavBuffer);
+      }),
+    );
   }
 
-  return results;
+  // Read results (all clips now cached)
+  return entries.map(({ entry, clipPath }) => {
+    const wavBuf = fs.readFileSync(clipPath);
+    const { durationMs } = parseWavHeader(wavBuf);
+    return { scene: entry.scene, clipPath, durationMs };
+  });
 }

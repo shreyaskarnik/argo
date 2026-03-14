@@ -40,6 +40,15 @@ export { showConfetti, type ConfettiOptions } from './effects.js';
 // TTS
 export { type TTSEngineOptions } from './tts/engine.js';
 
+// Subtitles
+export { generateSrt, generateVtt } from './subtitles.js';
+
+// Chapters
+export { generateChapterMetadata } from './chapters.js';
+
+// Report
+export { buildSceneReport, formatSceneReport, type SceneReport } from './report.js';
+
 // Validate
 export { validateDemo, type ValidateOptions, type ValidateResult } from './validate.js';
 

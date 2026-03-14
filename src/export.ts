@@ -18,6 +18,8 @@ export interface ExportOptions {
   deviceScaleFactor?: number;
   /** Optional path to a PNG image to embed as the MP4 thumbnail (cover art). */
   thumbnailPath?: string;
+  /** Optional path to ffmpeg chapter metadata file for MP4 chapter markers. */
+  chapterMetadataPath?: string;
 }
 
 function formatSeconds(ms: number): string {
@@ -58,6 +60,7 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     outputHeight,
     deviceScaleFactor = 1,
     thumbnailPath,
+    chapterMetadataPath,
   } = options;
 
   checkFfmpeg();
@@ -88,11 +91,21 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
   const hasThumbnail = thumbnailPath && existsSync(thumbnailPath);
 
   const args: string[] = [
-    '-i', videoPath,
-    '-i', audioPath,
+    '-i', videoPath,   // input 0: video
+    '-i', audioPath,   // input 1: audio
   ];
 
+  let nextInput = 2;
+  const hasChapters = chapterMetadataPath && existsSync(chapterMetadataPath);
+  let chapterInputIdx = -1;
+  if (hasChapters) {
+    chapterInputIdx = nextInput++;
+    args.push('-i', chapterMetadataPath);
+  }
+
+  let thumbInputIdx = -1;
   if (hasThumbnail) {
+    thumbInputIdx = nextInput++;
     args.push('-i', thumbnailPath);
   }
 
@@ -120,13 +133,16 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     args.push('-r', String(fps));
   }
 
+  if (hasChapters) {
+    args.push('-map_metadata', String(chapterInputIdx));
+  }
+
   if (hasThumbnail) {
     // Map video, audio, and thumbnail streams explicitly
-    args.push('-map', '0:v', '-map', '1:a', '-map', '2:v');
+    args.push('-map', '0:v', '-map', '1:a', '-map', `${thumbInputIdx}:v`);
     // Encode thumbnail stream as PNG attached picture
     args.push('-c:v:1', 'png', '-disposition:v:1', 'attached_pic');
     // Skip -shortest: the PNG has 0 duration and would truncate the whole output.
-    // Audio and video are already aligned by the pipeline.
   } else {
     args.push('-shortest');
   }
