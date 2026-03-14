@@ -9,6 +9,7 @@ export interface KokoroEngineOptions {
 
 export class KokoroEngine implements TTSEngine {
   private tts: any = null;
+  private initPromise: Promise<any> | null = null;
   private modelId: string;
   private dtype: string;
   private device: 'wasm' | 'webgpu' | 'cpu' | null;
@@ -23,21 +24,28 @@ export class KokoroEngine implements TTSEngine {
 
   private async getTTS(): Promise<any> {
     if (this.tts) return this.tts;
-    try {
-      const { KokoroTTS } = await import('kokoro-js');
-      this.tts = await KokoroTTS.from_pretrained(this.modelId, {
-        dtype: this.dtype as 'fp32' | 'fp16' | 'q8' | 'q4' | 'q4f16',
-        device: this.device,
-        progress_callback: this.onProgress ?? undefined,
-      });
-    } catch (err) {
-      throw new Error(
-        `Failed to initialize Kokoro TTS (model: ${this.modelId}, dtype: ${this.dtype}). ` +
-        `This may require an internet connection for first-time model download. ` +
-        `Original error: ${(err as Error).message}`
-      );
+    // Share a single init promise so concurrent calls don't duplicate model loading
+    if (!this.initPromise) {
+      this.initPromise = (async () => {
+        try {
+          const { KokoroTTS } = await import('kokoro-js');
+          this.tts = await KokoroTTS.from_pretrained(this.modelId, {
+            dtype: this.dtype as 'fp32' | 'fp16' | 'q8' | 'q4' | 'q4f16',
+            device: this.device,
+            progress_callback: this.onProgress ?? undefined,
+          });
+        } catch (err) {
+          this.initPromise = null; // allow retry on failure
+          throw new Error(
+            `Failed to initialize Kokoro TTS (model: ${this.modelId}, dtype: ${this.dtype}). ` +
+            `This may require an internet connection for first-time model download. ` +
+            `Original error: ${(err as Error).message}`
+          );
+        }
+        return this.tts;
+      })();
     }
-    return this.tts;
+    return this.initPromise;
   }
 
   async generate(text: string, options: TTSEngineOptions): Promise<Buffer> {

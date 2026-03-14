@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { generateClips } from './tts/generate.js';
@@ -134,6 +134,9 @@ export async function runPipeline(
       `Padding the final video frame to preserve the full audio.`
     );
   }
+
+  // Ensure output directory exists before writing subtitles
+  mkdirSync(config.outputDir, { recursive: true });
 
   // Build scene text map for subtitles
   const manifestPath = `${config.demosDir}/${demoName}.voiceover.json`;
