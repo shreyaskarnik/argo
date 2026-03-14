@@ -137,4 +137,39 @@ describe('CLI', () => {
       expect(mockedLoadConfig).toHaveBeenCalledWith(process.cwd(), 'my-config.ts');
     });
   });
+
+  describe('demo name validation', () => {
+    it('rejects demo names with path traversal', async () => {
+      await expect(run('record', '../../../etc/passwd')).rejects.toThrow('Invalid demo name');
+    });
+
+    it('rejects demo names with spaces', async () => {
+      await expect(run('pipeline', 'my demo')).rejects.toThrow('Invalid demo name');
+    });
+
+    it('rejects demo names starting with a dot', async () => {
+      await expect(run('export', '.hidden')).rejects.toThrow('Invalid demo name');
+    });
+
+    it('accepts valid demo names with hyphens and underscores', async () => {
+      await run('record', 'my-demo_v2');
+      expect(mockedRecord).toHaveBeenCalledWith('my-demo_v2', expect.anything());
+    });
+  });
+
+  describe('tts generate demoName derivation', () => {
+    it('derives demoName from manifest filename using basename', async () => {
+      await run('tts', 'generate', 'demos/signup.voiceover.json');
+      expect(mockedGenerateClips).toHaveBeenCalledWith(
+        expect.objectContaining({ demoName: 'signup' }),
+      );
+    });
+
+    it('strips nested directory paths', async () => {
+      await run('tts', 'generate', 'path/to/demos/foo.voiceover.json');
+      expect(mockedGenerateClips).toHaveBeenCalledWith(
+        expect.objectContaining({ demoName: 'foo' }),
+      );
+    });
+  });
 });

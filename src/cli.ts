@@ -1,4 +1,5 @@
 import { Command, Option } from 'commander';
+import { basename } from 'node:path';
 import { loadConfig, type ArgoConfig, type BrowserEngine } from './config.js';
 import { record } from './record.js';
 import { generateClips } from './tts/generate.js';
@@ -64,7 +65,7 @@ export function createProgram(): Command {
       const config = await ensureTTSEngine(await loadConfig(process.cwd(), configPath));
       await generateClips({
         manifestPath: manifest,
-        demoName: manifest.replace(/^.*\//, '').replace(/\.voiceover\.json$/, '').replace(/\.json$/, ''),
+        demoName: basename(manifest).replace(/\.voiceover\.json$/, '').replace(/\.json$/, ''),
         engine: config.tts.engine!,
         projectRoot: '.',
         defaults: { voice: config.tts.defaultVoice, speed: config.tts.defaultSpeed },

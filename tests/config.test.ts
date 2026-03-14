@@ -170,6 +170,30 @@ describe('loadConfig', () => {
     expect(config.demosDir).toBe('demos');
   });
 
+  it('rejects config that exports a string', async () => {
+    await writeFile(
+      join(tmpDir, 'argo.config.mjs'),
+      `export default "not an object";`,
+    );
+    await expect(loadConfig(tmpDir)).rejects.toThrow('must export a plain object');
+  });
+
+  it('rejects config that exports an array', async () => {
+    await writeFile(
+      join(tmpDir, 'argo.config.mjs'),
+      `export default [{ baseURL: "http://localhost" }];`,
+    );
+    await expect(loadConfig(tmpDir)).rejects.toThrow('must export a plain object');
+  });
+
+  it('rejects config that exports null', async () => {
+    await writeFile(
+      join(tmpDir, 'argo.config.mjs'),
+      `export default null;`,
+    );
+    await expect(loadConfig(tmpDir)).rejects.toThrow('must export a plain object');
+  });
+
   it('finds argo.config.ts first in search order', async () => {
     await writeFile(
       join(tmpDir, 'argo.config.ts'),
