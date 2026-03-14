@@ -87,7 +87,15 @@ export async function runPipeline(
 
   // Step 3: Align clips with timing
   console.log('Step 3/4: Aligning narration with video...');
-  const timing: SceneTiming = JSON.parse(readFileSync(timingPath, 'utf-8'));
+  let timing: SceneTiming;
+  try {
+    timing = JSON.parse(readFileSync(timingPath, 'utf-8'));
+  } catch (err) {
+    throw new Error(
+      `Failed to parse timing file at ${timingPath}: ${(err as Error).message}. ` +
+      `The file may be corrupt from an interrupted recording. Try re-running: argo record ${demoName}`
+    );
+  }
 
   // Load WAV clips into memory
   const clips: ClipInfo[] = clipResults.map((cr) => {

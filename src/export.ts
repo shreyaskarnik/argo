@@ -79,6 +79,12 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
 
   const outputPath = join(outputDir, `${demoName}.mp4`);
 
+  if (thumbnailPath && !existsSync(thumbnailPath)) {
+    console.warn(
+      `Warning: configured thumbnailPath "${thumbnailPath}" does not exist. ` +
+      `The video will be exported without a thumbnail.`
+    );
+  }
   const hasThumbnail = thumbnailPath && existsSync(thumbnailPath);
 
   const args: string[] = [

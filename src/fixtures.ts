@@ -37,7 +37,11 @@ function loadSceneDurations(): Record<string, number> | undefined {
   if (!durationsPath || !existsSync(durationsPath)) return undefined;
   try {
     return JSON.parse(readFileSync(durationsPath, 'utf-8'));
-  } catch {
+  } catch (err) {
+    console.warn(
+      `Warning: failed to parse scene durations from ${durationsPath}: ${(err as Error).message}. ` +
+      `Falling back to default durations. Clear .argo/ and re-run the pipeline if timing is wrong.`
+    );
     return undefined;
   }
 }

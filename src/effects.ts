@@ -144,8 +144,12 @@ export async function showConfetti(
   if (wait) {
     await page.waitForTimeout(duration + fadeOut);
   }
-  } catch {
-    // Swallow errors (page/context disposal) so fire-and-forget callers
-    // never see an unhandled rejection.
+  } catch (err) {
+    // Swallow page/context disposal errors so fire-and-forget callers
+    // never see an unhandled rejection. Surface anything else.
+    const msg = (err as Error)?.message ?? '';
+    if (!msg.includes('Target closed') && !msg.includes('destroyed') && !msg.includes('closed') && !msg.includes('disposed')) {
+      console.warn(`Warning: confetti effect failed: ${msg}`);
+    }
   }
 }

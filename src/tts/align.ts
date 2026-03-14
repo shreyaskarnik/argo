@@ -64,6 +64,14 @@ export function alignClips(
     );
   }
 
+  if (matched.length === 0 && clips.length > 0) {
+    const names = clips.map((c) => c.scene).join(', ');
+    throw new Error(
+      `None of the ${clips.length} TTS clip(s) matched any scene in the timing data (clips: ${names}). ` +
+      `Check that voiceover manifest scene names match narration.mark() calls in the demo script.`
+    );
+  }
+
   // 2. Sort by scene timestamp ascending
   matched.sort((a, b) => timing[a.scene] - timing[b.scene]);
 

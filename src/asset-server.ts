@@ -66,7 +66,15 @@ export function startAssetServer(assetDir: string): Promise<AssetServer> {
       const ext = extname(filePath).toLowerCase();
       const contentType = MIME_TYPES[ext] ?? 'application/octet-stream';
       res.writeHead(200, { 'Content-Type': contentType });
-      createReadStream(filePath).pipe(res);
+      const stream = createReadStream(filePath);
+      stream.on('error', (err) => {
+        console.warn(`Warning: asset server failed to read ${filePath}: ${err.message}`);
+        if (!res.headersSent) {
+          res.writeHead(500);
+        }
+        res.end();
+      });
+      stream.pipe(res);
     });
 
     server.on('error', (err) => {

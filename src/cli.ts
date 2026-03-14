@@ -6,6 +6,15 @@ import { exportVideo } from './export.js';
 import { runPipeline } from './pipeline.js';
 import { init } from './init.js';
 
+function validateDemoName(name: string): string {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(name)) {
+    throw new Error(
+      `Invalid demo name "${name}": only letters, numbers, hyphens, and underscores are allowed.`
+    );
+  }
+  return name;
+}
+
 async function ensureTTSEngine(config: ArgoConfig): Promise<ArgoConfig> {
   if (!config.tts.engine) {
     const { KokoroEngine } = await import('./tts/kokoro.js');
@@ -27,6 +36,7 @@ export function createProgram(): Command {
     .description('Record a demo using Playwright')
     .addOption(new Option('--browser <engine>', 'browser engine').choices(['chromium', 'webkit', 'firefox']))
     .action(async (demo: string, cmdOpts: { browser?: string }) => {
+      validateDemoName(demo);
       const configPath = program.opts().config;
       const config = await loadConfig(process.cwd(), configPath);
       if (!config.baseURL) {
@@ -65,6 +75,7 @@ export function createProgram(): Command {
     .command('export <demo>')
     .description('Export demo to MP4')
     .action(async (demo: string) => {
+      validateDemoName(demo);
       const configPath = program.opts().config;
       const config = await loadConfig(process.cwd(), configPath);
       await exportVideo({
@@ -86,6 +97,7 @@ export function createProgram(): Command {
     .description('Run the full pipeline: TTS → record → export')
     .addOption(new Option('--browser <engine>', 'browser engine').choices(['chromium', 'webkit', 'firefox']))
     .action(async (demo: string, cmdOpts: { browser?: string }) => {
+      validateDemoName(demo);
       const configPath = program.opts().config;
       const loaded = await ensureTTSEngine(await loadConfig(process.cwd(), configPath));
       const config = cmdOpts.browser

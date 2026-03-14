@@ -43,10 +43,18 @@ export class KokoroEngine implements TTSEngine {
   async generate(text: string, options: TTSEngineOptions): Promise<Buffer> {
     if (!text?.trim()) throw new Error('TTS text must not be empty');
     const tts = await this.getTTS();
-    const audio = await tts.generate(text, {
-      voice: options.voice ?? 'af_heart',
-      speed: options.speed ?? 1.0,
-    });
+    let audio;
+    try {
+      audio = await tts.generate(text, {
+        voice: options.voice ?? 'af_heart',
+        speed: options.speed ?? 1.0,
+      });
+    } catch (err) {
+      throw new Error(
+        `Kokoro TTS failed to generate audio for text "${text.substring(0, 80)}..." ` +
+        `(voice: ${options.voice ?? 'af_heart'}). Original error: ${(err as Error).message}`
+      );
+    }
     const samples: Float32Array = audio.data ?? audio.audio;
     if (!samples || !(samples instanceof Float32Array)) {
       throw new Error('kokoro-js returned unexpected audio format. Check kokoro-js version.');

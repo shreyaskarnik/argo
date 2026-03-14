@@ -157,5 +157,12 @@ export async function loadConfig(
     throw new Error(`Failed to load config from ${configPath}: ${(err as Error).message}`);
   }
   const userConfig: UserConfig = mod.default ?? mod;
+  if (typeof userConfig !== 'object' || userConfig === null || Array.isArray(userConfig)) {
+    throw new Error(
+      `Config file ${configPath} must export a plain object. ` +
+      `Got ${Array.isArray(userConfig) ? 'array' : typeof userConfig}. ` +
+      `Use: export default { baseURL: "...", ... }`
+    );
+  }
   return defineConfig(userConfig);
 }
