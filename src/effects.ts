@@ -11,6 +11,8 @@ export interface ConfettiOptions {
   colors?: string[];
   /** Fade-out duration in ms. Default: 800 */
   fadeOut?: number;
+  /** Block until animation completes. Default: false (non-blocking, fire-and-forget safe). */
+  wait?: boolean;
 }
 
 const DEFAULT_COLORS = ['#3b82f6', '#06b6d4', '#4ade80', '#f59e0b', '#ef4444', '#a78bfa'];
@@ -26,6 +28,7 @@ export async function showConfetti(
   const spread = opts?.spread ?? 'burst';
   const colors = opts?.colors ?? DEFAULT_COLORS;
   const fadeOut = opts?.fadeOut ?? 800;
+  const wait = opts?.wait ?? false;
 
   await page.evaluate(
     ({ pieces, spread, colors, duration, fadeOut, id }) => {
@@ -137,6 +140,7 @@ export async function showConfetti(
     { pieces, spread, colors, duration, fadeOut, id: CONFETTI_ID },
   );
 
-  // Wait for the full animation + fade to complete
-  await page.waitForTimeout(duration + fadeOut);
+  if (wait) {
+    await page.waitForTimeout(duration + fadeOut);
+  }
 }

@@ -70,10 +70,10 @@ test('showcase', async ({ page, narration }) => {
     autoBackground: true,
   }, narration.durationFor('closing', { maxMs: 14000, leadOutMs: 800 }));
 
-  // Scene 6: Mic drop — confetti on light mode
+  // Scene 6: Mic drop — confetti + overlay together
   narration.mark('mic-drop');
 
-  await showConfetti(page, { spread: 'burst', duration: 3000 });
+  showConfetti(page, { spread: 'burst', duration: 3000 });
 
   await showOverlay(page, 'mic-drop', {
     type: 'lower-third',

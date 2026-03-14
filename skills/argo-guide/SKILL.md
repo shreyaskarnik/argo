@@ -94,7 +94,7 @@ test('my-demo', async ({ page, narration }) => {
 | `withOverlay(page, scene, cue, action)` | Show overlay during an async action, auto-remove when done (even on throw). |
 | `hideOverlay(page, zone?)` | Manually remove overlay from a zone (or all zones). |
 | `demoType(page, selector, text, delay?)` | Type text character-by-character (60ms default delay) for a realistic typing effect. **Gotcha**: `selector` is a CSS selector (e.g., `'input[type="email"]'`), not a label string. Use `page.getByLabel('Email').click()` first to focus, then `demoType(page, 'input[type="email"]', ...)`. |
-| `showConfetti(page, opts?)` | Burst confetti animation for mic-drop moments. Options: `duration` (default 3000ms), `pieces` (150), `spread` (`'burst'` or `'rain'`), `colors` (hex array), `fadeOut` (800ms). Auto-cleans up. |
+| `showConfetti(page, opts?)` | Burst confetti animation for mic-drop moments. **Non-blocking by default** — fires the animation and returns immediately, safe to call without `await`. Options: `duration` (3000ms), `pieces` (150), `spread` (`'burst'` / `'rain'`), `colors` (hex array), `fadeOut` (800ms), `wait` (false). Set `wait: true` to block until animation completes. |
 | `page.waitForTimeout(ms)` | Add deliberate pauses for pacing. |
 
 ### Dynamic Scene Durations with `durationFor()`
