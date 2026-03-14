@@ -113,3 +113,11 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - `demoType(page, selector, text)` takes a CSS selector, not a label — users expect `getByLabel` semantics. Consider accepting a Locator directly.
 - `deviceScaleFactor: 2` is broken with webkit — viewport renders at 1/4 of the frame. Stick to `deviceScaleFactor: 1` until fixed.
 - `argo init` scaffolds `argo.config.js` which causes Node ESM warnings in projects without `"type": "module"`. Should scaffold `.mjs` by default.
+
+## Security Invariants
+
+- Demo names are validated at CLI entry (`src/cli.ts`): `[a-zA-Z0-9][a-zA-Z0-9_-]*` only. Always validate before `path.join()`.
+- Overlay text is HTML-escaped via `escapeHtml()` in `src/overlays/templates.ts` before `innerHTML` injection. Never bypass.
+- Subprocess calls use `execFile`/`spawnSync` with array args — never shell string interpolation.
+- `showConfetti` catch block filters by error message — only swallows page disposal errors, surfaces everything else. Don't broaden.
+- `loadConfig` validates the exported value is a plain object. Config files run with full Node.js privileges (same as Vite/Webpack).
