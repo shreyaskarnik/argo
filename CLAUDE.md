@@ -33,10 +33,13 @@ Argo turns Playwright demo scripts into polished product demo videos with AI voi
 
 The system is a 4-step pipeline: **TTS → Record → Align → Export**
 
-- **TTS** (`src/tts/`): Generates voice clips from JSON manifests using Kokoro TTS. Clips are content-addressed cached (SHA256 of scene+text+voice+speed) in `.argo/<demo>/clips/`.
+- **TTS** (`src/tts/`): Generates voice clips from JSON manifests using Kokoro TTS. Clips are content-addressed cached (SHA256 of scene+text+voice+speed) in `.argo/<demo>/clips/`. Uncached clips generate in parallel via `Promise.all`.
 - **Record** (`src/record.ts`): Runs Playwright demo script, captures video (WebM) and timing marks (`.timing.json`). Generates a dynamic Playwright config on-the-fly.
 - **Align** (`src/tts/align.ts`): Places audio clips at scene timestamps from timing data. Prevents overlap with 100ms gaps. Mixes into single WAV (Float32, 24kHz).
-- **Export** (`src/export.ts`): Merges video + aligned audio via ffmpeg into final MP4. Supports optional MP4 thumbnail embedding via `export.thumbnailPath` config (ffmpeg attached_pic stream). CRITICAL: `-shortest` must be skipped when thumbnail is present — PNG has 0 duration and truncates the entire output.
+- **Export** (`src/export.ts`): Merges video + aligned audio via ffmpeg into final MP4. Supports optional MP4 thumbnail embedding via `export.thumbnailPath` config (ffmpeg attached_pic stream). CRITICAL: `-shortest` must be skipped when thumbnail is present — PNG has 0 duration and truncates the entire output. Embeds chapter markers from scene placements via ffmpeg metadata. Input indices are dynamic based on presence of chapters/thumbnail.
+- **Subtitles** (`src/subtitles.ts`): Generates `.srt` and `.vtt` files from alignment placements + voiceover manifest text. Best-effort — won't fail the pipeline.
+- **Chapters** (`src/chapters.ts`): Generates ffmpeg metadata format (`TIMEBASE=1/1000`) for MP4 chapter markers from scene placements.
+- **Report** (`src/report.ts`): Builds scene timing report (JSON + formatted console output) with per-scene durations, overflow, and output path.
 
 Pipeline orchestration: `src/pipeline.ts` → CLI entry: `src/cli.ts` (Commander.js)
 

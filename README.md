@@ -230,13 +230,23 @@ choco install ffmpeg       # Windows
 
 ## How the pipeline works
 
-1. **TTS** — Kokoro (via `kokoro-js`) generates WAV clips from the voiceover manifest. Clips are cached by content hash in `.argo/<demo>/clips/` so regeneration is instant if text hasn't changed.
+1. **TTS** — Kokoro (via `kokoro-js`) generates WAV clips from the voiceover manifest. Clips are cached by content hash in `.argo/<demo>/clips/` so regeneration is instant if text hasn't changed. Uncached clips generate in parallel.
 
 2. **Record** — Playwright runs the demo script in a real browser. The `narration` fixture records timestamps for each `mark()` call. Video is captured at native resolution.
 
 3. **Align** — Each TTS clip is placed at its scene's recorded timestamp. Overlapping clips are pushed forward with a 100ms gap. All clips are mixed into a single `narration-aligned.wav`.
 
-4. **Export** — ffmpeg combines the screen recording (WebM) with the aligned narration (WAV) into an H.264 MP4.
+4. **Export** — ffmpeg combines the screen recording (WebM) with the aligned narration (WAV) into an H.264 MP4 with chapter markers. Subtitle files (`.srt` + `.vtt`) and a scene report are generated alongside the video.
+
+## Example
+
+A self-contained example is in [`example/`](example/) — it records a demo of Argo's own showcase page:
+
+```bash
+cd example && npm install && npx playwright install webkit
+npm run serve      # in one terminal
+npm run demo       # in another
+```
 
 ## LLM Skill
 

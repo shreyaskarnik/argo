@@ -293,6 +293,15 @@ npx argo init    # creates example demo, config (.mjs), playwright config
 ### Pipeline order
 **TTS → Record → Align → Export** (not Record first — TTS must run first so `durationFor()` has clip lengths available during recording).
 
+### Pipeline output
+After a successful run, the pipeline produces:
+- `videos/<name>.mp4` — the final video with embedded chapter markers
+- `videos/<name>.srt` — SRT subtitle file
+- `videos/<name>.vtt` — WebVTT subtitle file
+- `.argo/<name>/scene-report.json` — scene timing report (durations, overflow)
+
+TTS clips generate in parallel for faster builds. Subtitles are derived from voiceover manifest text + alignment placements.
+
 ---
 
 ## Troubleshooting
