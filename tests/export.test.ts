@@ -188,4 +188,50 @@ describe('exportVideo', () => {
     await expect(exportVideo({ demoName: 'demo', argoDir: '.argo', outputDir: 'out' }))
       .rejects.toThrow(/Failed to launch ffmpeg/);
   });
+
+  it('embeds thumbnail as attached picture when thumbnailPath exists', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      thumbnailPath: 'assets/logo-thumb.png',
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const a = args as string[];
+    // Should have 3 inputs
+    expect(a.filter(x => x === '-i').length).toBe(3);
+    expect(a).toContain('assets/logo-thumb.png');
+    // Should map explicit streams: 0:v, 1:a, 2:v
+    const mapIndices = a.reduce<number[]>((acc, x, i) => x === '-map' ? [...acc, i] : acc, []);
+    expect(mapIndices.length).toBe(3);
+    expect(a[mapIndices[0] + 1]).toBe('0:v');
+    expect(a[mapIndices[1] + 1]).toBe('1:a');
+    expect(a[mapIndices[2] + 1]).toBe('2:v');
+    // Encode thumbnail stream as PNG attached picture
+    expect(a).toContain('-c:v:1');
+    expect(a).toContain('png');
+    expect(a).toContain('-disposition:v:1');
+    expect(a).toContain('attached_pic');
+    // -shortest must NOT be present (PNG has 0 duration, would truncate output)
+    expect(a).not.toContain('-shortest');
+  });
+
+  it('skips thumbnail when thumbnailPath does not exist on disk', async () => {
+    mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
+    mockedExistsSync.mockImplementation((p) => {
+      if (String(p) === 'assets/missing.png') return false;
+      return true;
+    });
+    mockedSpawnSync.mockReturnValue({ status: 0 } as any);
+
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      thumbnailPath: 'assets/missing.png',
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const a = args as string[];
+    expect(a.filter(x => x === '-i').length).toBe(2);
+    expect(a).not.toContain('-disposition:v:1');
+  });
 });

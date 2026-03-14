@@ -16,6 +16,8 @@ export interface ExportOptions {
   outputHeight?: number;
   /** When > 1, recording was captured at scaled resolution and needs lanczos downscale. */
   deviceScaleFactor?: number;
+  /** Optional path to a PNG image to embed as the MP4 thumbnail (cover art). */
+  thumbnailPath?: string;
 }
 
 function formatSeconds(ms: number): string {
@@ -55,6 +57,7 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     outputWidth,
     outputHeight,
     deviceScaleFactor = 1,
+    thumbnailPath,
   } = options;
 
   checkFfmpeg();
@@ -76,10 +79,16 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
 
   const outputPath = join(outputDir, `${demoName}.mp4`);
 
+  const hasThumbnail = thumbnailPath && existsSync(thumbnailPath);
+
   const args: string[] = [
     '-i', videoPath,
     '-i', audioPath,
   ];
+
+  if (hasThumbnail) {
+    args.push('-i', thumbnailPath);
+  }
 
   // Build video filter chain
   const vFilters: string[] = [];
@@ -105,7 +114,18 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     args.push('-r', String(fps));
   }
 
-  args.push('-shortest', '-y', outputPath);
+  if (hasThumbnail) {
+    // Map video, audio, and thumbnail streams explicitly
+    args.push('-map', '0:v', '-map', '1:a', '-map', '2:v');
+    // Encode thumbnail stream as PNG attached picture
+    args.push('-c:v:1', 'png', '-disposition:v:1', 'attached_pic');
+    // Skip -shortest: the PNG has 0 duration and would truncate the whole output.
+    // Audio and video are already aligned by the pipeline.
+  } else {
+    args.push('-shortest');
+  }
+
+  args.push('-y', outputPath);
 
   const result = spawnSync('ffmpeg', args, { stdio: 'inherit' });
 

@@ -77,6 +77,7 @@ export function createProgram(): Command {
         outputWidth: config.video.width,
         outputHeight: config.video.height,
         deviceScaleFactor: config.video.deviceScaleFactor,
+        thumbnailPath: config.export.thumbnailPath,
       });
     });
 

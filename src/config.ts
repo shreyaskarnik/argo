@@ -25,6 +25,7 @@ export interface VideoConfig {
 export interface ExportConfig {
   preset: string;
   crf: number;
+  thumbnailPath?: string;
 }
 
 export interface OverlayConfig {

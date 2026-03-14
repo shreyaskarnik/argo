@@ -135,6 +135,7 @@ export async function runPipeline(
     outputWidth: config.video.width,
     outputHeight: config.video.height,
     deviceScaleFactor: config.video.deviceScaleFactor,
+    thumbnailPath: config.export.thumbnailPath,
   };
   if (tailPadMs !== undefined) exportOptions.tailPadMs = tailPadMs;
   const outputPath = await exportVideo(exportOptions);

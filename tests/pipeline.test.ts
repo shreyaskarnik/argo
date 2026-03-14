@@ -47,7 +47,7 @@ const defaultConfig: Pick<ArgoConfig, 'baseURL' | 'demosDir' | 'outputDir' | 'tt
   outputDir: 'videos',
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0, engine: mockEngine },
   video: { width: 1920, height: 1080, fps: 30, browser: 'chromium' as const, deviceScaleFactor: 1 },
-  export: { preset: 'slow', crf: 16 },
+  export: { preset: 'slow', crf: 16, thumbnailPath: 'assets/thumb.png' },
   overlays: { autoBackground: false },
 };
 
@@ -153,6 +153,7 @@ describe('runPipeline', () => {
       outputWidth: 1920,
       outputHeight: 1080,
       deviceScaleFactor: 1,
+      thumbnailPath: 'assets/thumb.png',
     });
   });
 
