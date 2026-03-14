@@ -13,6 +13,7 @@ export interface RecordOptions {
   deviceScaleFactor?: number;
   autoBackground?: boolean;
   defaultPlacement?: string;
+  headed?: boolean;
 }
 
 export interface RecordResult {
@@ -54,6 +55,7 @@ export default defineConfig({
       testDir: ${JSON.stringify(demosDir)},
       testMatch: '**/*.demo.ts',
       use: {
+        headless: ${options.headed ? 'false' : 'true'},
         browserName: ${JSON.stringify(browser)},
         baseURL: ${JSON.stringify(options.baseURL)},
         viewport: { width: ${width}, height: ${height} },

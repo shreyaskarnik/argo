@@ -118,7 +118,7 @@ describe('CLI', () => {
       await run('pipeline', 'onboarding');
 
       expect(mockedLoadConfig).toHaveBeenCalledWith(process.cwd(), undefined);
-      expect(mockedRunPipeline).toHaveBeenCalledWith('onboarding', defaultConfig);
+      expect(mockedRunPipeline).toHaveBeenCalledWith('onboarding', defaultConfig, { headed: undefined });
     });
   });
 

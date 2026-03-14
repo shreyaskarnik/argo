@@ -38,7 +38,8 @@ export function createProgram(): Command {
     .description('Record a demo using Playwright')
     .addOption(new Option('--browser <engine>', 'browser engine').choices(['chromium', 'webkit', 'firefox']))
     .option('--base-url <url>', 'override baseURL from config')
-    .action(async (demo: string, cmdOpts: { browser?: string; baseUrl?: string }) => {
+    .option('--headed', 'run browser in headed mode (visible window)')
+    .action(async (demo: string, cmdOpts: { browser?: string; baseUrl?: string; headed?: boolean }) => {
       validateDemoName(demo);
       const configPath = program.opts().config;
       const config = await loadConfig(process.cwd(), configPath);
@@ -55,6 +56,7 @@ export function createProgram(): Command {
         deviceScaleFactor: config.video.deviceScaleFactor,
         autoBackground: config.overlays?.autoBackground,
         defaultPlacement: config.overlays?.defaultPlacement,
+        headed: cmdOpts.headed,
       });
     });
 
@@ -103,7 +105,8 @@ export function createProgram(): Command {
     .description('Run the full pipeline: TTS → record → export')
     .addOption(new Option('--browser <engine>', 'browser engine').choices(['chromium', 'webkit', 'firefox']))
     .option('--base-url <url>', 'override baseURL from config')
-    .action(async (demo: string, cmdOpts: { browser?: string; baseUrl?: string }) => {
+    .option('--headed', 'run browser in headed mode (visible window)')
+    .action(async (demo: string, cmdOpts: { browser?: string; baseUrl?: string; headed?: boolean }) => {
       validateDemoName(demo);
       const configPath = program.opts().config;
       const loaded = await ensureTTSEngine(await loadConfig(process.cwd(), configPath));
@@ -113,7 +116,7 @@ export function createProgram(): Command {
       if (cmdOpts.baseUrl) {
         config = { ...config, baseURL: cmdOpts.baseUrl };
       }
-      await runPipeline(demo, config);
+      await runPipeline(demo, config, { headed: cmdOpts.headed });
     });
 
   program

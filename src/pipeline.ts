@@ -35,9 +35,14 @@ function getVideoDurationMs(videoPath: string): number {
   return durationMs;
 }
 
+export interface PipelineOptions {
+  headed?: boolean;
+}
+
 export async function runPipeline(
   demoName: string,
-  config: Pick<ArgoConfig, 'baseURL' | 'demosDir' | 'outputDir' | 'tts' | 'video' | 'export' | 'overlays'>
+  config: Pick<ArgoConfig, 'baseURL' | 'demosDir' | 'outputDir' | 'tts' | 'video' | 'export' | 'overlays'>,
+  pipelineOpts?: PipelineOptions,
 ): Promise<string> {
   if (!config.baseURL) {
     throw new Error(
@@ -87,6 +92,7 @@ export async function runPipeline(
     deviceScaleFactor: config.video.deviceScaleFactor,
     autoBackground: config.overlays.autoBackground,
     defaultPlacement: config.overlays.defaultPlacement,
+    headed: pipelineOpts?.headed,
   });
 
   // Step 3: Align clips with timing
