@@ -1,0 +1,23 @@
+{
+  "skill_name": "argo-guide",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "I have a Next.js app running on localhost:3000 with a signup flow (landing page -> click 'Get Started' -> fill in email/password -> click 'Create Account' -> see dashboard). Create an Argo demo video that walks through this signup flow with voiceover narration and some nice overlays.",
+      "expected_output": "A complete demo script (*.demo.ts), voiceover manifest (*.voiceover.json), and optionally an overlay manifest or inline overlay calls. Should import from @argo-video/cli, use narration.mark() for each scene, use narration.durationFor() for timing, and include showOverlay/withOverlay calls.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "I'm trying to run my argo demo but getting 'No timing file found' after the record step. My demo script imports test from '@playwright/test' and I have narration.mark() calls. The pipeline runs but export fails. What's wrong and how do I fix it?",
+      "expected_output": "Should identify the root cause: importing test from @playwright/test instead of @argo-video/cli. The Argo fixture provides the narration object - the Playwright import won't have it. Should suggest changing the import to '@argo-video/cli'.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I have an existing demo script for my app. I want to add a headline-card overlay to the 'features' scene that auto-detects whether the page background is dark or light and adjusts the overlay colors accordingly. The overlay should slide in from the left and show in the top-right corner. Also, my demo is about 2 minutes long and keeps timing out.",
+      "expected_output": "Should provide the correct showOverlay or withOverlay call with type: 'headline-card', placement: 'top-right', motion: 'slide-in', autoBackground: true. Should also mention test.setTimeout() to fix the timeout issue. Should use narration.durationFor() for the overlay duration.",
+      "files": []
+    }
+  ]
+}

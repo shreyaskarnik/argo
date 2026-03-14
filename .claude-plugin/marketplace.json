@@ -1,0 +1,21 @@
+{
+  "name": "argo-video",
+  "owner": {
+    "name": "Argo Video"
+  },
+  "metadata": {
+    "description": "Argo plugin for creating polished product demo videos from Playwright scripts with AI voiceover",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "argo-guide",
+      "description": "Guide for using Argo to create polished product demo videos from Playwright scripts with AI voiceover and animated overlays",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/argo-guide"
+      ]
+    }
+  ]
+}
