@@ -51,7 +51,7 @@ echo "Processing audio..."
 DURATION=$(ffprobe -v error -show_entries format=duration \
   -of csv=p=0 "$RAW_FILE" 2>/dev/null || echo "0")
 
-if [ "$(echo "$DURATION < 2" | bc -l 2>/dev/null || echo 1)" = "1" ] && [ "$DURATION" = "0" ]; then
+if [ "$DURATION" = "0" ] || [ "$(echo "$DURATION < 2" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
   echo "Error: Recording too short or failed. Try again."
   rm -f "$RAW_FILE"
   exit 1
