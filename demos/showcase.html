@@ -805,29 +805,16 @@
         <div class="feature-card" id="feature-overlays" data-demo-target="feature-overlays">
           <div class="feature-icon-wrap">&#127381;</div>
           <h3 class="feature-name">Overlays</h3>
-          <p class="feature-desc">
-            Lower-thirds, headline cards, callouts — add professional overlays to your recordings with a single API call. Fully typed, timing-aware, and composited directly into the video.
-          </p>
+          <p class="feature-desc">Lower-thirds, headline cards, callouts, and image cards. Typed, timing-aware, auto-themed.</p>
           <span class="feature-tag">showOverlay()</span>
         </div>
 
         <div class="feature-card" id="feature-voiceover" data-demo-target="feature-voiceover">
           <div class="feature-icon-wrap">&#127908;</div>
           <h3 class="feature-name">Voiceover</h3>
-          <p class="feature-desc">
-            AI-generated narration from a simple JSON manifest. Mark moments in your script, write your lines, and Argo synthesizes and syncs professional-quality speech automatically.
-          </p>
-          <div id="voiceover-snippet" style="background: #000; border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin: 12px 0 8px; font-family: var(--font-mono); font-size: 0.75em; line-height: 1.7; color: var(--text-muted); text-align: left; overflow-x: auto;">
-            <span style="color: #6b7280;">[</span><br>
-            &nbsp;&nbsp;<span style="color: #6b7280;">{</span><br>
-            &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #93c5fd;">"scene"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"intro"</span><span style="color: #6b7280;">,</span><br>
-            &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #93c5fd;">"text"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"Welcome to our app."</span><br>
-            &nbsp;&nbsp;<span style="color: #6b7280;">},</span><br>
-            &nbsp;&nbsp;<span style="color: #6b7280;">{</span><br>
-            &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #93c5fd;">"scene"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"feature"</span><span style="color: #6b7280;">,</span><br>
-            &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #93c5fd;">"text"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"This makes everything easier."</span><br>
-            &nbsp;&nbsp;<span style="color: #6b7280;">}</span><br>
-            <span style="color: #6b7280;">]</span>
+          <p class="feature-desc">AI narration from a JSON manifest. Six TTS engines — local or cloud. Scene pacing follows clip lengths.</p>
+          <div id="voiceover-snippet" style="background: #000; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; margin: 8px 0 6px; font-family: var(--font-mono); font-size: 0.7em; line-height: 1.5; color: var(--text-muted); text-align: left;">
+            <span style="color: #6b7280;">{</span> <span style="color: #93c5fd;">"scene"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"intro"</span><span style="color: #6b7280;">,</span> <span style="color: #93c5fd;">"text"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"Welcome."</span> <span style="color: #6b7280;">}</span>
           </div>
           <span class="feature-tag">narration.mark()</span>
         </div>
@@ -835,19 +822,15 @@
         <div class="feature-card" id="feature-camera" data-demo-target="feature-camera">
           <div class="feature-icon-wrap">&#128269;</div>
           <h3 class="feature-name">Camera Effects</h3>
-          <p class="feature-desc">
-            Direct the viewer's eye with spotlight, focus ring, dim-around, and zoom-to. These effects layer cleanly with overlays, so you can guide attention without rewriting your app.
-          </p>
+          <p class="feature-desc">Spotlight, focus ring, dim-around, zoom-to. Direct attention without rewriting your app.</p>
           <span class="feature-tag">zoomTo()</span>
         </div>
 
         <div class="feature-card" id="feature-pipeline" data-demo-target="feature-pipeline">
           <div class="feature-icon-wrap">&#9881;&#65039;</div>
           <h3 class="feature-name">Pipeline</h3>
-          <p class="feature-desc">
-            One command. Record, narrate, and export — end to end. The Argo pipeline orchestrates Playwright, FFmpeg, and AI speech into a single reproducible, scriptable workflow.
-          </p>
-          <span class="feature-tag">npx @argo-video/cli pipeline</span>
+          <p class="feature-desc">One command. TTS, record, align, export. Subtitles, chapters, and scene report included.</p>
+          <span class="feature-tag">argo pipeline</span>
         </div>
 
       </div>
