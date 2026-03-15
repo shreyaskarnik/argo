@@ -7,4 +7,7 @@ playwright.config.ts
 test-results/
 narration-*.json
 *.tsbuildinfo
+voice-preview*/
+.venv/
+.superpowers/
 .DS_Store
