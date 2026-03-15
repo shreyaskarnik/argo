@@ -90,9 +90,8 @@ test('showcase', async ({ page, narration }) => {
   await page.waitForTimeout(camDur + 500);
   dimAround(page, '#effect-dim-around', { duration: camDur });
   await page.waitForTimeout(camDur + 500);
-  await zoomTo(page, '#effect-zoom-to', { scale: 1.2, duration: camDur, wait: true });
-  await resetCamera(page);
-  await page.waitForTimeout(1000);
+  focusRing(page, '#effect-zoom-to', { color: '#3b82f6', duration: camDur });
+  await page.waitForTimeout(camDur + 500);
 
   // Scene 6: Code — zoom into demo script
   narration.mark('code');
