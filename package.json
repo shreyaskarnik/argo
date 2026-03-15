@@ -29,6 +29,12 @@
     "commander": "^12.0.0",
     "kokoro-js": "^1.2.1"
   },
+  "optionalDependencies": {
+    "openai": "^4.0.0",
+    "elevenlabs": "^1.0.0",
+    "@google/genai": "^1.0.0",
+    "sarvamai": "^1.0.0"
+  },
   "publishConfig": {
     "access": "public"
   },

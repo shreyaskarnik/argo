@@ -28,36 +28,34 @@ export class SarvamEngine implements TTSEngine {
   async generate(text: string, options: TTSEngineOptions): Promise<Buffer> {
     if (!text?.trim()) throw new Error('TTS text must not be empty');
 
-    const response = await fetch('https://api.sarvam.ai/text-to-speech', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'API-Subscription-Key': this.resolveApiKey(),
-      },
-      body: JSON.stringify({
-        inputs: [text],
-        target_language_code: options.lang ?? 'hi-IN',
-        speaker: options.voice ?? 'meera',
-        model: this.model,
-        pitch: 0,
-        pace: options.speed ?? 1.0,
-        loudness: 1.5,
-        enable_preprocessing: true,
-      }),
-    });
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`Sarvam TTS API error ${response.status}: ${body}`);
+    let SarvamAI: any;
+    try {
+      // @ts-ignore — sarvamai is an optional dependency
+      ({ default: SarvamAI } = await import('sarvamai'));
+    } catch {
+      throw new Error(
+        "Sarvam TTS engine requires the 'sarvamai' package. Install it with: npm i sarvamai"
+      );
     }
 
-    const json = await response.json() as { audios?: string[] };
-    if (!json.audios?.[0]) {
+    const client = new SarvamAI({ apiSubscriptionKey: this.resolveApiKey() });
+    const response = await client.textToSpeech.convert({
+      inputs: [text],
+      target_language_code: options.lang ?? 'hi-IN',
+      speaker: options.voice ?? 'meera',
+      model: this.model,
+      pitch: 0,
+      pace: options.speed ?? 1.0,
+      loudness: 1.5,
+      enable_preprocessing: true,
+    });
+
+    if (!response.audios?.[0]) {
       throw new Error('Sarvam TTS returned no audio data');
     }
 
     // Sarvam returns base64-encoded WAV
-    const audioBuffer = Buffer.from(json.audios[0], 'base64');
+    const audioBuffer = Buffer.from(response.audios[0], 'base64');
 
     // Convert to Argo WAV format (mono Float32 24kHz)
     const { convertToWav } = await import('../engine.js');

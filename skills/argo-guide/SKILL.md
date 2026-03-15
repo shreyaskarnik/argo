@@ -214,7 +214,7 @@ export default defineConfig({
 | `engines.openai()` | cloud | `npm i openai` | `alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer` |
 | `engines.elevenlabs()` | cloud | `npm i elevenlabs` | ElevenLabs voice IDs |
 | `engines.gemini()` | cloud | `npm i @google/genai` | Gemini voice names |
-| `engines.sarvam()` | cloud | none (fetch) | `meera` + Indian language voices |
+| `engines.sarvam()` | cloud | `npm i sarvamai` | `meera` + Indian language voices |
 | `engines.mlxAudio()` | local | `pip install mlx-audio` | model-dependent (Apple Silicon) |
 
 Cloud engines read API keys from environment variables (`OPENAI_API_KEY`, `ELEVENLABS_API_KEY`, `GEMINI_API_KEY`, `SARVAM_API_KEY`) or accept `apiKey` in the factory options.
