@@ -20,7 +20,7 @@ Write a demo script with Playwright. Add a voiceover manifest. Run one command. 
 ## Showcase
 
 [Watch the demo video](
-https://gist.github.com/user-attachments/assets/76c8cae7-b11f-4315-9189-213760f830ba)
+https://gist.github.com/user-attachments/assets/ba009e90-0310-454b-833e-e0d71d4dd72f)
 
 > *This demo was recorded by Argo, using Argo. Yes, really.*
 
