@@ -66,5 +66,8 @@ export { buildSceneReport, formatSceneReport, type SceneReport } from './report.
 // Validate
 export { validateDemo, type ValidateOptions, type ValidateResult } from './validate.js';
 
+// Doctor
+export { runDoctor, formatDoctorResults } from './doctor.js';
+
 // Init
 export { init } from './init.js';

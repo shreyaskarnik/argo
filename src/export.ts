@@ -20,6 +20,8 @@ export interface ExportOptions {
   thumbnailPath?: string;
   /** Optional path to ffmpeg chapter metadata file for MP4 chapter markers. */
   chapterMetadataPath?: string;
+  /** Additional aspect ratios to export alongside the main 16:9. */
+  formats?: Array<'1:1' | '9:16'>;
 }
 
 function formatSeconds(ms: number): string {
@@ -159,6 +161,46 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
   }
   if (result.status !== 0) {
     throw new Error(`ffmpeg failed with exit code ${result.status}`);
+  }
+
+  // Export additional aspect ratios by cropping from the main 16:9 output
+  const formats = options.formats ?? [];
+  for (const format of formats) {
+    const suffix = format.replace(':', 'x');
+    const formatPath = outputPath.replace(/\.mp4$/, `.${suffix}.mp4`);
+
+    // Compute crop dimensions from 16:9 source
+    const srcW = outputWidth ?? 1920;
+    const srcH = outputHeight ?? 1080;
+    let cropW: number, cropH: number;
+
+    if (format === '1:1') {
+      // Square: crop to height × height, centered horizontally
+      cropW = srcH;
+      cropH = srcH;
+    } else {
+      // 9:16 vertical: crop to (height × 9/16) × height, centered
+      cropW = Math.round(srcH * 9 / 16);
+      cropH = srcH;
+    }
+
+    const cropX = Math.round((srcW - cropW) / 2);
+    const cropY = 0;
+
+    const formatArgs = [
+      '-i', outputPath,
+      '-vf', `crop=${cropW}:${cropH}:${cropX}:${cropY}`,
+      '-c:v', 'libx264',
+      '-preset', preset,
+      '-crf', String(crf),
+      '-c:a', 'copy',
+      '-y', formatPath,
+    ];
+
+    const fmtResult = spawnSync('ffmpeg', formatArgs, { stdio: 'inherit' });
+    if (fmtResult.status !== 0) {
+      console.warn(`Warning: failed to export ${format} format to ${formatPath}`);
+    }
   }
 
   return outputPath;

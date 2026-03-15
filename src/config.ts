@@ -26,6 +26,7 @@ export interface ExportConfig {
   preset: string;
   crf: number;
   thumbnailPath?: string;
+  formats?: Array<'1:1' | '9:16'>;
 }
 
 export interface OverlayConfig {

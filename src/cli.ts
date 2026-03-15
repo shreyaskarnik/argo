@@ -7,6 +7,7 @@ import { exportVideo } from './export.js';
 import { runPipeline } from './pipeline.js';
 import { init } from './init.js';
 import { validateDemo } from './validate.js';
+import { runDoctor, formatDoctorResults } from './doctor.js';
 
 function validateDemoName(name: string): string {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(name)) {
@@ -143,6 +144,16 @@ export function createProgram(): Command {
         console.error(`\n  ${demo}: ${result.errors.length} error(s), ${result.warnings.length} warning(s)`);
         process.exitCode = 1;
       }
+    });
+
+  program
+    .command('doctor')
+    .description('Check environment: ffmpeg, Playwright, config, assets')
+    .action(async () => {
+      const results = await runDoctor();
+      console.log(formatDoctorResults(results));
+      const fails = results.filter(r => r.status === 'fail').length;
+      if (fails > 0) process.exitCode = 1;
     });
 
   program
