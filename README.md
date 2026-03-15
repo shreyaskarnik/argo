@@ -179,6 +179,7 @@ argo tts generate <manifest>       Generate TTS clips from manifest
 argo export <demo>                 Merge video + audio to MP4
 argo pipeline <demo>               Run all steps end-to-end
 argo validate <demo>               Check scene name consistency (no TTS/recording)
+argo doctor                        Check environment (ffmpeg, Playwright, config)
 argo --config <path> <command>     Use a custom config file
 
 Options:

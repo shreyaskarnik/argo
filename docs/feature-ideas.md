@@ -5,7 +5,7 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 ## Near Term
 
 - ~~Manifest-driven overlays.~~ **SHIPPED** — `.overlays.json` is a first-class authoring path.
-- `argo doctor`. Check `ffmpeg`, Playwright browsers, quality settings, missing assets, broken config, and common environment issues before a run.
+- ~~`argo doctor`.~~ **SHIPPED** — checks ffmpeg, ffprobe, Playwright browsers, config, baseURL, demosDir, thumbnail, video settings, and DPI issues.
 - ~~`argo lint`.~~ **SHIPPED** as `argo validate` — checks scene name consistency between demo script, voiceover manifest, and overlay manifest.
 - ~~Subtitle export.~~ **SHIPPED** — `.srt` and `.vtt` generated alongside the MP4.
 - ~~Scene report.~~ **SHIPPED** — JSON + formatted console output with per-scene durations, overflow, and output path.
@@ -13,7 +13,7 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 ## High-Leverage Product Features
 
 - ~~Camera language.~~ **SHIPPED** — `spotlight`, `focusRing`, `dimAround`, `zoomTo`, `resetCamera` helpers for directed demo recordings.
-- Multi-format export. Support `16:9`, `1:1`, and `9:16` from the same source demo, with overlay reflow and safe areas.
+- ~~Multi-format export.~~ **SHIPPED** — `export.formats: ['1:1', '9:16']` crops from 16:9 source. Overlay reflow deferred.
 - Resumable pipeline. Cache per-step artifacts so changing one voice line or one scene does not force a full rerun.
 - Per-scene transitions. Add fades, wipes, hold-freezes, and section bumpers so the final result feels more editorial.
 - Theme packs for overlays. Provide reusable visual styles like `terminal`, `product-keynote`, `minimal-docs`, and `launch-trailer`.
@@ -90,6 +90,6 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 
 Next up from what's remaining:
 
-1. Multi-format export (16:9, 1:1, 9:16)
-2. `argo preview` (hot-reload)
-3. `argo doctor`
+1. `argo preview` (hot-reload)
+2. Per-scene transitions (fades, wipes)
+3. Theme packs for overlays
