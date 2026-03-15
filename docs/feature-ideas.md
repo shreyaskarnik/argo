@@ -58,7 +58,7 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 ## Pipeline Robustness
 
 - Artifact manifest. Write a `pipeline-manifest.json` after each run with hashes of all inputs and outputs. Enables incremental rebuilds and CI caching.
-- ~~Parallel TTS generation.~~ **SHIPPED** — clips generate concurrently via `Promise.all` with shared Kokoro init promise.
+- ~~Parallel TTS generation.~~ **SHIPPED** — shared Kokoro init promise prevents duplicate model downloads. Generation is sequential (Kokoro ONNX runtime has mutex issues with concurrent calls).
 - `argo ci`. Opinionated CI mode: lint → pipeline → assert duration bounds → upload artifact. One command for GitHub Actions integration.
 
 ## Distribution
@@ -71,6 +71,20 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 - Timeline preview UI. A lightweight local viewer showing scenes, overlays, and narration lengths before rendering.
 - AI assist for demo polish. Suggest shorter copy, better scene splits, improved pacing, and stronger overlay placement.
 - Auto social package. Export MP4 plus thumbnail, transcript, title ideas, subtitle variants, and aspect-ratio cuts in one command.
+
+## Also Shipped (not on original list)
+
+- Extensible TTS — 6 built-in engines (Kokoro, OpenAI, ElevenLabs, Gemini, Sarvam, mlx-audio) via `engines.*` factories
+- `--base-url` and `--headed` CLI flags
+- `demoType` accepts Playwright Locator
+- `argo init` scaffolds `.mjs` with `defineConfig()`
+- `showConfetti` effects (burst + rain)
+- `overlays.defaultPlacement` config
+- Demo name validation at CLI boundary (security hardening)
+- Error hardening: zero-clip detection, thumbnail warnings, timing parse context, asset server streams
+- Self-contained `example/` directory
+- LLM skill (`skills/argo-guide/`) + Agent Skills cross-client support (`.agents/skills/`)
+- `argo validate` command
 
 ## Suggested Priority
 
