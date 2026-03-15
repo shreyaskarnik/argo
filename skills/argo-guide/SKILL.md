@@ -95,7 +95,14 @@ test('my-demo', async ({ page, narration }) => {
 | `hideOverlay(page, zone?)` | Manually remove overlay from a zone (or all zones). |
 | `demoType(page, selectorOrLocator, text, delay?)` | Type text character-by-character (60ms default delay). Accepts a CSS selector string OR a Playwright Locator: `demoType(page, page.getByLabel('Email'), 'test@example.com')`. |
 | `showConfetti(page, opts?)` | Burst confetti animation for mic-drop moments. **Non-blocking by default** — fires the animation and returns immediately, safe to call without `await`. Options: `duration` (3000ms), `pieces` (150), `spread` (`'burst'` / `'rain'`), `colors` (hex array), `fadeOut` (800ms), `wait` (false). Set `wait: true` to block until animation completes. |
+| `spotlight(page, selector, opts?)` | Dark overlay with hole around target. Non-blocking. Options: `duration`, `opacity` (0.7), `padding` (12px). |
+| `focusRing(page, selector, opts?)` | Pulsing glow border on target. Non-blocking. Options: `duration`, `color` ('#3b82f6'), `pulse` (true). |
+| `dimAround(page, selector, opts?)` | Fade sibling elements to highlight target. Non-blocking. Options: `duration`, `dimOpacity` (0.3). |
+| `zoomTo(page, selector, opts?)` | Scale viewport centered on target element. Options: `duration`, `scale` (1.5), `wait`. Note: overlays active during zoom will scale with the page. |
+| `resetCamera(page)` | Clear all active camera effects immediately. |
 | `page.waitForTimeout(ms)` | Add deliberate pauses for pacing. |
+
+**Camera best practice**: Derive effect durations from `narration.durationFor()` so camera timing tracks the voiceover. Example: `const stepDur = Math.floor(narration.durationFor('scene') / 3)` then use `stepDur` for each effect.
 
 ### Dynamic Scene Durations with `durationFor()`
 

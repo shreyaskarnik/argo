@@ -27,8 +27,6 @@ export interface DimAroundOptions extends CameraOptions {
 export interface ZoomToOptions extends CameraOptions {
   /** Zoom level — 1.5 means 150% magnification. Default: 1.5 */
   scale?: number;
-  /** Extra padding around target in px. Default: 40 */
-  padding?: number;
 }
 
 async function runCameraEffect(
@@ -222,7 +220,6 @@ export async function zoomTo(
   const fadeIn = opts?.fadeIn ?? 400;
   const fadeOut = opts?.fadeOut ?? 400;
   const scale = opts?.scale ?? 1.5;
-  const padding = opts?.padding ?? 40;
   const wait = opts?.wait ?? false;
 
   await runCameraEffect(page, ({
@@ -231,28 +228,15 @@ export async function zoomTo(
     fadeIn,
     fadeOut,
     scale,
-    padding,
     attr,
   }: any) => {
     const target = document.querySelector(selector);
     if (!target) return;
     const rect = target.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-
-    // Compute the crop region centered on the target
-    // The crop region is what we want to fill the viewport after scaling
-    const cropW = vw / scale;
-    const cropH = vh / scale;
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
 
-    // Crop boundaries (clamped to viewport)
-    const cropLeft = Math.max(0, Math.min(centerX - cropW / 2, vw - cropW));
-    const cropTop = Math.max(0, Math.min(centerY - cropH / 2, vh - cropH));
-
-    // Create a zoom overlay that covers the full viewport
-    // It contains a clone-free approach: just transform the document
+    // Marker element for cleanup tracking
     const overlay = document.createElement('div');
     overlay.setAttribute(attr, 'zoom-to');
     overlay.style.cssText = `
@@ -308,7 +292,6 @@ export async function zoomTo(
     fadeIn,
     fadeOut,
     scale,
-    padding,
     attr: CAMERA_ATTR,
   }, duration + fadeOut, wait);
 }

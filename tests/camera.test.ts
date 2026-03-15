@@ -106,12 +106,6 @@ describe('zoomTo', () => {
     expect(args.scale).toBe(2.0);
   });
 
-  it('accepts custom padding', async () => {
-    await zoomTo(page, '.revenue', { padding: 60 });
-    const [, args] = (page.evaluate as any).mock.calls[0];
-    expect(args.padding).toBe(60);
-  });
-
   it('blocks with wait: true', async () => {
     await zoomTo(page, '.card', { wait: true, duration: 5000, fadeOut: 500 });
     expect(page.waitForTimeout).toHaveBeenCalledWith(5500);

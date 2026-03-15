@@ -25,7 +25,7 @@ Argo turns Playwright demo scripts into polished product demo videos with AI voi
 
 ## Git Conventions
 
-- `demos/` directory is gitignored — use `git add -f demos/<file>` for demo source files
+- `demos/` directory is no longer gitignored — demo source files are tracked normally
 - `videos/` directory is also gitignored — use `git add -f videos/<file>` for tracked video artifacts
 - GPG signing may fail in CLI environments — use `git -c commit.gpgsign=false commit` if needed
 
@@ -53,6 +53,10 @@ Overlay cues use discriminated unions — each template type has its own TypeScr
 
 `showConfetti(page, opts?)` — non-blocking by default (fire-and-forget safe). Injects a canvas-based confetti animation via `page.evaluate()`. Two spread modes: `burst` (Raycast-style, center-top fan) and `rain` (full-width fall). Set `wait: true` to block until animation completes. Errors from page/context disposal are swallowed; all other errors surface as warnings.
 
+### Camera (`src/camera.ts`)
+
+Four directed recording effects: `spotlight`, `focusRing`, `dimAround`, `zoomTo`, plus `resetCamera`. All non-blocking by default (fire-and-forget safe). `zoomTo` uses `transform-origin` at target center + `scale()` on `documentElement` — no wrapper div, no translate, viewport clips naturally like a real camera. Overlays stay fixed and are not affected by the zoom. Error handling follows the same pattern as `showConfetti` (filter by disposal errors, warn on others).
+
 ### Playwright Integration (`src/fixtures.ts`)
 
 Custom `test` fixture extends Playwright's `test` with a `narration` fixture that records `Date.now()` timestamps for each `mark()` call, flushed to `.timing.json` after test completion.
@@ -64,6 +68,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - `argo record/export/pipeline/validate` take bare demo names (e.g., `argo pipeline example`)
 - `argo validate <demo>` checks scene name consistency between script, voiceover, and overlay manifests (no TTS/recording)
 - `--base-url <url>` flag on `record` and `pipeline` overrides `config.baseURL`
+- `--headed` flag on `record` and `pipeline` runs the browser in visible mode
 - README config/CLI/API snippets must stay in sync with code changes (check after modifying config schema, CLI options, or scaffold templates)
 - Demo names are validated at the CLI boundary: only `[a-zA-Z0-9][a-zA-Z0-9_-]*` allowed. This prevents path traversal — maintain this validation if adding new commands that accept demo names.
 - `tts generate` derives demoName via `basename()` from the manifest path — do not use `/`-only regex (breaks on Windows paths)
@@ -118,6 +123,8 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - ~~`demoType` selector gotcha~~ — FIXED: `demoType(page, selectorOrLocator, text)` now accepts a CSS selector string or a Playwright Locator directly.
 - `deviceScaleFactor: 2` is broken with webkit — viewport renders at 1/4 of the frame. Stick to `deviceScaleFactor: 1` until fixed.
 - ~~`argo init` ESM warnings~~ — FIXED: now scaffolds `argo.config.mjs` with `defineConfig()`.
+- `zoomTo` transforms `documentElement` — overlays active during zoom will scale with the page. Avoid overlapping `withOverlay` and `zoomTo` on the same scene for best results.
+- OpenAI engine requests raw PCM (`response_format: 'pcm'`) and converts to Float32 directly — do not use `convertToWav` (ffmpeg pipe introduces 0xFFFFFFFF data size artifacts).
 
 ## Security Invariants
 

@@ -184,6 +184,7 @@ argo --config <path> <command>     Use a custom config file
 Options:
   --browser <engine>               chromium | webkit | firefox (overrides config)
   --base-url <url>                 Override baseURL from config
+  --headed                         Run browser in visible mode
 ```
 
 ## API
@@ -194,8 +195,9 @@ Argo exports Playwright fixtures and helpers for use in demo scripts:
 import { test, expect, demoType } from '@argo-video/cli';
 import { showOverlay, hideOverlay, withOverlay } from '@argo-video/cli';
 import { showConfetti } from '@argo-video/cli';
+import { spotlight, focusRing, dimAround, zoomTo, resetCamera } from '@argo-video/cli';
 import { showCaption, hideCaption, withCaption } from '@argo-video/cli';
-import { defineConfig, demosProject } from '@argo-video/cli';
+import { defineConfig, demosProject, engines } from '@argo-video/cli';
 ```
 
 | Export | Description |
@@ -207,6 +209,11 @@ import { defineConfig, demosProject } from '@argo-video/cli';
 | `withOverlay(page, scene, cue, action)` | Show overlay during an async action |
 | `hideOverlay(page, zone?)` | Remove overlay from a zone |
 | `showConfetti(page, opts?)` | Non-blocking confetti animation (`spread: 'burst' \| 'rain'`, `wait: true` to block) |
+| `spotlight(page, selector, opts?)` | Dark overlay with hole around target element |
+| `focusRing(page, selector, opts?)` | Pulsing glow border on target |
+| `dimAround(page, selector, opts?)` | Fade sibling elements to highlight target |
+| `zoomTo(page, selector, opts?)` | Scale viewport centered on target |
+| `resetCamera(page)` | Clear all active camera effects |
 | `showCaption(page, scene, text, durationMs)` | Show a simple text caption |
 | `withCaption(page, scene, text, action)` | Show caption during an async action |
 | `hideCaption(page)` | Remove caption |
@@ -239,14 +246,14 @@ choco install ffmpeg       # Windows
    });
    ```
 
-   | Engine | Install | API Key |
-   |--------|---------|---------|
-   | `engines.kokoro()` | built-in | none (local) |
-   | `engines.openai()` | `npm i openai` | `OPENAI_API_KEY` |
-   | `engines.elevenlabs()` | `npm i elevenlabs` | `ELEVENLABS_API_KEY` |
-   | `engines.gemini()` | `npm i @google/genai` | `GEMINI_API_KEY` |
-   | `engines.sarvam()` | none (fetch) | `SARVAM_API_KEY` |
-   | `engines.mlxAudio()` | `pip install mlx-audio` | none (local) |
+   | Engine | Type | Install | API Key |
+   |--------|------|---------|---------|
+   | `engines.kokoro()` | local | built-in | none |
+   | `engines.mlxAudio()` | local | `pip install mlx-audio` | none |
+   | `engines.openai()` | cloud | `npm i openai` | `OPENAI_API_KEY` |
+   | `engines.elevenlabs()` | cloud | `npm i elevenlabs` | `ELEVENLABS_API_KEY` |
+   | `engines.gemini()` | cloud | `npm i @google/genai` | `GEMINI_API_KEY` |
+   | `engines.sarvam()` | cloud | none (fetch) | `SARVAM_API_KEY` |
 
 2. **Record** — Playwright runs the demo script in a real browser. The `narration` fixture records timestamps for each `mark()` call. Video is captured at native resolution.
 
