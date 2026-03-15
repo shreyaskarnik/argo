@@ -359,7 +359,15 @@ This parses the Playwright test and generates:
 
 **Scene detection heuristics:** `test.step()` names (strongest signal), `page.goto()` navigations, `// comments`, form fills grouped together, click + assertion pairs.
 
-**LLM workflow:** After running `init --from`, ask the LLM to "flesh out the voiceover for `<name>`". The `_hint` fields in the voiceover skeleton give the LLM context about each scene's actions, so it can write natural narration text without re-reading the script. Remove `_hint` fields after filling in text.
+**LLM workflow after `init --from`:**
+
+1. **Fill in voiceover text** — open `<name>.voiceover.json`. Each entry has a `_hint` field describing what happens in that scene. Write natural narration text for each `text` field using the hint as context. Remove `_hint` fields when done.
+2. **Add camera effects** — open `<name>.demo.ts`. Add `spotlight()`, `focusRing()`, `dimAround()` calls at key moments. Derive durations from `narration.durationFor()` (e.g., `Math.floor(durationFor('scene') / 3)`).
+3. **Refine overlays** — the generated `<name>.overlays.json` has basic lower-third placeholders. Upgrade to `headline-card`, `callout`, or `image-card` where appropriate. Add `motion: 'slide-in'` and `autoBackground: true`.
+4. **Add `test.setTimeout()`** — if the demo is longer than 30 seconds, add `test.setTimeout(90000)` at the top.
+5. **Apply phonetic fixes** — if using Kokoro, spell tricky words phonetically in voiceover text (e.g., "sass" for SaaS). Not needed for OpenAI.
+6. **Validate** — run `npx argo validate <name>` to check scene name consistency before recording.
+7. **Record** — run `npx argo pipeline <name>` to generate the video.
 
 ### Pipeline order
 **TTS → Record → Align → Export** (not Record first — TTS must run first so `durationFor()` has clip lengths available during recording).
