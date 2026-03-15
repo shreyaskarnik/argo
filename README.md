@@ -251,6 +251,10 @@ choco install ffmpeg       # Windows
    |--------|------|---------|---------|
    | `engines.kokoro()` | local | built-in | none |
    | `engines.mlxAudio()` | local | `pip install mlx-audio` | none |
+   | `engines.openai()` | cloud | `npm i openai` | `OPENAI_API_KEY` |
+   | `engines.elevenlabs()` | cloud | `npm i elevenlabs` | `ELEVENLABS_API_KEY` |
+   | `engines.gemini()` | cloud | `npm i @google/genai` | `GEMINI_API_KEY` |
+   | `engines.sarvam()` | cloud | none (fetch) | `SARVAM_API_KEY` |
 
    **Voice cloning** — Clone your own voice locally with mlx-audio. Record a 15-second clip, and every demo sounds like you — privately, no data leaves your machine:
 
@@ -274,10 +278,6 @@ choco install ffmpeg       # Windows
      }),
    }
    ```
-   | `engines.openai()` | cloud | `npm i openai` | `OPENAI_API_KEY` |
-   | `engines.elevenlabs()` | cloud | `npm i elevenlabs` | `ELEVENLABS_API_KEY` |
-   | `engines.gemini()` | cloud | `npm i @google/genai` | `GEMINI_API_KEY` |
-   | `engines.sarvam()` | cloud | none (fetch) | `SARVAM_API_KEY` |
 
 2. **Record** — Playwright runs the demo script in a real browser. The `narration` fixture records timestamps for each `mark()` call. Video is captured at native resolution.
 
