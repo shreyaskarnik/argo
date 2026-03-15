@@ -11,12 +11,12 @@
   },
   {
     "scene": "features",
-    "text": "Four pillars make it work. Overlays for on-screen text. Voiceover from six tee tee ess engines. Camera effects for editorial direction. And a pipeline that exports everything at once.",
+    "text": "Four pillars make it work. Overlays for on-screen text. Voiceover with your choice of engine. Camera effects for editorial direction. And a pipeline that exports everything at once.",
     "speed": 0.9
   },
   {
     "scene": "tts",
-    "text": "Tee tee ess is now first class. Start with Kokoro for free local iteration, then swap to Open A.I., Eleven Labs, Gemini, Sarvam, or M.L.X. audio for the final cut. One config line.",
+    "text": "Pick your voice. Six engines from local to cloud. Or clone your own voice with M.L.X. audio — record a fifteen second clip, and every demo sounds like you. Locally, privately, no data leaves your machine.",
     "speed": 0.9
   },
   {
