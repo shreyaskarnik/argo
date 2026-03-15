@@ -250,7 +250,16 @@ function deduplicateName(name: string, counts: Map<string, number>): string {
 export function generateDemoScript(parsed: ParsedPlaywrightTest): string {
   const lines: string[] = [];
 
-  lines.push("import { test } from '@argo-video/cli';");
+  // Check if any scene lines contain expect() to decide on imports
+  const hasExpect = parsed.scenes.some(s =>
+    s.lines.some(l => /\bexpect\s*\(/.test(l))
+  );
+
+  if (hasExpect) {
+    lines.push("import { test, expect } from '@argo-video/cli';");
+  } else {
+    lines.push("import { test } from '@argo-video/cli';");
+  }
   lines.push("import { showOverlay, withOverlay } from '@argo-video/cli';");
   lines.push('');
   lines.push(`test('${parsed.testName}', async ({ page, narration }) => {`);
@@ -259,8 +268,13 @@ export function generateDemoScript(parsed: ParsedPlaywrightTest): string {
     lines.push('');
     lines.push(`  narration.mark('${scene.name}');`);
     for (const sourceLine of scene.lines) {
+      // Strip test.step() wrappers — we flatten steps into narration.mark() scenes
+      const stripped = sourceLine
+        .replace(/^\s*test\.step\s*\(\s*(['"`]).*?\1\s*,\s*async\s*\(\s*\)\s*=>\s*\{\s*$/, '')
+        .replace(/^\s*\}\s*\)\s*;?\s*$/, '');
+      if (stripped === '') continue;
       // Normalize indentation to 2-space inside the test block
-      const trimmed = sourceLine.replace(/^\s+/, '');
+      const trimmed = stripped.replace(/^\s+/, '');
       lines.push(`  ${trimmed}`);
     }
     lines.push(`  await page.waitForTimeout(narration.durationFor('${scene.name}'));`);

@@ -181,11 +181,23 @@ export async function initFrom(options: InitFromOptions): Promise<void> {
   const source = await readFile(options.from, 'utf-8');
 
   // Derive demo name from filename: checkout.spec.ts → checkout
-  const demoName =
+  // Sanitize to match CLI's demo name validation: [a-zA-Z0-9][a-zA-Z0-9_-]*
+  const rawName =
     options.demo ??
     basename(options.from)
       .replace(/\.(spec|test|demo)\.(ts|js|mjs)$/, '')
       .replace(/\.(ts|js|mjs)$/, '');
+  const demoName = rawName
+    .replace(/[^a-zA-Z0-9_-]/g, '-')  // replace invalid chars with hyphens
+    .replace(/^-+/, '')                // strip leading hyphens
+    .replace(/-+/g, '-');              // collapse consecutive hyphens
+
+  if (!demoName || !/^[a-zA-Z0-9]/.test(demoName)) {
+    throw new Error(
+      `Cannot derive a valid demo name from "${rawName}". ` +
+      `Use --demo <name> to specify one (letters, numbers, hyphens, underscores).`
+    );
+  }
 
   const parsed = parsePlaywrightTest(source);
 

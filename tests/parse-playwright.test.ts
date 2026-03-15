@@ -139,7 +139,8 @@ describe('generateDemoScript', () => {
     const parsed = parsePlaywrightTest(SIMPLE_TEST);
     const script = generateDemoScript(parsed);
 
-    expect(script).toContain("import { test } from '@argo-video/cli'");
+    // SIMPLE_TEST has expect() calls, so the import includes expect
+    expect(script).toContain("import { test, expect } from '@argo-video/cli'");
     expect(script).toContain("import { showOverlay, withOverlay } from '@argo-video/cli'");
     expect(script).toContain("narration.mark('login')");
     expect(script).toContain("narration.durationFor('login')");

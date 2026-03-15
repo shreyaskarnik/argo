@@ -37,7 +37,7 @@ describe('initFrom', () => {
   it('creates demo script with narration fixture', async () => {
     await initFrom({ from: testFile, cwd: dir });
     const content = await readFile(join(dir, 'demos', 'checkout.demo.ts'), 'utf-8');
-    expect(content).toContain("import { test } from '@argo-video/cli'");
+    expect(content).toContain("import { test, expect } from '@argo-video/cli'");
     expect(content).toContain('narration.mark(');
     expect(content).toContain('narration.durationFor(');
     expect(content).toContain('async ({ page, narration })');
