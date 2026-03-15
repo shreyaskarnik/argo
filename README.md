@@ -47,8 +47,9 @@ npm i -D @argo-video/cli
 # Initialize project
 npx argo init
 
-# Edit your demo script
+# Edit your demo script (or convert an existing Playwright test)
 vim demos/example.demo.ts
+npx argo init --from tests/checkout.spec.ts  # auto-convert
 
 # Run the full pipeline
 npx argo pipeline example
@@ -174,6 +175,7 @@ export default defineConfig({
 
 ```
 argo init                          Scaffold demo files + config
+argo init --from <test>            Convert Playwright test to Argo demo
 argo record <demo>                 Record browser session
 argo tts generate <manifest>       Generate TTS clips from manifest
 argo export <demo>                 Merge video + audio to MP4
@@ -260,10 +262,10 @@ choco install ffmpeg       # Windows
 
    ```bash
    # Record a reference clip (macOS)
-   ./scripts/record-voice-ref.sh assets/ref-voice.wav
+   bash $(npm root)/@argo-video/cli/scripts/record-voice-ref.sh assets/ref-voice.wav
 
    # Preview cloned voice against your manifest
-   ./scripts/voice-clone-preview.sh \
+   bash $(npm root)/@argo-video/cli/scripts/voice-clone-preview.sh \
      --ref-audio assets/ref-voice.wav \
      --ref-text "Transcript of what I said." \
      --voiceover demos/showcase.voiceover.json --play

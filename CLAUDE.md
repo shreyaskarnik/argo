@@ -69,6 +69,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - `argo validate <demo>` checks scene name consistency between script, voiceover, and overlay manifests (no TTS/recording)
 - `--base-url <url>` flag on `record` and `pipeline` overrides `config.baseURL`
 - `--headed` flag on `record` and `pipeline` runs the browser in visible mode
+- `argo init --from <test.spec.ts>` converts existing Playwright tests into Argo demos (parses scene boundaries from `test.step()`, `page.goto()`, comments, and action clusters)
 - README config/CLI/API snippets must stay in sync with code changes (check after modifying config schema, CLI options, or scaffold templates)
 - Demo names are validated at the CLI boundary: only `[a-zA-Z0-9][a-zA-Z0-9_-]*` allowed. This prevents path traversal — maintain this validation if adding new commands that accept demo names.
 - `tts generate` derives demoName via `basename()` from the manifest path — do not use `/`-only regex (breaks on Windows paths)

@@ -234,9 +234,9 @@ engines.mlxAudio({
 })
 ```
 
-Helper scripts:
-- `./scripts/record-voice-ref.sh assets/ref-voice.wav` — record reference clip (macOS)
-- `./scripts/voice-clone-preview.sh --ref-audio ... --voiceover ... --play` — preview cloned voice
+Helper scripts (use `$(npm root)/@argo-video/cli/scripts/` for npm installs, or `./scripts/` if cloned from repo):
+- `record-voice-ref.sh assets/ref-voice.wav` — record reference clip (macOS)
+- `voice-clone-preview.sh --ref-audio ... --voiceover ... --play` — preview cloned voice
 
 Qwen3-TTS produces the best voice clone quality. CSM is supported but lower quality.
 
