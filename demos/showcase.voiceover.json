@@ -1,27 +1,37 @@
 [
   {
     "scene": "hero",
-    "text": "Meet Argo — the tool that turns Playwright scripts into polished product demo videos, complete with A.I. voiceover.",
+    "text": "Meet Argo. One command turns a Playwright script into a launch-ready product video, complete with A.I. voiceover and camera direction.",
     "speed": 0.9
   },
   {
     "scene": "how-it-works",
-    "text": "The workflow is three steps. Write, record, export. Watch how Argo zooms into each step to guide your eye — that's the new camera language.",
+    "text": "The pipeline is three steps. Write the demo, record the browser, export the video. Camera effects like zoom-to guide the viewer through each step automatically.",
     "speed": 0.9
   },
   {
     "scene": "features",
-    "text": "Overlays appear on screen while camera effects like dim-around highlight what matters. Overlays and camera work together, independently.",
+    "text": "Four pillars make it work. Overlays for on-screen text. Voiceover from six tee tee ess engines. Camera effects for editorial direction. And a pipeline that exports everything at once.",
+    "speed": 0.9
+  },
+  {
+    "scene": "tts",
+    "text": "Tee tee ess is now first class. Start with Kokoro for free local iteration, then swap to Open A.I., Eleven Labs, Gemini, Sarvam, or M.L.X. audio for the final cut. One config line.",
+    "speed": 0.9
+  },
+  {
+    "scene": "camera",
+    "text": "Watch each camera effect in action. Spotlight dims everything except the target. Focus ring pulses a glow border. Dim-around fades siblings. Zoom-to scales and centers.",
     "speed": 0.9
   },
   {
     "scene": "code",
-    "text": "A focus ring pulses around the code block. Spotlight, focus ring, dim-around, and zoom-to are all one-liners in your demo script.",
+    "text": "Your demo scripts are just Playwright tests with a few extra helpers. Spotlight, focus ring, dim-around, zoom-to, confetti — all one-liners in your script.",
     "speed": 0.9
   },
   {
     "scene": "closing",
-    "text": "Overlays auto-detect your page theme. Argo also generates subtitles, chapter markers, and a scene timing report alongside every video.",
+    "text": "Overlays auto-detect your page theme and adapt. The pipeline also generates subtitles, chapter markers, and a scene timing report alongside every video.",
     "speed": 0.9
   },
   {
