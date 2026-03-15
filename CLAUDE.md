@@ -33,7 +33,7 @@ Argo turns Playwright demo scripts into polished product demo videos with AI voi
 
 The system is a 4-step pipeline: **TTS → Record → Align → Export**
 
-- **TTS** (`src/tts/`): Generates voice clips from JSON manifests. Pluggable engine system with 6 built-in adapters in `src/tts/engines/`: Kokoro (default), OpenAI, ElevenLabs, Gemini, Sarvam, mlx-audio. Selected via `engines.*` factory functions in config. Cloud engines lazy-load their SDKs. All audio normalized to mono Float32 24kHz WAV via `convertToWav()` (ffmpeg). Clips are content-addressed cached (SHA256 of scene+text+voice+speed) in `.argo/<demo>/clips/`.
+- **TTS** (`src/tts/`): Generates voice clips from JSON manifests. Pluggable engine system with 6 built-in adapters in `src/tts/engines/`: Kokoro (default), OpenAI, ElevenLabs, Gemini, Sarvam, mlx-audio. Selected via `engines.*` factory functions in config. Cloud engines lazy-load their SDKs. All audio normalized to mono Float32 24kHz WAV via `convertToWav()` (ffmpeg). Clips are content-addressed cached (SHA256 of scene+text+voice+speed+lang) in `.argo/<demo>/clips/`. Cloud engine API keys are validated lazily at `generate()` time, not constructor — so non-TTS commands like `argo validate` work without keys. Kokoro's ONNX runtime is not safe for concurrent `generate()` calls — clips generate sequentially despite shared init promise.
 - **Record** (`src/record.ts`): Runs Playwright demo script, captures video (WebM) and timing marks (`.timing.json`). Generates a dynamic Playwright config on-the-fly.
 - **Align** (`src/tts/align.ts`): Places audio clips at scene timestamps from timing data. Prevents overlap with 100ms gaps. Mixes into single WAV (Float32, 24kHz).
 - **Export** (`src/export.ts`): Merges video + aligned audio via ffmpeg into final MP4. Supports optional MP4 thumbnail embedding via `export.thumbnailPath` config (ffmpeg attached_pic stream). CRITICAL: `-shortest` must be skipped when thumbnail is present — PNG has 0 duration and truncates the entire output. Embeds chapter markers from scene placements via ffmpeg metadata. Input indices are dynamic based on presence of chapters/thumbnail.
@@ -55,7 +55,7 @@ Overlay cues use discriminated unions — each template type has its own TypeScr
 
 ### Camera (`src/camera.ts`)
 
-Four directed recording effects: `spotlight`, `focusRing`, `dimAround`, `zoomTo`, plus `resetCamera`. All non-blocking by default (fire-and-forget safe). `zoomTo` uses `transform-origin` at target center + `scale()` on `documentElement` — no wrapper div, no translate, viewport clips naturally like a real camera. Overlays stay fixed and are not affected by the zoom. Error handling follows the same pattern as `showConfetti` (filter by disposal errors, warn on others).
+Four directed recording effects: `spotlight`, `focusRing`, `dimAround`, `zoomTo`, plus `resetCamera`. All non-blocking by default (fire-and-forget safe). `zoomTo` uses `transform-origin: 0 0` + `scale() translate()` on `documentElement` to zoom and reframe the viewport onto the target. Note: overlays active during zoom will scale with the page (they're children of `documentElement`). Error handling follows the same pattern as `showConfetti` (filter by disposal errors, warn on others).
 
 ### Playwright Integration (`src/fixtures.ts`)
 
@@ -83,7 +83,8 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - Showcase demo (`demos/showcase.demo.ts`) requires a local HTTP server serving `demos/`: `python3 -m http.server 8976 --directory demos` then `BASE_URL=http://127.0.0.1:8976 npx tsx bin/argo.js pipeline showcase --browser webkit`
 - Browser default is `chromium`. Video quality ranking on macOS: **webkit > firefox > chromium**. Chromium has a known video capture quality issue (see [playwright#31424](https://github.com/microsoft/playwright/issues/31424)). Use `--browser webkit` for best results.
 - `deviceScaleFactor: 2` captures at 2x resolution; export downscales with lanczos. Value is rounded to integer (min 1).
-- Voiceover `text` is spoken only, never displayed — spell words phonetically to fix TTS pronunciation (e.g., `"sass"` for SaaS, `"A P I"` for API, `"cube control"` for kubectl). Overlay text is what viewers see.
+- Voiceover `text` is spoken only, never displayed — spell words phonetically to fix TTS pronunciation (e.g., `"sass"` for SaaS, `"A P I"` for API, `"cube control"` for kubectl). Overlay text is what viewers see. Phonetics differ per engine: Kokoro needs `tee tee ess` / `A.I.` / `M.L.X.`, OpenAI handles acronyms natively. When switching engines, update voiceover text.
+- Camera effect durations should derive from `narration.durationFor()` (e.g., `Math.floor(durationFor('scene') / N)`) so effects track voiceover timing.
 
 ## Scene Durations & Dynamic Timing
 
@@ -125,6 +126,8 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - ~~`argo init` ESM warnings~~ — FIXED: now scaffolds `argo.config.mjs` with `defineConfig()`.
 - `zoomTo` transforms `documentElement` — overlays active during zoom will scale with the page. Avoid overlapping `withOverlay` and `zoomTo` on the same scene for best results.
 - OpenAI engine requests raw PCM (`response_format: 'pcm'`) and converts to Float32 directly — do not use `convertToWav` (ffmpeg pipe introduces 0xFFFFFFFF data size artifacts).
+- `convertToWav` (ffmpeg pipe to stdout) writes WAV with `0xFFFFFFFF` data size — `parseWavHeader` falls back to actual buffer length. All engines using `convertToWav` are affected.
+- Showcase demo video hosted via GitHub gist comment upload: https://gist.github.com/shreyaskarnik/6a0996942a96528a984010f36de76079
 
 ## Security Invariants
 

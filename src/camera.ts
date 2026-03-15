@@ -264,12 +264,21 @@ export async function zoomTo(
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
 
-    // Set transform-origin to the crop center and scale
-    html.style.transformOrigin = `${centerX}px ${centerY}px`;
+    // Compute translate to center the target in the viewport after scaling.
+    // With transform-origin at 0,0: after scale(s), the point (x,y) moves to (x*s, y*s).
+    // We want the target center to land at the viewport center, so:
+    //   centerX * scale + translateX = viewportWidth / 2
+    //   translateX = viewportWidth / 2 - centerX * scale
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const tx = vw / 2 - centerX * scale;
+    const ty = vh / 2 - centerY * scale;
+
+    html.style.transformOrigin = '0 0';
     html.style.transition = `transform ${fadeIn}ms ease-out`;
 
     requestAnimationFrame(() => {
-      html.style.transform = `scale(${scale})`;
+      html.style.transform = `scale(${scale}) translate(${tx / scale}px, ${ty / scale}px)`;
       overlay.style.opacity = '1';
     });
 
