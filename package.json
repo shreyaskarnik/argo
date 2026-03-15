@@ -31,7 +31,7 @@
   },
   "optionalDependencies": {
     "openai": "^4.0.0",
-    "elevenlabs": "^1.0.0",
+    "@elevenlabs/elevenlabs-js": "^1.0.0",
     "@google/genai": "^1.0.0",
     "sarvamai": "^1.0.0"
   },

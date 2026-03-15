@@ -213,7 +213,7 @@ export default defineConfig({
 |--------|------|---------|--------|
 | `engines.kokoro()` | local | built-in | `af_heart`, `am_michael` |
 | `engines.openai()` | cloud | `npm i openai` | `alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer` |
-| `engines.elevenlabs()` | cloud | `npm i elevenlabs` | ElevenLabs voice IDs |
+| `engines.elevenlabs()` | cloud | `npm i @elevenlabs/elevenlabs-js` | ElevenLabs voice IDs |
 | `engines.gemini()` | cloud | `npm i @google/genai` | Gemini voice names |
 | `engines.sarvam()` | cloud | `npm i sarvamai` | `meera` + Indian language voices |
 | `engines.mlxAudio()` | local | `pip install mlx-audio` | model-dependent (Apple Silicon) |

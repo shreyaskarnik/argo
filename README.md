@@ -254,7 +254,7 @@ choco install ffmpeg       # Windows
    | `engines.kokoro()` | local | built-in | none |
    | `engines.mlxAudio()` | local | `pip install mlx-audio` | none |
    | `engines.openai()` | cloud | `npm i openai` | `OPENAI_API_KEY` |
-   | `engines.elevenlabs()` | cloud | `npm i elevenlabs` | `ELEVENLABS_API_KEY` |
+   | `engines.elevenlabs()` | cloud | `npm i @elevenlabs/elevenlabs-js` | `ELEVENLABS_API_KEY` |
    | `engines.gemini()` | cloud | `npm i @google/genai` | `GEMINI_API_KEY` |
    | `engines.sarvam()` | cloud | `npm i sarvamai` | `SARVAM_API_KEY` |
 

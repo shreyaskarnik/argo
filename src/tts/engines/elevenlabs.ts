@@ -36,11 +36,11 @@ export class ElevenLabsEngine implements TTSEngine {
 
     let ElevenLabsClient: any;
     try {
-      // @ts-ignore — elevenlabs is an optional dependency
-      ({ ElevenLabsClient } = await import('elevenlabs'));
+      // @ts-ignore — @elevenlabs/elevenlabs-js is an optional dependency
+      ({ ElevenLabsClient } = await import('@elevenlabs/elevenlabs-js'));
     } catch {
       throw new Error(
-        "ElevenLabs TTS engine requires the 'elevenlabs' package. Install it with: npm i elevenlabs"
+        "ElevenLabs TTS engine requires the '@elevenlabs/elevenlabs-js' package. Install it with: npm i @elevenlabs/elevenlabs-js"
       );
     }
 
