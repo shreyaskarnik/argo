@@ -174,4 +174,27 @@ describe('generateClips', () => {
     expect(engine.calls[0].options.voice).toBe('nova');
     expect(engine.calls[0].options.speed).toBe(0.8);
   });
+
+  it('passes lang through to the TTS engine', async () => {
+    const entries = [
+      { scene: 'intro', text: 'Namaste world', lang: 'hi-IN' },
+    ];
+    writeManifest(entries);
+    const engine = createMockTTSEngine();
+
+    await generateClips({
+      manifestPath,
+      demoName,
+      engine,
+      projectRoot: tmpDir,
+      defaults: { voice: 'alloy', speed: 1.2 },
+    });
+
+    expect(engine.calls).toHaveLength(1);
+    expect(engine.calls[0].options).toEqual({
+      voice: 'alloy',
+      speed: 1.2,
+      lang: 'hi-IN',
+    });
+  });
 });

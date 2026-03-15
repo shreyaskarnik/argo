@@ -7,59 +7,60 @@ test('showcase', async ({ page, narration }) => {
   await page.goto('/showcase.html');
   await page.waitForTimeout(800);
 
-  // Scene 1: Hero — spotlight the terminal command
+  // Scene 1: Hero — spotlight + voiceover together
   narration.mark('hero');
-  spotlight(page, '#hero-command', { duration: 4000, padding: 16 });
+  spotlight(page, '#hero-command', { duration: 5000, padding: 16 });
   await showOverlay(page, 'hero', {
     type: 'headline-card',
     kicker: 'PLAYWRIGHT TO VIDEO',
     title: 'One command. Full demo.',
-    body: 'Argo turns Playwright scripts into polished product videos with AI voiceover.',
+    body: 'AI voiceover and camera direction included.',
     placement: 'top-right',
     motion: 'slide-in',
     autoBackground: true,
-  }, narration.durationFor('hero', { maxMs: 7000 }));
+  }, narration.durationFor('hero', { maxMs: 8000 }));
 
-  // Scene 2: How it works — zoom into each step
+  // Scene 2: How it works — voiceover plays WHILE zooming through steps
   narration.mark('how-it-works');
   await page.locator('#how-it-works').scrollIntoViewIfNeeded();
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(400);
   await withOverlay(page, 'how-it-works', {
     type: 'headline-card',
     title: 'Write. Record. Export.',
-    body: 'Camera effects guide the viewer through each step.',
     placement: 'top-left',
     motion: 'slide-in',
     autoBackground: true,
   }, async () => {
-    await zoomTo(page, '#step-write', { scale: 1.22, duration: 1700, wait: true });
-    await zoomTo(page, '#step-record', { scale: 1.22, duration: 1700, wait: true });
-    await zoomTo(page, '#step-export', { scale: 1.22, duration: 1700, wait: true });
+    const stepDur = Math.floor(narration.durationFor('how-it-works') / 4);
+    await zoomTo(page, '#step-write', { scale: 1.22, duration: stepDur, wait: true });
+    await zoomTo(page, '#step-record', { scale: 1.22, duration: stepDur, wait: true });
+    await zoomTo(page, '#step-export', { scale: 1.22, duration: stepDur, wait: true });
     await resetCamera(page);
   });
 
-  // Scene 3: Features — dim-around each card
+  // Scene 3: Features — dim each card in sync with voiceover
   narration.mark('features');
   await page.locator('#features').scrollIntoViewIfNeeded();
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(400);
   await withOverlay(page, 'features', {
     type: 'callout',
-    text: 'Four pillars — overlays, voiceover, camera, and pipeline',
+    text: 'Overlays, voiceover, camera, and pipeline',
     placement: 'top-left',
     motion: 'fade-in',
     autoBackground: true,
   }, async () => {
-    await dimAround(page, '#feature-overlays', { duration: 1300, wait: true });
-    await dimAround(page, '#feature-voiceover', { duration: 1300, wait: true });
-    await dimAround(page, '#feature-camera', { duration: 1300, wait: true });
-    await dimAround(page, '#feature-pipeline', { duration: 1300, wait: true });
+    const cardDur = Math.floor(narration.durationFor('features') / 5);
+    await dimAround(page, '#feature-overlays', { duration: cardDur, wait: true });
+    await dimAround(page, '#feature-voiceover', { duration: cardDur, wait: true });
+    await dimAround(page, '#feature-camera', { duration: cardDur, wait: true });
+    await dimAround(page, '#feature-pipeline', { duration: cardDur, wait: true });
     await resetCamera(page);
   });
 
-  // Scene 4: TTS engines — scroll to section, highlight each engine
+  // Scene 4: TTS engines — dim each engine card in sync
   narration.mark('tts');
   await page.locator('#tts-engines').scrollIntoViewIfNeeded();
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(400);
   await withOverlay(page, 'tts', {
     type: 'lower-third',
     text: 'Six TTS engines — swap with one config line',
@@ -67,58 +68,53 @@ test('showcase', async ({ page, narration }) => {
     motion: 'fade-in',
     autoBackground: true,
   }, async () => {
-    await dimAround(page, '#engine-kokoro', { duration: 1000, wait: true });
-    await dimAround(page, '#engine-openai', { duration: 1000, wait: true });
-    await dimAround(page, '#engine-elevenlabs', { duration: 1000, wait: true });
-    await dimAround(page, '#engine-gemini', { duration: 1000, wait: true });
-    await dimAround(page, '#engine-sarvam', { duration: 1000, wait: true });
-    await dimAround(page, '#engine-mlx', { duration: 1000, wait: true });
+    const engDur = Math.floor(narration.durationFor('tts') / 7);
+    await dimAround(page, '#engine-kokoro', { duration: engDur, wait: true });
+    await dimAround(page, '#engine-openai', { duration: engDur, wait: true });
+    await dimAround(page, '#engine-elevenlabs', { duration: engDur, wait: true });
+    await dimAround(page, '#engine-gemini', { duration: engDur, wait: true });
+    await dimAround(page, '#engine-sarvam', { duration: engDur, wait: true });
+    await dimAround(page, '#engine-mlx', { duration: engDur, wait: true });
     await resetCamera(page);
   });
 
-  // Scene 5: Camera effects section — demo each effect on its own card
+  // Scene 5: Camera effects — demo each effect timed to voiceover
   narration.mark('camera');
   await page.locator('#camera-effects').scrollIntoViewIfNeeded();
-  await page.waitForTimeout(600);
-  spotlight(page, '#effect-spotlight', { duration: 2000, padding: 8 });
-  await page.waitForTimeout(2200);
-  focusRing(page, '#effect-focus-ring', { color: '#ef4444', duration: 2000 });
-  await page.waitForTimeout(2200);
-  dimAround(page, '#effect-dim-around', { duration: 2000 });
-  await page.waitForTimeout(2200);
-  await zoomTo(page, '#effect-zoom-to', { scale: 1.2, duration: 2000, wait: true });
+  await page.waitForTimeout(400);
+  const camDur = Math.floor(narration.durationFor('camera') / 5);
+  spotlight(page, '#effect-spotlight', { duration: camDur, padding: 8 });
+  await page.waitForTimeout(camDur + 200);
+  focusRing(page, '#effect-focus-ring', { color: '#ef4444', duration: camDur });
+  await page.waitForTimeout(camDur + 200);
+  dimAround(page, '#effect-dim-around', { duration: camDur });
+  await page.waitForTimeout(camDur + 200);
+  await zoomTo(page, '#effect-zoom-to', { scale: 1.2, duration: camDur, wait: true });
   await resetCamera(page);
-  await showOverlay(page, 'camera', {
-    type: 'callout',
-    text: 'Each effect demonstrated on its own card',
-    placement: 'top-left',
-    motion: 'fade-in',
-    autoBackground: true,
-  }, narration.durationFor('camera', { minMs: 2000, maxMs: 4000 }));
 
-  // Scene 6: Code — zoom into the demo script
+  // Scene 6: Code — zoom into demo script
   narration.mark('code');
   await page.locator('#code-example').scrollIntoViewIfNeeded();
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(400);
   await withOverlay(page, 'code', {
     type: 'lower-third',
-    text: 'Familiar Playwright API — all effects are one-liners',
+    text: 'All effects are one-liners in your Playwright script',
     placement: 'top-left',
     motion: 'fade-in',
     autoBackground: true,
   }, async () => {
-    await zoomTo(page, '#demo-script-code', { scale: 1.15, duration: 2500, wait: true });
+    await zoomTo(page, '#demo-script-code', { scale: 1.15, duration: narration.durationFor('code') - 500, wait: true });
     await resetCamera(page);
   });
 
-  // Scene 7: Toggle to light mode — show autoBackground adapting
+  // Scene 7: Theme toggle — autoBackground adapts
   narration.mark('closing');
   await page.locator('#hero').scrollIntoViewIfNeeded();
-  await page.waitForTimeout(400);
-  focusRing(page, '#theme-toggle', { color: '#f59e0b', duration: 1500 });
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(300);
+  focusRing(page, '#theme-toggle', { color: '#f59e0b', duration: 1200 });
+  await page.waitForTimeout(600);
   await page.click('#theme-toggle');
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(600);
   await showOverlay(page, 'closing', {
     type: 'headline-card',
     title: 'Get Started',
@@ -126,7 +122,7 @@ test('showcase', async ({ page, narration }) => {
     placement: 'top-right',
     motion: 'fade-in',
     autoBackground: true,
-  }, narration.durationFor('closing', { maxMs: 10000, leadOutMs: 800 }));
+  }, narration.durationFor('closing', { maxMs: 10000, leadOutMs: 600 }));
 
   // Scene 8: Mic drop
   narration.mark('mic-drop');

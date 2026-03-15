@@ -106,6 +106,13 @@ describe('zoomTo', () => {
     expect(args.scale).toBe(2.0);
   });
 
+  it('passes wrapper metadata so overlays stay outside the zoomed subtree', async () => {
+    await zoomTo(page, '.revenue');
+    const [, args] = (page.evaluate as any).mock.calls[0];
+    expect(args.overlayPrefix).toBe('argo-overlay-');
+    expect(args.wrapperId).toBe('argo-camera-zoom-wrapper');
+  });
+
   it('blocks with wait: true', async () => {
     await zoomTo(page, '.card', { wait: true, duration: 5000, fadeOut: 500 });
     expect(page.waitForTimeout).toHaveBeenCalledWith(5500);
@@ -117,6 +124,11 @@ describe('resetCamera', () => {
     const page = createMockPage();
     await resetCamera(page);
     expect(page.evaluate).toHaveBeenCalledTimes(1);
+    const [, args] = (page.evaluate as any).mock.calls[0];
+    expect(args).toEqual({
+      attr: 'data-argo-camera',
+      wrapperId: 'argo-camera-zoom-wrapper',
+    });
   });
 
   it('swallows errors silently', async () => {

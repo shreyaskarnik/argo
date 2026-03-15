@@ -11,8 +11,8 @@ function makeTmpDir(): string {
 }
 
 function makeHash(entry: ManifestEntry): string {
-  const { scene, text, voice, speed } = entry;
-  return crypto.createHash('sha256').update(JSON.stringify({ scene, text, voice, speed })).digest('hex');
+  const { scene, text, voice, speed, lang } = entry;
+  return crypto.createHash('sha256').update(JSON.stringify({ scene, text, voice, speed, lang })).digest('hex');
 }
 
 describe('ClipCache', () => {
@@ -95,6 +95,11 @@ describe('ClipCache', () => {
 
     it('different speed produces different hash', () => {
       const entry2: ManifestEntry = { scene: 'intro', text: 'Hello world', speed: 1.5 };
+      expect(cache.getClipPath(demoName, entry)).not.toBe(cache.getClipPath(demoName, entry2));
+    });
+
+    it('different lang produces different hash', () => {
+      const entry2: ManifestEntry = { scene: 'intro', text: 'Hello world', lang: 'hi-IN' };
       expect(cache.getClipPath(demoName, entry)).not.toBe(cache.getClipPath(demoName, entry2));
     });
   });
