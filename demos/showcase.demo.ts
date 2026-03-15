@@ -70,11 +70,11 @@ test('showcase', async ({ page, narration }) => {
   }, async () => {
     const engDur = Math.floor(narration.durationFor('tts') / 7);
     await dimAround(page, '#engine-kokoro', { duration: engDur, wait: true });
+    await dimAround(page, '#engine-mlx', { duration: engDur, wait: true });
     await dimAround(page, '#engine-openai', { duration: engDur, wait: true });
     await dimAround(page, '#engine-elevenlabs', { duration: engDur, wait: true });
     await dimAround(page, '#engine-gemini', { duration: engDur, wait: true });
     await dimAround(page, '#engine-sarvam', { duration: engDur, wait: true });
-    await dimAround(page, '#engine-mlx', { duration: engDur, wait: true });
     await resetCamera(page);
   });
 

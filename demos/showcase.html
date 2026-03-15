@@ -800,7 +800,7 @@
         Professional output without the production overhead. Argo handles the complexity so you can focus on the demo.
       </p>
 
-      <div class="features-grid">
+      <div class="features-grid" style="grid-template-columns: repeat(2, 1fr);">
 
         <div class="feature-card" id="feature-overlays" data-demo-target="feature-overlays">
           <div class="feature-icon-wrap">&#127381;</div>
@@ -863,12 +863,18 @@
         Start local and free, then swap to a cloud voice for the final cut. All engines cache clips by content hash.
       </p>
 
-      <div class="features-grid" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="features-grid" style="grid-template-columns: repeat(2, 1fr);">
 
         <div class="feature-card" id="engine-kokoro" data-demo-target="engine-kokoro">
           <h3 class="feature-name">Kokoro</h3>
           <p class="feature-desc">Local, free, zero API keys. Default engine for fast iteration.</p>
           <span class="feature-tag">engines.kokoro()</span>
+        </div>
+
+        <div class="feature-card" id="engine-mlx" data-demo-target="engine-mlx">
+          <h3 class="feature-name">mlx-audio</h3>
+          <p class="feature-desc">Local Apple Silicon TTS via OpenAI-compatible HTTP API.</p>
+          <span class="feature-tag">engines.mlxAudio()</span>
         </div>
 
         <div class="feature-card" id="engine-openai" data-demo-target="engine-openai">
@@ -895,12 +901,6 @@
           <span class="feature-tag">engines.sarvam()</span>
         </div>
 
-        <div class="feature-card" id="engine-mlx" data-demo-target="engine-mlx">
-          <h3 class="feature-name">mlx-audio</h3>
-          <p class="feature-desc">Local Apple Silicon TTS via OpenAI-compatible HTTP API.</p>
-          <span class="feature-tag">engines.mlxAudio()</span>
-        </div>
-
       </div>
     </div>
   </section>
@@ -914,7 +914,7 @@
         Four effects that layer cleanly with overlays. Non-blocking by default — fire-and-forget safe.
       </p>
 
-      <div class="features-grid">
+      <div class="features-grid" style="grid-template-columns: repeat(2, 1fr);">
 
         <div class="feature-card" id="effect-spotlight" data-demo-target="effect-spotlight">
           <div class="feature-icon-wrap">&#128161;</div>
