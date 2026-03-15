@@ -184,10 +184,8 @@ if $JOIN && [[ ${#GENERATED_FILES[@]} -gt 1 ]]; then
     ffplay -autoexit -nodisp "$JOINED" 2>/dev/null
   fi
 elif $PLAY && [[ ${#GENERATED_FILES[@]} -gt 0 ]]; then
-  PLAY_FILE="${GENERATED_FILES[-1]}"
-  if $JOIN && [[ ${#GENERATED_FILES[@]} -eq 1 ]]; then
-    PLAY_FILE="${GENERATED_FILES[0]}"
-  fi
+  LAST_IDX=$(( ${#GENERATED_FILES[@]} - 1 ))
+  PLAY_FILE="${GENERATED_FILES[$LAST_IDX]}"
   echo "Playing: $PLAY_FILE"
   ffplay -autoexit -nodisp "$PLAY_FILE" 2>/dev/null
 fi
