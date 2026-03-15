@@ -21,7 +21,7 @@
   },
   {
     "scene": "camera",
-    "text": "Watch each camera effect in action. Spotlight dims everything except the target. Focus ring pulses a glow border. Dim-around fades siblings. Zoom-to scales and centers.",
+    "text": "Four camera effects. Spotlight. Focus ring. Dim-around. And zoom-to. Each one is a single line in your demo script.",
     "speed": 0.9
   },
   {
