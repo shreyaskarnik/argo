@@ -39,19 +39,29 @@ export class OpenAIEngine implements TTSEngine {
     }
 
     const client = new OpenAI({ apiKey: this.resolveApiKey() });
+
+    // Request raw PCM so we can build an exact WAV without ffmpeg pipe artifacts
     const response = await client.audio.speech.create({
       model: this.model,
       voice: options.voice ?? 'alloy',
       input: text,
       speed: options.speed ?? 1.0,
-      response_format: 'wav',
+      response_format: 'pcm',
     });
 
     const arrayBuffer = await response.arrayBuffer();
-    const wavBuffer = Buffer.from(arrayBuffer);
+    const pcmBuffer = Buffer.from(arrayBuffer);
 
-    // OpenAI returns 16-bit PCM WAV — convert to Float32 24kHz
-    const { convertToWav } = await import('../engine.js');
-    return convertToWav(wavBuffer);
+    // OpenAI PCM format: 24kHz, 16-bit signed LE, mono
+    // Convert 16-bit PCM samples to Float32 and build WAV directly
+    const sampleRate = 24000;
+    const sampleCount = pcmBuffer.length / 2;
+    const samples = new Float32Array(sampleCount);
+    for (let i = 0; i < sampleCount; i++) {
+      samples[i] = pcmBuffer.readInt16LE(i * 2) / 32768;
+    }
+
+    const { createWavBuffer } = await import('../engine.js');
+    return createWavBuffer(samples, sampleRate);
   }
 }
