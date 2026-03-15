@@ -81,21 +81,23 @@ test('showcase', async ({ page, narration }) => {
   // Scene 5: Camera effects — demo each effect timed to voiceover
   narration.mark('camera');
   await page.locator('#camera-effects').scrollIntoViewIfNeeded();
-  await page.waitForTimeout(400);
-  const camDur = Math.floor(narration.durationFor('camera') / 5);
+  await page.waitForTimeout(600);
+  const totalCamMs = narration.durationFor('camera');
+  const camDur = Math.floor(totalCamMs / 4);
   spotlight(page, '#effect-spotlight', { duration: camDur, padding: 8 });
-  await page.waitForTimeout(camDur + 200);
+  await page.waitForTimeout(camDur + 300);
   focusRing(page, '#effect-focus-ring', { color: '#ef4444', duration: camDur });
-  await page.waitForTimeout(camDur + 200);
+  await page.waitForTimeout(camDur + 300);
   dimAround(page, '#effect-dim-around', { duration: camDur });
-  await page.waitForTimeout(camDur + 200);
+  await page.waitForTimeout(camDur + 300);
   await zoomTo(page, '#effect-zoom-to', { scale: 1.2, duration: camDur, wait: true });
   await resetCamera(page);
+  await page.waitForTimeout(800);
 
   // Scene 6: Code — zoom into demo script
   narration.mark('code');
   await page.locator('#code-example').scrollIntoViewIfNeeded();
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(600);
   await withOverlay(page, 'code', {
     type: 'lower-third',
     text: 'All effects are one-liners in your Playwright script',
