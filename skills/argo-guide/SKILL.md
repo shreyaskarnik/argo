@@ -30,12 +30,13 @@ Before writing or running any demo, verify:
 1. Check installation — look for `@argo-video/cli` in `package.json`. Install if absent.
 2. Check config — look for `argo.config.js`. Run `npx argo init` if absent.
 3. Ask the user for the app's base URL (e.g., `http://localhost:3000`). Set as `baseURL` in config.
-4. Explore the app — navigate routes and features to plan a meaningful demo script.
-5. Write `demos/<name>.demo.ts` — Playwright actions with `narration.mark()` scene boundaries.
-6. Write `demos/<name>.voiceover.json` — narration text per scene. Scene names must exactly match `narration.mark()` arguments.
-7. Optionally write `demos/<name>.overlays.json` — overlay cues keyed to scenes.
-8. Run: `npx argo pipeline <name>`
-9. Report output — finished MP4 is in `videos/` (or configured `outputDir`).
+4. **If the user already has a Playwright test:** Run `npx argo init --from <path>` to auto-generate demo script + skeleton manifests. Then fill in voiceover text (use `_hint` fields as context) and refine overlays. Skip to step 8.
+5. Explore the app — navigate routes and features to plan a meaningful demo script.
+6. Write `demos/<name>.demo.ts` — Playwright actions with `narration.mark()` scene boundaries.
+7. Write `demos/<name>.voiceover.json` — narration text per scene. Scene names must exactly match `narration.mark()` arguments.
+8. Optionally write `demos/<name>.overlays.json` — overlay cues keyed to scenes.
+9. Run: `npx argo pipeline <name>`
+10. Report output — finished MP4 is in `videos/` (or configured `outputDir`).
 
 ---
 
@@ -326,6 +327,21 @@ npx argo export <name>
 ```bash
 npx argo init    # creates example demo, config (.mjs), playwright config
 ```
+
+### Convert Existing Playwright Test
+```bash
+npx argo init --from tests/checkout.spec.ts           # auto-derives demo name from filename
+npx argo init --from tests/checkout.spec.ts --demo my-demo  # custom demo name
+```
+
+This parses the Playwright test and generates:
+- `demos/<name>.demo.ts` — fixture swapped to `@argo-video/cli`, `narration.mark()` + `durationFor()` inserted at scene boundaries
+- `demos/<name>.voiceover.json` — skeleton with `_hint` fields describing what each scene does (for LLM-assisted text generation)
+- `demos/<name>.overlays.json` — lower-third placeholders per scene
+
+**Scene detection heuristics:** `test.step()` names (strongest signal), `page.goto()` navigations, `// comments`, form fills grouped together, click + assertion pairs.
+
+**LLM workflow:** After running `init --from`, ask the LLM to "flesh out the voiceover for `<name>`". The `_hint` fields in the voiceover skeleton give the LLM context about each scene's actions, so it can write natural narration text without re-reading the script. Remove `_hint` fields after filling in text.
 
 ### Pipeline order
 **TTS → Record → Align → Export** (not Record first — TTS must run first so `durationFor()` has clip lengths available during recording).

@@ -5,7 +5,7 @@ import { record } from './record.js';
 import { generateClips } from './tts/generate.js';
 import { exportVideo } from './export.js';
 import { runPipeline } from './pipeline.js';
-import { init } from './init.js';
+import { init, initFrom } from './init.js';
 import { validateDemo } from './validate.js';
 import { runDoctor, formatDoctorResults } from './doctor.js';
 
@@ -159,8 +159,15 @@ export function createProgram(): Command {
   program
     .command('init')
     .description('Initialize a new Argo project')
-    .action(async () => {
-      await init();
+    .option('--from <path>', 'convert an existing Playwright test into an Argo demo')
+    .option('--demo <name>', 'demo name (defaults to filename without extension)')
+    .action(async (cmdOpts: { from?: string; demo?: string }) => {
+      if (cmdOpts.from) {
+        if (cmdOpts.demo) validateDemoName(cmdOpts.demo);
+        await initFrom({ from: cmdOpts.from, demo: cmdOpts.demo });
+      } else {
+        await init();
+      }
     });
 
   return program;
