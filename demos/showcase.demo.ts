@@ -98,16 +98,14 @@ test('showcase', async ({ page, narration }) => {
   narration.mark('code');
   await page.locator('#code-example').scrollIntoViewIfNeeded();
   await page.waitForTimeout(600);
-  await withOverlay(page, 'code', {
+  focusRing(page, '#demo-script-code', { color: '#06b6d4', duration: narration.durationFor('code') });
+  await showOverlay(page, 'code', {
     type: 'lower-third',
     text: 'All effects are one-liners in your Playwright script',
     placement: 'top-left',
     motion: 'fade-in',
     autoBackground: true,
-  }, async () => {
-    await zoomTo(page, '#demo-script-code', { scale: 1.15, duration: narration.durationFor('code') - 500, wait: true });
-    await resetCamera(page);
-  });
+  }, narration.durationFor('code'));
 
   // Scene 7: Theme toggle — autoBackground adapts
   narration.mark('closing');
