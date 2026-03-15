@@ -106,11 +106,10 @@ describe('zoomTo', () => {
     expect(args.scale).toBe(2.0);
   });
 
-  it('passes wrapper metadata so overlays stay outside the zoomed subtree', async () => {
-    await zoomTo(page, '.revenue');
+  it('accepts custom padding', async () => {
+    await zoomTo(page, '.revenue', { padding: 60 });
     const [, args] = (page.evaluate as any).mock.calls[0];
-    expect(args.overlayPrefix).toBe('argo-overlay-');
-    expect(args.wrapperId).toBe('argo-camera-zoom-wrapper');
+    expect(args.padding).toBe(60);
   });
 
   it('blocks with wait: true', async () => {
@@ -125,10 +124,7 @@ describe('resetCamera', () => {
     await resetCamera(page);
     expect(page.evaluate).toHaveBeenCalledTimes(1);
     const [, args] = (page.evaluate as any).mock.calls[0];
-    expect(args).toEqual({
-      attr: 'data-argo-camera',
-      wrapperId: 'argo-camera-zoom-wrapper',
-    });
+    expect(args).toBe('data-argo-camera');
   });
 
   it('swallows errors silently', async () => {

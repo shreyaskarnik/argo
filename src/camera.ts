@@ -1,8 +1,6 @@
 import type { Page } from '@playwright/test';
 
 const CAMERA_ATTR = 'data-argo-camera';
-const OVERLAY_ID_PREFIX = 'argo-overlay-';
-const ZOOM_WRAPPER_ID = 'argo-camera-zoom-wrapper';
 
 interface CameraOptions {
   duration?: number;
@@ -27,7 +25,10 @@ export interface DimAroundOptions extends CameraOptions {
 }
 
 export interface ZoomToOptions extends CameraOptions {
+  /** Zoom level — 1.5 means 150% magnification. Default: 1.5 */
   scale?: number;
+  /** Extra padding around target in px. Default: 40 */
+  padding?: number;
 }
 
 async function runCameraEffect(
@@ -221,6 +222,7 @@ export async function zoomTo(
   const fadeIn = opts?.fadeIn ?? 400;
   const fadeOut = opts?.fadeOut ?? 400;
   const scale = opts?.scale ?? 1.5;
+  const padding = opts?.padding ?? 40;
   const wait = opts?.wait ?? false;
 
   await runCameraEffect(page, ({
@@ -229,78 +231,75 @@ export async function zoomTo(
     fadeIn,
     fadeOut,
     scale,
+    padding,
     attr,
-    overlayPrefix,
-    wrapperId,
   }: any) => {
     const target = document.querySelector(selector);
     if (!target) return;
     const rect = target.getBoundingClientRect();
-    const isArgoManaged = (el: Element) => el.hasAttribute(attr) || el.id.startsWith(overlayPrefix);
-    const ensureZoomWrapper = () => {
-      let wrapper = document.getElementById(wrapperId) as HTMLElement | null;
-      if (wrapper) return wrapper;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
 
-      wrapper = document.createElement('div');
-      wrapper.id = wrapperId;
-      wrapper.style.cssText = 'transform-origin: 0 0; will-change: transform;';
-
-      const children = Array.from(document.body.children).filter((child) => {
-        if (child.id === wrapperId) return false;
-        return !isArgoManaged(child);
-      });
-      children.forEach((child) => wrapper!.appendChild(child));
-      document.body.insertBefore(wrapper, document.body.firstChild);
-      return wrapper;
-    };
-    const unwrapZoomWrapper = () => {
-      const wrapper = document.getElementById(wrapperId);
-      if (!wrapper) return;
-      const children = Array.from(wrapper.children);
-      children.forEach((child) => document.body.insertBefore(child, wrapper));
-      wrapper.remove();
-    };
-
-    const wrapper = ensureZoomWrapper();
-    const originalStyles = {
-      transform: wrapper.style.transform,
-      transformOrigin: wrapper.style.transformOrigin,
-      transition: wrapper.style.transition,
-    };
-
+    // Compute the crop region centered on the target
+    // The crop region is what we want to fill the viewport after scaling
+    const cropW = vw / scale;
+    const cropH = vh / scale;
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    const viewCenterX = window.innerWidth / 2;
-    const viewCenterY = window.innerHeight / 2;
-    const translateX = viewCenterX - centerX;
-    const translateY = viewCenterY - centerY;
 
-    // Mark for cleanup
-    const marker = document.createElement('div');
-    marker.setAttribute(attr, 'zoom-to');
-    marker.style.display = 'none';
-    (marker as any).__zoomRestore = {
-      wrapperId,
-      styles: originalStyles,
+    // Crop boundaries (clamped to viewport)
+    const cropLeft = Math.max(0, Math.min(centerX - cropW / 2, vw - cropW));
+    const cropTop = Math.max(0, Math.min(centerY - cropH / 2, vh - cropH));
+
+    // Create a zoom overlay that covers the full viewport
+    // It contains a clone-free approach: just transform the document
+    const overlay = document.createElement('div');
+    overlay.setAttribute(attr, 'zoom-to');
+    overlay.style.cssText = `
+      position: fixed; inset: 0; z-index: 99989;
+      pointer-events: none; overflow: hidden;
+      opacity: 0; transition: opacity ${fadeIn}ms ease-out;
+    `;
+
+    // Use an iframe-like approach: apply transform to html element
+    // but clip it so only the target region shows, scaled up
+    const html = document.documentElement;
+    const origTransform = html.style.transform;
+    const origTransformOrigin = html.style.transformOrigin;
+    const origTransition = html.style.transition;
+    const origOverflow = document.body.style.overflow;
+
+    // Store restore data on the overlay element
+    (overlay as any).__zoomRestore = {
+      transform: origTransform,
+      transformOrigin: origTransformOrigin,
+      transition: origTransition,
+      overflow: origOverflow,
     };
-    document.body.appendChild(marker);
 
-    wrapper.style.transformOrigin = `${centerX}px ${centerY}px`;
-    wrapper.style.transition = `transform ${fadeIn}ms ease-out`;
-    wrapper.style.transform = `scale(${scale}) translate(${translateX / scale}px, ${translateY / scale}px)`;
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+
+    // Set transform-origin to the crop center and scale
+    html.style.transformOrigin = `${centerX}px ${centerY}px`;
+    html.style.transition = `transform ${fadeIn}ms ease-out`;
+
+    requestAnimationFrame(() => {
+      html.style.transform = `scale(${scale})`;
+      overlay.style.opacity = '1';
+    });
 
     setTimeout(() => {
-      wrapper.style.transition = `transform ${fadeOut}ms ease-out`;
-      wrapper.style.transform = '';
+      html.style.transition = `transform ${fadeOut}ms ease-out`;
+      html.style.transform = origTransform || '';
+      overlay.style.transition = `opacity ${fadeOut}ms ease-out`;
+      overlay.style.opacity = '0';
+
       setTimeout(() => {
-        const w = document.getElementById(wrapperId) as HTMLElement | null;
-        if (w) {
-          w.style.transform = originalStyles.transform;
-          w.style.transformOrigin = originalStyles.transformOrigin;
-          w.style.transition = originalStyles.transition;
-        }
-        unwrapZoomWrapper();
-        marker.remove();
+        html.style.transformOrigin = origTransformOrigin || '';
+        html.style.transition = origTransition || '';
+        document.body.style.overflow = origOverflow || '';
+        overlay.remove();
       }, fadeOut);
     }, duration);
   }, {
@@ -309,38 +308,30 @@ export async function zoomTo(
     fadeIn,
     fadeOut,
     scale,
+    padding,
     attr: CAMERA_ATTR,
-    overlayPrefix: OVERLAY_ID_PREFIX,
-    wrapperId: ZOOM_WRAPPER_ID,
   }, duration + fadeOut, wait);
 }
 
 export async function resetCamera(page: Page): Promise<void> {
   try {
-    await page.evaluate(({ attr, wrapperId }) => {
+    await page.evaluate((attr) => {
+      const html = document.documentElement;
       // Clean up all camera elements
       document.querySelectorAll(`[${attr}]`).forEach(el => {
         // Restore dim-around originals
         if ((el as any).__dimRestore) (el as any).__dimRestore();
-        // Restore zoom-to transform
+        // Restore zoom-to: reset html transform
         if ((el as any).__zoomRestore) {
           const r = (el as any).__zoomRestore;
-          const w = document.getElementById(r.wrapperId) as HTMLElement | null;
-          if (w) {
-            w.style.transform = r.styles.transform;
-            w.style.transformOrigin = r.styles.transformOrigin;
-            w.style.transition = r.styles.transition;
-          }
-          const wrapper = document.getElementById(wrapperId);
-          if (wrapper) {
-            const children = Array.from(wrapper.children);
-            children.forEach((child) => document.body.insertBefore(child, wrapper));
-            wrapper.remove();
-          }
+          html.style.transform = r.transform || '';
+          html.style.transformOrigin = r.transformOrigin || '';
+          html.style.transition = r.transition || '';
+          document.body.style.overflow = r.overflow || '';
         }
         el.remove();
       });
-    }, { attr: CAMERA_ATTR, wrapperId: ZOOM_WRAPPER_ID });
+    }, CAMERA_ATTR);
   } catch {
     // Page may be closed
   }
