@@ -251,6 +251,18 @@ choco install ffmpeg       # Windows
    |--------|------|---------|---------|
    | `engines.kokoro()` | local | built-in | none |
    | `engines.mlxAudio()` | local | `pip install mlx-audio` | none |
+
+   **Voice cloning** — The mlx-audio engine supports voice cloning via Qwen3-TTS or CSM models. Record a short (5–15s) WAV clip, then pass it as a reference:
+
+   ```js
+   tts: {
+     engine: engines.mlxAudio({
+       model: 'mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16',
+       refAudio: './my-voice.wav',
+       refText: 'Transcript of what I said in the clip.',
+     }),
+   }
+   ```
    | `engines.openai()` | cloud | `npm i openai` | `OPENAI_API_KEY` |
    | `engines.elevenlabs()` | cloud | `npm i elevenlabs` | `ELEVENLABS_API_KEY` |
    | `engines.gemini()` | cloud | `npm i @google/genai` | `GEMINI_API_KEY` |
