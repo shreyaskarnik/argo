@@ -221,6 +221,24 @@ Cloud engines read API keys from environment variables (`OPENAI_API_KEY`, `ELEVE
 
 Custom engines: implement the `TTSEngine` interface and pass to `tts.engine` in config.
 
+### Voice Cloning (mlx-audio)
+
+Clone your own voice from a 15-second reference clip. Local, private — no data leaves the machine.
+
+```javascript
+engines.mlxAudio({
+  model: 'mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16',
+  refAudio: './assets/ref-voice.wav',
+  refText: 'Transcript of what I said in the reference clip.',
+})
+```
+
+Helper scripts:
+- `./scripts/record-voice-ref.sh assets/ref-voice.wav` — record reference clip (macOS)
+- `./scripts/voice-clone-preview.sh --ref-audio ... --voiceover ... --play` — preview cloned voice
+
+Qwen3-TTS produces the best voice clone quality. CSM is supported but lower quality.
+
 ### Phonetic Spelling for TTS Pronunciation
 
 The voiceover `text` is only spoken, never displayed — overlay text in the demo script is what viewers see. So you can spell words phonetically in the manifest to fix TTS pronunciation without affecting visuals.

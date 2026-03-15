@@ -11,3 +11,4 @@ voice-preview*/
 .venv/
 .superpowers/
 .DS_Store
+assets/ref-voice.wav

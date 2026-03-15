@@ -252,13 +252,24 @@ choco install ffmpeg       # Windows
    | `engines.kokoro()` | local | built-in | none |
    | `engines.mlxAudio()` | local | `pip install mlx-audio` | none |
 
-   **Voice cloning** — The mlx-audio engine supports voice cloning via Qwen3-TTS or CSM models. Record a short (5–15s) WAV clip, then pass it as a reference:
+   **Voice cloning** — Clone your own voice locally with mlx-audio. Record a 15-second clip, and every demo sounds like you — privately, no data leaves your machine:
+
+   ```bash
+   # Record a reference clip (macOS)
+   ./scripts/record-voice-ref.sh assets/ref-voice.wav
+
+   # Preview cloned voice against your manifest
+   ./scripts/voice-clone-preview.sh \
+     --ref-audio assets/ref-voice.wav \
+     --ref-text "Transcript of what I said." \
+     --voiceover demos/showcase.voiceover.json --play
+   ```
 
    ```js
    tts: {
      engine: engines.mlxAudio({
        model: 'mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16',
-       refAudio: './my-voice.wav',
+       refAudio: './assets/ref-voice.wav',
        refText: 'Transcript of what I said in the clip.',
      }),
    }
