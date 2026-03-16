@@ -294,7 +294,7 @@ engines.mlxAudio({
 
 The voiceover `text` is only spoken, never displayed — overlay text in the demo script is what viewers see. So you can spell words phonetically in the manifest to fix TTS pronunciation without affecting visuals.
 
-**Important:** Phonetic spellings are for voiceover manifest text only. Overlay text in demo scripts is visible to viewers, so always use normal human-facing spelling there.
+**Important:** Phonetic spellings are for spoken narration text only (the `text` field in `.scenes.json`). Overlay text is visible to viewers, so always use normal human-facing spelling there.
 
 | Written | Phonetic for TTS |
 |---------|-----------------|
@@ -404,7 +404,7 @@ npx argo export <name>
 
 ### Preview (interactive replay viewer)
 ```bash
-npx argo preview <name>              # opens browser-based preview at localhost
+npx argo preview <name>              # starts preview server at localhost (open URL in browser)
 npx argo preview <name> --port 3333  # custom port
 ```
 

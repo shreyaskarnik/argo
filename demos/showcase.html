@@ -770,7 +770,7 @@
           <span class="step-icon">&#127909;</span>
           <h3 class="step-title">Record the browser</h3>
           <p class="step-desc">
-            Argo launches a headless Chromium at 1920&times;1080 and
+            Argo launches a real browser at 1920&times;1080 and
             captures your script frame-by-frame. Overlays are composited
             live into the recording — what you script is exactly what
             viewers see.
@@ -782,9 +782,9 @@
           <span class="step-icon">&#128190;</span>
           <h3 class="step-title">Export the video</h3>
           <p class="step-desc">
-            AI narration is generated from your JSON manifest and mixed
+            AI narration is generated from your scenes manifest and mixed
             into the final MP4. One pipeline command handles recording,
-            voiceover synthesis, and FFmpeg export — ready to ship.
+            voiceover synthesis, and ffmpeg export — ready to ship.
           </p>
         </div>
       </div>
@@ -814,7 +814,7 @@
           <h3 class="feature-name">Voiceover</h3>
           <p class="feature-desc">AI narration from a JSON manifest. Six TTS engines — local or cloud. Scene pacing follows clip lengths.</p>
           <div id="voiceover-snippet" style="background: #000; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; margin: 8px 0 6px; font-family: var(--font-mono); font-size: 0.7em; line-height: 1.5; color: var(--text-muted); text-align: left;">
-            <span style="color: #6b7280;">{</span> <span style="color: #93c5fd;">"scene"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"intro"</span><span style="color: #6b7280;">,</span> <span style="color: #93c5fd;">"text"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"Welcome."</span> <span style="color: #6b7280;">}</span>
+            <span style="color: #6b7280;">{</span> <span style="color: #93c5fd;">"scene"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"intro"</span><span style="color: #6b7280;">,</span> <span style="color: #93c5fd;">"text"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"Welcome."</span><span style="color: #6b7280;">,</span><br>  <span style="color: #93c5fd;">"overlay"</span><span style="color: #6b7280;">:</span> <span style="color: #6b7280;">{</span> <span style="color: #93c5fd;">"type"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"lower-third"</span><span style="color: #6b7280;">,</span> <span style="color: #93c5fd;">"text"</span><span style="color: #6b7280;">:</span> <span style="color: #4ade80;">"Welcome"</span> <span style="color: #6b7280;">}</span> <span style="color: #6b7280;">}</span>
           </div>
           <span class="feature-tag">narration.mark()</span>
         </div>
@@ -957,16 +957,14 @@
         </div>
         <div class="code-body">
           <pre id="demo-script-code"><code><span class="syn-kw">import</span> <span class="syn-punc">{ </span><span class="syn-obj">test</span><span class="syn-punc"> }</span> <span class="syn-kw">from</span> <span class="syn-str">'<span class="syn-pkg">@argo-video/cli</span>'</span><span class="syn-punc">;</span>
-<span class="syn-kw">import</span> <span class="syn-punc">{ </span><span class="syn-obj">showOverlay</span><span class="syn-punc"> }</span> <span class="syn-kw">from</span> <span class="syn-str">'<span class="syn-pkg">@argo-video/cli</span>'</span><span class="syn-punc">;</span>
+<span class="syn-kw">import</span> <span class="syn-punc">{ </span><span class="syn-obj">showOverlay</span><span class="syn-punc">, </span><span class="syn-obj">spotlight</span><span class="syn-punc"> }</span> <span class="syn-kw">from</span> <span class="syn-str">'<span class="syn-pkg">@argo-video/cli</span>'</span><span class="syn-punc">;</span>
 
 <span class="syn-fn">test</span><span class="syn-punc">(</span><span class="syn-str">'my-demo'</span><span class="syn-punc">, </span><span class="syn-kw">async</span> <span class="syn-punc">({ </span><span class="syn-obj">page</span><span class="syn-punc">, </span><span class="syn-obj">narration</span><span class="syn-punc"> }) =&gt; {</span>
   <span class="syn-kw">await</span> <span class="syn-obj">page</span><span class="syn-punc">.</span><span class="syn-fn">goto</span><span class="syn-punc">(</span><span class="syn-str">'/'</span><span class="syn-punc">);</span>
 
   <span class="syn-obj">narration</span><span class="syn-punc">.</span><span class="syn-fn">mark</span><span class="syn-punc">(</span><span class="syn-str">'intro'</span><span class="syn-punc">);</span>
-  <span class="syn-kw">await</span> <span class="syn-fn">showOverlay</span><span class="syn-punc">(</span><span class="syn-obj">page</span><span class="syn-punc">, </span><span class="syn-str">'intro'</span><span class="syn-punc">, {</span>
-    <span class="syn-prop">type</span><span class="syn-punc">: </span><span class="syn-str">'lower-third'</span><span class="syn-punc">,</span>
-    <span class="syn-prop">text</span><span class="syn-punc">: </span><span class="syn-str">'Welcome to our app'</span><span class="syn-punc">,</span>
-  <span class="syn-punc">}, </span><span class="syn-num">3000</span><span class="syn-punc">);</span>
+  <span class="syn-fn">spotlight</span><span class="syn-punc">(</span><span class="syn-obj">page</span><span class="syn-punc">, </span><span class="syn-str">'#hero'</span><span class="syn-punc">, { </span><span class="syn-prop">duration</span><span class="syn-punc">: </span><span class="syn-num">3000</span><span class="syn-punc"> });</span>
+  <span class="syn-kw">await</span> <span class="syn-fn">showOverlay</span><span class="syn-punc">(</span><span class="syn-obj">page</span><span class="syn-punc">, </span><span class="syn-str">'intro'</span><span class="syn-punc">, </span><span class="syn-obj">narration</span><span class="syn-punc">.</span><span class="syn-fn">durationFor</span><span class="syn-punc">(</span><span class="syn-str">'intro'</span><span class="syn-punc">));</span>
 <span class="syn-punc">});</span>
 </code></pre>
         </div>
