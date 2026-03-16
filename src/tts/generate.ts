@@ -68,17 +68,21 @@ export async function generateClips(options: GenerateClipsOptions): Promise<Clip
     return { entry, clipPath: cache.getClipPath(demoName, entry) };
   });
 
-  // Generate uncached clips sequentially — Kokoro's ONNX runtime is not
-  // safe for concurrent generate() calls (mutex errors). The shared init
-  // promise prevents duplicate model downloads, but generation must serialize.
-  const uncached = entries.filter(({ entry }) => !cache.isCached(demoName, entry));
-  for (const { entry } of uncached) {
-    const wavBuffer = await engine.generate(entry.text, {
-      voice: entry.voice,
-      speed: entry.speed,
-      lang: entry.lang,
-    });
-    cache.cacheClip(demoName, entry, wavBuffer);
+  // Log per-scene status and generate uncached clips sequentially —
+  // Kokoro's ONNX runtime is not safe for concurrent generate() calls.
+  for (const { entry } of entries) {
+    if (cache.isCached(demoName, entry)) {
+      console.log(`  ▸ ${entry.scene} (cached)`);
+    } else {
+      process.stdout.write(`  ▸ ${entry.scene} (generating...)`);
+      const wavBuffer = await engine.generate(entry.text, {
+        voice: entry.voice,
+        speed: entry.speed,
+        lang: entry.lang,
+      });
+      cache.cacheClip(demoName, entry, wavBuffer);
+      process.stdout.write(' done\n');
+    }
   }
 
   // Read results (all clips now cached)
