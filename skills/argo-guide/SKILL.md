@@ -270,6 +270,22 @@ Helper scripts (use `$(npm root)/@argo-video/cli/scripts/` for npm installs, or 
 
 Qwen3-TTS produces the best voice clone quality. CSM is supported but lower quality.
 
+#### mlx-audio Full Options
+
+```javascript
+engines.mlxAudio({
+  baseUrl: 'http://localhost:8000',  // server URL (default)
+  model: 'mlx-community/Spark-TTS-0.5B-bf16',
+  refAudio: './ref.wav',        // voice cloning reference
+  refText: 'Transcript...',     // required with refAudio
+  instruct: 'Speak warmly',    // style/emotion control
+  gender: 'male',              // gender hint
+  temperature: 0.7,            // sampling temperature
+  topP: 0.95,                  // top-p sampling
+  topK: 40,                    // top-k sampling
+})
+```
+
 ### Phonetic Spelling for TTS Pronunciation
 
 The voiceover `text` is only spoken, never displayed — overlay text in the demo script is what viewers see. So you can spell words phonetically in the manifest to fix TTS pronunciation without affecting visuals.
@@ -292,6 +308,17 @@ The voiceover `text` is only spoken, never displayed — overlay text in the dem
 2. **Portmanteaus** — hyphenate syllables: `Kubernetes` → `koo-ber-net-eez`
 3. **Elongated letters** — reduce repeated chars: `IaaS` → `ee-ass`
 4. **Silent/odd spellings** — write how it sounds: `sudo` → `sue-doo`
+
+**Per-engine differences:** Kokoro needs heavy phonetic help (`tee tee ess`, `A.I.`, `M.L.X.`). OpenAI handles most acronyms natively — just write `TTS`, `AI`, `MLX`. Qwen3 (mlx-audio) is similar to Kokoro. When switching engines, review voiceover text for pronunciation.
+
+### Overlays: Manifest vs Inline
+
+Two ways to add overlays — use **one or the other**, not both for the same scene:
+
+- **Inline** (recommended): `showOverlay()` / `withOverlay()` in the demo script. Full control over timing, camera effect pairing, and conditional logic.
+- **Manifest** (`.overlays.json`): Static overlay definitions loaded at recording time. Useful for simple demos where overlays don't need to interact with camera effects or page actions.
+
+Most real demos use inline overlays exclusively. The manifest is mainly useful as a starting point from `init --from`.
 
 ---
 
@@ -388,6 +415,8 @@ This parses the Playwright test and generates:
 - `demos/<name>.overlays.json` — lower-third placeholders per scene
 
 **Scene detection heuristics:** `test.step()` names (strongest signal), `page.goto()` navigations, `// comments`, form fills grouped together, click + assertion pairs.
+
+**Important:** The parser is heuristic-based — generated scripts may need manual fixes, especially for chained Playwright expressions (e.g., `page.locator().filter().click()` may produce orphaned calls). Always review the generated demo script before recording.
 
 **LLM workflow after `init --from`:**
 
