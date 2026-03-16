@@ -2,14 +2,15 @@
  * argo preview — browser-based replay viewer for iterating on voiceover,
  * overlays, and timing without re-recording.
  *
- * Serves a local web page that plays the recorded video.webm, overlays audio
- * clips at scene timestamps, renders overlay cues on a DOM layer, and lets the
- * user edit voiceover text + overlay props inline with per-scene TTS regen.
+ * Serves a local web page that plays a seekable preview video (preferring MP4
+ * over the raw Playwright WebM), overlays audio clips at scene timestamps,
+ * renders overlay cues on a DOM layer, and lets the user edit voiceover text
+ * + overlay props inline with per-scene TTS regen.
  */
 
 import { execFile } from 'node:child_process';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { readFileSync, existsSync, readdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, writeFileSync, statSync, createReadStream } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { renderTemplate } from './overlays/templates.js';
 import { alignClips, schedulePlacements, type ClipInfo, type Placement } from './tts/align.js';
@@ -339,13 +340,17 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
   const demoName = options.demoName;
   const demoDir = join(argoDir, demoName);
 
-  // Verify the demo has been recorded
-  const videoPath = join(demoDir, 'video.webm');
+  // Prefer exported MP4 (has keyframes for seeking) over raw WebM (no cue points)
+  const webmPath = join(demoDir, 'video.webm');
+  const projectRoot = dirname(resolve(argoDir));
+  const mp4Candidates = ['videos', 'output'].map(d => join(projectRoot, d, `${demoName}.mp4`));
+  const videoPath = mp4Candidates.find(p => existsSync(p)) ?? webmPath;
   if (!existsSync(videoPath)) {
     throw new Error(
       `No recording found for '${demoName}'. Run 'argo pipeline ${demoName}' first.`
     );
   }
+  const videoMime = videoPath.endsWith('.mp4') ? 'video/mp4' : 'video/webm';
 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const url = req.url ?? '/';
@@ -437,9 +442,9 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
 
       // --- Static file serving ---
 
-      // Serve video.webm
-      if (url === '/video.webm') {
-        serveFile(res, videoPath);
+      // Serve video with Range request support (required for seeking)
+      if (url === '/video' || url === '/video.webm') {
+        serveFileWithRanges(req, res, videoPath, videoMime);
         return;
       }
 
@@ -505,6 +510,39 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
       });
     });
   });
+}
+
+function serveFileWithRanges(req: IncomingMessage, res: ServerResponse, filePath: string, mime: string): void {
+  if (!existsSync(filePath)) {
+    res.writeHead(404);
+    res.end('Not found');
+    return;
+  }
+  const stat = statSync(filePath);
+  const total = stat.size;
+  const range = req.headers.range;
+
+  if (range) {
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : total - 1;
+    const chunkSize = end - start + 1;
+    const stream = createReadStream(filePath, { start, end });
+    res.writeHead(206, {
+      'Content-Range': `bytes ${start}-${end}/${total}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunkSize,
+      'Content-Type': mime,
+    });
+    stream.pipe(res);
+  } else {
+    res.writeHead(200, {
+      'Content-Length': total,
+      'Content-Type': mime,
+      'Accept-Ranges': 'bytes',
+    });
+    createReadStream(filePath).pipe(res);
+  }
 }
 
 function serveFile(res: ServerResponse, filePath: string): void {
@@ -660,6 +698,21 @@ const PREVIEW_HTML = `<!DOCTYPE html>
     transition: opacity 0.3s ease;
   }
   .overlay-cue.visible { opacity: 1; }
+  .overlay-cue .preview-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: #fff;
+    background: var(--accent);
+    padding: 2px 6px;
+    border-radius: 3px;
+    line-height: 1;
+    opacity: 0.85;
+  }
 
   /* Zone positioning */
   .overlay-cue[data-zone="bottom-center"] { bottom: 60px; left: 50%; transform: translateX(-50%); }
@@ -964,7 +1017,7 @@ const PREVIEW_HTML = `<!DOCTYPE html>
 
 <div class="viewer">
   <div class="video-container">
-    <video id="video" src="/video.webm" preload="auto"></video>
+    <video id="video" src="/video" preload="auto" muted playsinline></video>
     <div class="overlay-layer" id="overlay-layer"></div>
   </div>
 
@@ -1023,6 +1076,7 @@ let audioCtx = null;
 let alignedAudioBuffer = null;
 let audioSource = null;
 let scenePlaybackEndMs = null;
+let latestSeekRequest = 0;
 const scrubState = new Map();
 
 async function initAudio() {
@@ -1116,8 +1170,8 @@ timelineBar.addEventListener('click', (e) => {
   const rect = timelineBar.getBoundingClientRect();
   const pct = (e.clientX - rect.left) / rect.width;
   const seekTime = pct * video.duration;
-  video.currentTime = seekTime;
-  syncAudio();
+  scenePlaybackEndMs = null;
+  void seekAbsoluteMs(seekTime * 1000);
 });
 
 // Play/pause icon toggling
@@ -1205,7 +1259,7 @@ function renderOverlayElements() {
     el.className = 'overlay-cue';
     el.dataset.scene = s.name;
     el.dataset.zone = s.rendered.zone;
-    el.innerHTML = s.rendered.html;
+    el.innerHTML = '<span class="preview-badge">PREVIEW</span>' + s.rendered.html;
     Object.assign(el.style, s.rendered.styles);
     overlayLayer.appendChild(el);
   }
@@ -1441,7 +1495,7 @@ function wireOverlayListeners(sceneName) {
 // ─── Actions ───────────────────────────────────────────────────────────────
 function seekToScene(s) {
   scenePlaybackEndMs = null;
-  seekAbsoluteMs(getSceneBounds(s).startMs);
+  void seekAbsoluteMs(getSceneBounds(s).startMs);
   activeScene = s;
   updateActiveSceneUI();
 }
@@ -1470,10 +1524,45 @@ function getSceneBounds(s) {
   };
 }
 
-function seekAbsoluteMs(absoluteMs) {
-  video.currentTime = Math.max(0, absoluteMs) / 1000;
-  updateOverlayVisibility(Math.max(0, absoluteMs));
-  updateSceneScrubUI(Math.max(0, absoluteMs));
+async function seekAbsoluteMs(absoluteMs) {
+  const targetMs = Math.max(0, absoluteMs);
+  const targetSec = targetMs / 1000;
+  const requestId = ++latestSeekRequest;
+
+  console.log('[seekAbsoluteMs] target=' + targetMs + 'ms, currentTime=' + video.currentTime + ', readyState=' + video.readyState + ', seeking=' + video.seeking + ', requestId=' + requestId);
+
+  if (video.readyState < 1) {
+    console.log('[seekAbsoluteMs] waiting for loadedmetadata');
+    await new Promise(resolve => video.addEventListener('loadedmetadata', resolve, { once: true }));
+    console.log('[seekAbsoluteMs] loadedmetadata fired, readyState=' + video.readyState);
+  }
+
+  if (Math.abs(video.currentTime - targetSec) > 0.01 || video.seeking) {
+    console.log('[seekAbsoluteMs] seeking to ' + targetSec + 's (delta=' + Math.abs(video.currentTime - targetSec) + ')');
+    await new Promise(resolve => {
+      const onSeeked = () => resolve();
+      video.addEventListener('seeked', onSeeked, { once: true });
+      video.currentTime = targetSec;
+    });
+    console.log('[seekAbsoluteMs] seeked fired, video.currentTime=' + video.currentTime);
+  } else {
+    console.log('[seekAbsoluteMs] skipping seek (already at target)');
+  }
+
+  if (requestId !== latestSeekRequest) {
+    console.log('[seekAbsoluteMs] STALE request ' + requestId + ' vs latest ' + latestSeekRequest + ', bailing');
+    return;
+  }
+
+  const totalMs = video.duration * 1000;
+  if (totalMs > 0) {
+    const pct = (targetMs / totalMs) * 100;
+    timelineProgress.style.width = pct + '%';
+    document.getElementById('timeline-playhead').style.left = pct + '%';
+  }
+  document.getElementById('time-current').textContent = formatTime(targetMs);
+  updateOverlayVisibility(targetMs);
+  updateSceneScrubUI(targetMs);
   syncAudio();
 }
 
@@ -1494,7 +1583,7 @@ function updateSceneScrubUI(currentMs = video.currentTime * 1000) {
   }
 }
 
-function handleSceneScrubInput(sceneName, rawValue) {
+async function handleSceneScrubInput(sceneName, rawValue) {
   const s = scenes.find((scene) => scene.name === sceneName);
   if (!s) return;
   if (!scrubState.has(sceneName)) {
@@ -1504,13 +1593,13 @@ function handleSceneScrubInput(sceneName, rawValue) {
   const { startMs, durationMs } = getSceneBounds(s);
   const offsetMs = Math.max(0, Math.min(durationMs, Number(rawValue) || 0));
   scenePlaybackEndMs = null;
-  seekAbsoluteMs(startMs + offsetMs);
   activeScene = s;
   updateActiveSceneUI();
+  await seekAbsoluteMs(startMs + offsetMs);
 }
 
-function handleSceneScrubCommit(sceneName, rawValue) {
-  handleSceneScrubInput(sceneName, rawValue);
+async function handleSceneScrubCommit(sceneName, rawValue) {
+  await handleSceneScrubInput(sceneName, rawValue);
   const state = scrubState.get(sceneName);
   scrubState.delete(sceneName);
   if (state?.resumeAfter) {
@@ -1528,29 +1617,40 @@ function nudgeScene(sceneName, deltaMs) {
   if (!s) return;
   const scrub = document.querySelector('[data-field="scene-scrub"][data-scene="' + sceneName + '"]');
   const currentMs = scrub ? Number(scrub.value) || 0 : 0;
-  handleSceneScrubInput(sceneName, currentMs + deltaMs);
-  handleSceneScrubCommit(sceneName, currentMs + deltaMs);
+  void handleSceneScrubCommit(sceneName, currentMs + deltaMs);
 }
 
 async function previewScene(sceneName) {
+  console.log('[previewScene] START scene=' + sceneName);
   await initAudio();
   const s = scenes.find(s => s.name === sceneName);
   if (!s) return;
   const { startMs, endMs, durationMs } = getSceneBounds(s);
+  console.log('[previewScene] bounds: startMs=' + startMs + ' endMs=' + endMs + ' durationMs=' + durationMs);
   if (!durationMs) return;
-  const targetSec = startMs / 1000;
-  if (Math.abs(video.currentTime - targetSec) > 0.01) {
-    video.currentTime = targetSec;
-    await new Promise(resolve => { video.addEventListener('seeked', resolve, { once: true }); });
+  // Pause first to prevent timeupdate race, then seek, then play
+  video.pause();
+  stopAudio();
+  scenePlaybackEndMs = null;
+  console.log('[previewScene] before seekAbsoluteMs, video.currentTime=' + video.currentTime + ' readyState=' + video.readyState);
+  await seekAbsoluteMs(startMs);
+  console.log('[previewScene] after seekAbsoluteMs, video.currentTime=' + video.currentTime);
+  // Verify seek landed — some browsers reset on play()
+  if (Math.abs(video.currentTime - startMs / 1000) > 0.1) {
+    console.log('[previewScene] VERIFY FAILED, re-seeking. currentTime=' + video.currentTime + ' expected=' + (startMs/1000));
+    video.currentTime = startMs / 1000;
+    await new Promise(r => video.addEventListener('seeked', r, { once: true }));
+    console.log('[previewScene] after re-seek, video.currentTime=' + video.currentTime);
   }
   activeScene = s;
   updateActiveSceneUI();
-  updateOverlayVisibility(startMs);
-  updateSceneScrubUI(startMs);
   scenePlaybackEndMs = endMs;
+  console.log('[previewScene] calling video.play(), currentTime=' + video.currentTime);
   await video.play();
+  console.log('[previewScene] after video.play(), currentTime=' + video.currentTime);
   if (document.getElementById('cb-audio').checked) await playAudio();
   showPauseIcon();
+  console.log('[previewScene] DONE, currentTime=' + video.currentTime);
 }
 
 async function regenClip(sceneName, btn) {
