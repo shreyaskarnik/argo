@@ -830,6 +830,15 @@ function renderSceneList() {
       seekToScene(s);
     });
 
+    // Live preview: update overlay on the video layer when editing
+    let debounceTimer;
+    card.querySelectorAll('[data-field^="overlay"]').forEach(input => {
+      input.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => saveOverlays(), 300);
+      });
+    });
+
     sceneList.appendChild(card);
   }
 }
