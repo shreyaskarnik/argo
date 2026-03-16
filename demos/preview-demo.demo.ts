@@ -17,15 +17,7 @@ test('preview-demo', async ({ page, narration }) => {
 
   // Scene 1: Hero — show the full preview layout
   narration.mark('intro');
-  await showOverlay(page, 'intro', {
-    type: 'headline-card',
-    kicker: 'NEW IN ARGO',
-    title: 'argo preview',
-    body: 'Edit voiceover, overlays, and timing — without re-recording.',
-    placement: 'top-right',
-    motion: 'slide-in',
-    autoBackground: true,
-  }, narration.durationFor('intro', { maxMs: 8000 }));
+  await showOverlay(page, 'intro', narration.durationFor('intro', { maxMs: 8000 }));
 
   // Scene 2: Video player — hit play and show playback
   narration.mark('play-video');
@@ -35,13 +27,7 @@ test('preview-demo', async ({ page, narration }) => {
     wait: true,
   });
   await page.click('#btn-play');
-  await showOverlay(page, 'play-video', {
-    type: 'lower-third',
-    text: 'Video and audio play in sync — scrub the timeline to jump around',
-    placement: 'top-left',
-    motion: 'fade-in',
-    autoBackground: true,
-  }, narration.durationFor('play-video') / 2);
+  await showOverlay(page, 'play-video', narration.durationFor('play-video') / 2);
   // Pause after showing playback
   await page.click('#btn-play');
 
@@ -50,13 +36,7 @@ test('preview-demo', async ({ page, narration }) => {
   const sceneCards = page.locator('.scene-card');
   const cardCount = await sceneCards.count();
   if (cardCount >= 3) {
-    await withOverlay(page, 'browse-scenes', {
-      type: 'callout',
-      text: 'Click any scene to jump to it',
-      placement: 'top-left',
-      motion: 'fade-in',
-      autoBackground: true,
-    }, async () => {
+    await withOverlay(page, 'browse-scenes', async () => {
       const browseDur = Math.floor(narration.durationFor('browse-scenes') / 4);
       // Click through first few scene cards
       await sceneCards.nth(1).click();
@@ -86,25 +66,13 @@ test('preview-demo', async ({ page, narration }) => {
   await textarea.click();
   await textarea.selectText();
   await demoType(page, textarea, 'Meet Argo — the fastest way to create polished product demos with AI voiceover.', 30);
-  await showOverlay(page, 'edit-text', {
-    type: 'lower-third',
-    text: 'Edit voiceover text inline — changes save to your manifest',
-    placement: 'top-right',
-    motion: 'fade-in',
-    autoBackground: true,
-  }, narration.durationFor('edit-text', { minMs: 2000, leadOutMs: 300 }));
+  await showOverlay(page, 'edit-text', narration.durationFor('edit-text', { minMs: 2000, leadOutMs: 300 }));
 
   // Scene 5: Edit overlay — change the overlay type and placement
   narration.mark('edit-overlay');
   const overlayType = firstScene.locator('select[data-field="overlay-type"]');
   await overlayType.scrollIntoViewIfNeeded();
-  await withOverlay(page, 'edit-overlay', {
-    type: 'lower-third',
-    text: 'Swap overlay templates and zones with dropdowns',
-    placement: 'top-left',
-    motion: 'fade-in',
-    autoBackground: true,
-  }, async () => {
+  await withOverlay(page, 'edit-overlay', async () => {
     focusRing(page, 'select[data-field="overlay-type"]', {
       color: '#8b5cf6',
       duration: narration.durationFor('edit-overlay') / 2,
@@ -129,15 +97,7 @@ test('preview-demo', async ({ page, narration }) => {
     duration: narration.durationFor('regen-tts'),
     padding: 12,
   });
-  await showOverlay(page, 'regen-tts', {
-    type: 'headline-card',
-    kicker: 'SURGICAL UPDATES',
-    title: 'Regen TTS',
-    body: 'Regenerate just one scene — no need to re-run the full pipeline.',
-    placement: 'top-right',
-    motion: 'slide-in',
-    autoBackground: true,
-  }, narration.durationFor('regen-tts'));
+  await showOverlay(page, 'regen-tts', narration.durationFor('regen-tts'));
 
   // Scene 7: Save — hit the save button
   narration.mark('save');
@@ -146,25 +106,13 @@ test('preview-demo', async ({ page, narration }) => {
   spotlight(page, '#btn-save', { duration: 2000, padding: 8 });
   await page.waitForTimeout(1000);
   await saveBtn.click();
-  await showOverlay(page, 'save', {
-    type: 'lower-third',
-    text: 'Save writes directly to your voiceover and overlay manifests',
-    placement: 'top-left',
-    motion: 'fade-in',
-    autoBackground: true,
-  }, narration.durationFor('save'));
+  await showOverlay(page, 'save', narration.durationFor('save'));
 
   // Scene 8: Toggle controls — show audio and overlay toggles
   narration.mark('controls');
   const audioCheckbox = page.locator('#cb-audio');
   const overlayCheckbox = page.locator('#cb-overlays');
-  await withOverlay(page, 'controls', {
-    type: 'callout',
-    text: 'Toggle audio and overlays on or off',
-    placement: 'top-right',
-    motion: 'fade-in',
-    autoBackground: true,
-  }, async () => {
+  await withOverlay(page, 'controls', async () => {
     const toggleDur = Math.floor(narration.durationFor('controls') / 3);
     focusRing(page, '#cb-overlays', { color: '#f59e0b', duration: toggleDur });
     await overlayCheckbox.uncheck();
@@ -179,13 +127,5 @@ test('preview-demo', async ({ page, narration }) => {
   // Scene 9: Closing — confetti + wrap up
   narration.mark('closing');
   showConfetti(page, { spread: 'burst', duration: 3000, pieces: 180 });
-  await showOverlay(page, 'closing', {
-    type: 'headline-card',
-    kicker: 'TRY IT',
-    title: 'npx argo preview my-demo',
-    body: 'Iterate on voiceover, overlays, and timing — all from your browser.',
-    placement: 'top-right',
-    motion: 'slide-in',
-    autoBackground: true,
-  }, narration.durationFor('closing', { minMs: 3000, leadOutMs: 600 }));
+  await showOverlay(page, 'closing', narration.durationFor('closing', { minMs: 3000, leadOutMs: 600 }));
 });
