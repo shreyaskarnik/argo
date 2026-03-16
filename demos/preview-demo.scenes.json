@@ -1,13 +1,13 @@
 [
   {
     "scene": "intro",
-    "text": "Introducing argo preview. After your first pipeline run, open a browser-based viewer to iterate on voiceover, overlays, and timing — without re-recording a single frame.",
+    "text": "Argo preview. After your first pipeline run, open a browser-based viewer to iterate on voiceover, overlays, and timing without re-recording a single frame.",
     "speed": 0.9,
     "overlay": {
       "type": "headline-card",
-      "kicker": "NEW IN ARGO",
-      "title": "argo preview",
-      "body": "Edit voiceover, overlays, and timing — without re-recording.",
+      "kicker": "ARGO PREVIEW",
+      "title": "Edit. Preview. Ship.",
+      "body": "Tweak voiceover, overlays, and timing without re-recording.",
       "placement": "top-right",
       "motion": "slide-in",
       "autoBackground": true
@@ -19,7 +19,7 @@
     "speed": 0.9,
     "overlay": {
       "type": "lower-third",
-      "text": "Video and audio play in sync — scrub the timeline to jump around",
+      "text": "Video and audio play in sync \u2014 scrub the timeline to jump around",
       "placement": "top-left",
       "motion": "fade-in",
       "autoBackground": true
@@ -39,11 +39,11 @@
   },
   {
     "scene": "edit-text",
-    "text": "Edit voiceover text right in the browser. Change a word, rephrase a sentence, fix pronunciation. Your edits save directly to the scenes manifest file.",
+    "text": "Edit voiceover text right in the browser. Change a word, rephrase a sentence, fix pronunciation. The save button turns amber when you have unsaved changes.",
     "speed": 0.9,
     "overlay": {
       "type": "lower-third",
-      "text": "Edit voiceover text inline — changes save to your manifest",
+      "text": "Edit voiceover text inline \u2014 save when you\u2019re ready",
       "placement": "top-right",
       "motion": "fade-in",
       "autoBackground": true
@@ -51,7 +51,7 @@
   },
   {
     "scene": "edit-overlay",
-    "text": "Swap overlay templates and zones with simple dropdowns. Switch from a lower-third to a headline card, move it from bottom center to top right — all live.",
+    "text": "Swap overlay templates and zones with simple dropdowns. Switch from a lower-third to a headline card, move it from bottom center to top right. The preview updates live as you type.",
     "speed": 0.9,
     "overlay": {
       "type": "lower-third",
@@ -69,7 +69,7 @@
       "type": "headline-card",
       "kicker": "SURGICAL UPDATES",
       "title": "Regen TTS",
-      "body": "Regenerate just one scene — no need to re-run the full pipeline.",
+      "body": "Regenerate just one scene \u2014 no need to re-run the full pipeline.",
       "placement": "top-right",
       "motion": "slide-in",
       "autoBackground": true
@@ -77,11 +77,11 @@
   },
   {
     "scene": "save",
-    "text": "Hit Save and your changes write directly to your scenes manifest file on disk. No copy-paste, no manual syncing.",
+    "text": "Hit Save and your changes write directly to your scenes manifest on disk. Or hit Re-record to run the full pipeline with your edits and get a fresh video.",
     "speed": 0.9,
     "overlay": {
       "type": "lower-third",
-      "text": "Save writes directly to your scenes manifest",
+      "text": "Save persists to disk \u2014 Re-record runs the full pipeline",
       "placement": "top-left",
       "motion": "fade-in",
       "autoBackground": true
@@ -89,7 +89,7 @@
   },
   {
     "scene": "controls",
-    "text": "Toggle audio and overlay visibility with checkboxes. Preview the video with or without narration, with or without overlays — however you like.",
+    "text": "Toggle audio and overlay visibility with the switches. Preview the video with or without narration, with or without overlays, however you like.",
     "speed": 0.9,
     "overlay": {
       "type": "callout",
@@ -101,14 +101,14 @@
   },
   {
     "scene": "closing",
-    "text": "That's argo preview. Edit, regen, save, repeat — all from your browser. Try it with npx argo preview.",
+    "text": "That's argo preview. Edit, regen, save, repeat. All from your browser. Try it with npx argo preview.",
     "voice": "am_michael",
     "speed": 0.9,
     "overlay": {
       "type": "headline-card",
       "kicker": "TRY IT",
       "title": "npx argo preview my-demo",
-      "body": "Iterate on voiceover, overlays, and timing — all from your browser.",
+      "body": "Iterate on voiceover, overlays, and timing \u2014 all from your browser.",
       "placement": "top-right",
       "motion": "slide-in",
       "autoBackground": true
