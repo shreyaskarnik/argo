@@ -60,7 +60,7 @@ export async function runPipeline(
   // Step 1: Generate TTS clips
   console.log('★ Brewing voiceover clips...');
   const clipResults = await generateClips({
-    manifestPath: `${config.demosDir}/${demoName}.voiceover.json`,
+    manifestPath: `${config.demosDir}/${demoName}.scenes.json`,
     demoName,
     engine: config.tts.engine,
     projectRoot: '.',
@@ -145,7 +145,7 @@ export async function runPipeline(
   mkdirSync(config.outputDir, { recursive: true });
 
   // Build scene text map for subtitles
-  const manifestPath = `${config.demosDir}/${demoName}.voiceover.json`;
+  const manifestPath = `${config.demosDir}/${demoName}.scenes.json`;
   const sceneTexts: Record<string, string> = {};
   try {
     const manifestContent = JSON.parse(readFileSync(manifestPath, 'utf-8'));

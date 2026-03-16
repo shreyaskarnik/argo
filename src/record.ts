@@ -88,7 +88,7 @@ export async function record(demoName: string, options: RecordOptions): Promise<
 
   // Start asset server if overlay manifest has image assets
   let assetServer: AssetServer | undefined;
-  const overlayManifestPath = path.join(options.demosDir, `${demoName}.overlays.json`);
+  const overlayManifestPath = path.join(options.demosDir, `${demoName}.scenes.json`);
   try {
     const overlayEntries = await loadOverlayManifest(overlayManifestPath);
     if (overlayEntries && hasImageAssets(overlayEntries)) {
@@ -114,6 +114,7 @@ export async function record(demoName: string, options: RecordOptions): Promise<
           ARGO_AUTO_BACKGROUND: options.autoBackground ? '1' : '',
           ARGO_DEFAULT_PLACEMENT: options.defaultPlacement ?? '',
           ARGO_SCENE_DURATIONS_PATH: path.resolve(path.join('.argo', demoName, '.scene-durations.json')),
+          ARGO_OVERLAYS_PATH: path.resolve(path.join(options.demosDir, `${demoName}.scenes.json`)),
         },
       }, (error, stdout, stderr) => {
         if (error) {

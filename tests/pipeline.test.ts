@@ -121,7 +121,7 @@ describe('runPipeline', () => {
   it('passes correct options to generateClips', async () => {
     await runPipeline(DEMO_NAME, defaultConfig);
     expect(mockedGenerateClips).toHaveBeenCalledWith({
-      manifestPath: `demos/${DEMO_NAME}.voiceover.json`,
+      manifestPath: `demos/${DEMO_NAME}.scenes.json`,
       demoName: DEMO_NAME,
       engine: mockEngine,
       projectRoot: '.',

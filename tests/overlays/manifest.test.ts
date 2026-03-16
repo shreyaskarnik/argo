@@ -17,16 +17,16 @@ describe('loadOverlayManifest', () => {
 
   it('returns null when file does not exist', async () => {
     setup();
-    const result = await loadOverlayManifest(join(tmpDir, 'missing.overlays.json'));
+    const result = await loadOverlayManifest(join(tmpDir, 'missing.scenes.json'));
     expect(result).toBeNull();
   });
 
-  it('parses a valid manifest', async () => {
+  it('parses a valid scenes.json manifest and extracts overlay entries', async () => {
     setup();
-    const manifestPath = join(tmpDir, 'demo.overlays.json');
+    const manifestPath = join(tmpDir, 'demo.scenes.json');
     writeFileSync(manifestPath, JSON.stringify([
-      { scene: 'intro', type: 'lower-third', text: 'Hello' },
-      { scene: 'mid', type: 'headline-card', title: 'Title', placement: 'top-left' },
+      { scene: 'intro', text: 'Hello', overlay: { type: 'lower-third', text: 'Hello' } },
+      { scene: 'mid', text: 'Middle', overlay: { type: 'headline-card', title: 'Title', placement: 'top-left' } },
     ]));
     const result = await loadOverlayManifest(manifestPath);
     expect(result).toHaveLength(2);
@@ -34,48 +34,41 @@ describe('loadOverlayManifest', () => {
     expect(result![1].type).toBe('headline-card');
   });
 
+  it('skips scenes without an overlay field', async () => {
+    setup();
+    const manifestPath = join(tmpDir, 'demo.scenes.json');
+    writeFileSync(manifestPath, JSON.stringify([
+      { scene: 'intro', text: 'Hello' },
+      { scene: 'mid', text: 'Middle', overlay: { type: 'lower-third', text: 'Mid' } },
+    ]));
+    const result = await loadOverlayManifest(manifestPath);
+    expect(result).toHaveLength(1);
+    expect(result![0].scene).toBe('mid');
+  });
+
+  it('returns empty array when no scenes have overlays', async () => {
+    setup();
+    const manifestPath = join(tmpDir, 'demo.scenes.json');
+    writeFileSync(manifestPath, JSON.stringify([
+      { scene: 'intro', text: 'Hello' },
+      { scene: 'mid', text: 'Middle' },
+    ]));
+    const result = await loadOverlayManifest(manifestPath);
+    expect(result).toEqual([]);
+  });
+
   it('throws on invalid JSON', async () => {
     setup();
-    const manifestPath = join(tmpDir, 'bad.overlays.json');
+    const manifestPath = join(tmpDir, 'bad.scenes.json');
     writeFileSync(manifestPath, '{ nope }}}');
     await expect(loadOverlayManifest(manifestPath)).rejects.toThrow('Failed to parse overlay manifest');
   });
 
   it('throws when manifest is not an array', async () => {
     setup();
-    const manifestPath = join(tmpDir, 'obj.overlays.json');
+    const manifestPath = join(tmpDir, 'obj.scenes.json');
     writeFileSync(manifestPath, JSON.stringify({ scene: 'x' }));
     await expect(loadOverlayManifest(manifestPath)).rejects.toThrow('must contain a JSON array');
-  });
-
-  it('throws on entry missing scene', async () => {
-    setup();
-    const manifestPath = join(tmpDir, 'no-scene.overlays.json');
-    writeFileSync(manifestPath, JSON.stringify([{ type: 'lower-third', text: 'Hi' }]));
-    await expect(loadOverlayManifest(manifestPath)).rejects.toThrow('missing required field "scene"');
-  });
-
-  it('throws on entry missing type', async () => {
-    setup();
-    const manifestPath = join(tmpDir, 'no-type.overlays.json');
-    writeFileSync(manifestPath, JSON.stringify([{ scene: 'x', text: 'Hi' }]));
-    await expect(loadOverlayManifest(manifestPath)).rejects.toThrow('missing required field "type"');
-  });
-
-  it('throws on unknown template type', async () => {
-    setup();
-    const manifestPath = join(tmpDir, 'bad-type.overlays.json');
-    writeFileSync(manifestPath, JSON.stringify([{ scene: 'x', type: 'banner', text: 'Hi' }]));
-    await expect(loadOverlayManifest(manifestPath)).rejects.toThrow('unknown overlay type "banner"');
-  });
-
-  it('throws on unknown zone', async () => {
-    setup();
-    const manifestPath = join(tmpDir, 'bad-zone.overlays.json');
-    writeFileSync(manifestPath, JSON.stringify([
-      { scene: 'x', type: 'lower-third', text: 'Hi', placement: 'middle' },
-    ]));
-    await expect(loadOverlayManifest(manifestPath)).rejects.toThrow('unknown placement "middle"');
   });
 });
 

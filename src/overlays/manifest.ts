@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import type { OverlayManifestEntry } from './types.js';
-import { isValidTemplateType, isValidZone, isValidMotion } from './types.js';
+import type { OverlayManifestEntry, SceneEntry } from './types.js';
 
 export async function loadOverlayManifest(
   manifestPath: string,
@@ -23,29 +22,12 @@ export async function loadOverlayManifest(
     throw new Error(`Overlay manifest ${manifestPath} must contain a JSON array`);
   }
 
+  // Extract overlay entries from unified .scenes.json format (overlay nested under entry.overlay)
   const entries: OverlayManifestEntry[] = [];
-
-  for (let i = 0; i < parsed.length; i++) {
-    const entry = parsed[i];
-    const prefix = `Overlay manifest entry ${i}`;
-
-    if (!entry.scene || typeof entry.scene !== 'string') {
-      throw new Error(`${prefix}: missing required field "scene"`);
+  for (const entry of parsed as SceneEntry[]) {
+    if (entry.overlay && entry.scene) {
+      entries.push({ ...entry.overlay, scene: entry.scene } as OverlayManifestEntry);
     }
-    if (!entry.type || typeof entry.type !== 'string') {
-      throw new Error(`${prefix}: missing required field "type"`);
-    }
-    if (!isValidTemplateType(entry.type)) {
-      throw new Error(`${prefix}: unknown overlay type "${entry.type}"`);
-    }
-    if (entry.placement && !isValidZone(entry.placement)) {
-      throw new Error(`${prefix}: unknown placement "${entry.placement}"`);
-    }
-    if (entry.motion && !isValidMotion(entry.motion)) {
-      throw new Error(`${prefix}: unknown motion "${entry.motion}"`);
-    }
-
-    entries.push(entry as OverlayManifestEntry);
   }
 
   return entries;

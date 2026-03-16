@@ -74,7 +74,7 @@ export function createProgram(): Command {
       const config = await ensureTTSEngine(await loadConfig(process.cwd(), configPath));
       await generateClips({
         manifestPath: manifest,
-        demoName: basename(manifest).replace(/\.voiceover\.json$/, '').replace(/\.json$/, ''),
+        demoName: basename(manifest).replace(/\.scenes\.json$/, '').replace(/\.voiceover\.json$/, '').replace(/\.json$/, ''),
         engine: config.tts.engine!,
         projectRoot: '.',
         defaults: { voice: config.tts.defaultVoice, speed: config.tts.defaultSpeed },
@@ -159,7 +159,7 @@ export function createProgram(): Command {
 
   program
     .command('preview <demo>')
-    .description('Open a browser-based preview to tweak voiceover, overlays, and timing without re-recording')
+    .description('Start a browser-based preview server to tweak voiceover, overlays, and timing without re-recording')
     .option('--port <number>', 'server port (default: auto)', parseInt)
     .action(async (demo: string, cmdOpts: { port?: number }) => {
       validateDemoName(demo);
@@ -170,6 +170,10 @@ export function createProgram(): Command {
         argoDir: '.argo',
         demosDir: config.demosDir,
         port: cmdOpts.port,
+        ttsDefaults: {
+          voice: config.tts.defaultVoice,
+          speed: config.tts.defaultSpeed,
+        },
       });
       console.log(`\nArgo Preview running at: ${url}`);
       console.log('Press Ctrl+C to stop.\n');
