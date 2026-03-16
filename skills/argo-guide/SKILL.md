@@ -105,6 +105,36 @@ test('my-demo', async ({ page, narration }) => {
 
 **Camera best practice**: Derive effect durations from `narration.durationFor()` so camera timing tracks the voiceover. Example: `const stepDur = Math.floor(narration.durationFor('scene') / 3)` then use `stepDur` for each effect.
 
+### Off-Camera Setup and Teardown
+
+Everything before the first `narration.mark()` and after the last scene's `durationFor()` wait is off-camera — the video captures it but the export trims to narrated content via `-shortest`. Use this for:
+
+```typescript
+test('demo', async ({ page, narration }) => {
+  // OFF-CAMERA SETUP — login, enable feature flags, seed data
+  await page.goto('/admin');
+  await page.fill('#email', process.env.ADMIN_EMAIL);
+  await page.click('#login');
+  await page.waitForURL('/dashboard');
+  await page.click('#enable-beta-feature');
+
+  // ON-CAMERA — demo starts at first mark
+  narration.mark('intro');
+  await showOverlay(page, 'intro', { ... }, narration.durationFor('intro'));
+
+  // ... more scenes ...
+
+  narration.mark('closing');
+  await showOverlay(page, 'closing', { ... }, narration.durationFor('closing'));
+
+  // OFF-CAMERA TEARDOWN — clean up after video ends
+  await page.goto('/admin');
+  await page.click('#disable-beta-feature');
+});
+```
+
+This means you can toggle feature flags, switch accounts, or seed test data without it appearing in the final video — and tear it down after so re-recording works cleanly.
+
 ### Dynamic Scene Durations with `durationFor()`
 
 Instead of hardcoding wait times, use `narration.durationFor(scene, opts?)` which computes hold duration from the actual TTS clip length:
