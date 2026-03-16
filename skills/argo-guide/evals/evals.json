@@ -4,7 +4,7 @@
     {
       "id": 0,
       "prompt": "I have a Next.js app running on localhost:3000 with a signup flow (landing page -> click 'Get Started' -> fill in email/password -> click 'Create Account' -> see dashboard). Create an Argo demo video that walks through this signup flow with voiceover narration and some nice overlays.",
-      "expected_output": "A complete demo script (*.demo.ts), voiceover manifest (*.voiceover.json), and optionally an overlay manifest or inline overlay calls. Should import from @argo-video/cli, use narration.mark() for each scene, use narration.durationFor() for timing, and include showOverlay/withOverlay calls.",
+      "expected_output": "A complete demo script (*.demo.ts) and a unified scenes manifest (*.scenes.json) with voiceover text and overlay cues per scene. Should import from @argo-video/cli, use narration.mark() for each scene, use narration.durationFor() for timing, and include showOverlay/withOverlay calls.",
       "files": []
     },
     {

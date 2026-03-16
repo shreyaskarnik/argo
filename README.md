@@ -35,7 +35,7 @@ https://gist.github.com/user-attachments/assets/ba009e90-0310-454b-833e-e0d71d4d
  clips        scene marks                 audio
                   │              │
                   ▼              ▼
-           .voiceover.json → narration-aligned.wav → final.mp4
+           .scenes.json → narration-aligned.wav → final.mp4
 ```
 
 ## Quick start
@@ -56,13 +56,13 @@ npx argo pipeline example
 
 # Or run steps individually
 npx argo record example
-npx argo tts generate demos/example.voiceover.json
+npx argo tts generate demos/example.scenes.json
 npx argo export example
 ```
 
 ## Writing a demo
 
-A demo is two files: a **script** and a **voiceover manifest**.
+A demo is two files: a **script** and a **scenes manifest**.
 
 ### Demo script (`demos/my-feature.demo.ts`)
 
@@ -74,46 +74,43 @@ test('my-feature', async ({ page, narration }) => {
   await page.goto('/');
 
   narration.mark('intro');
-  await showOverlay(page, 'intro', {
-    type: 'lower-third',
-    text: 'Welcome to our product',
-    placement: 'bottom-center',
-    motion: 'fade-in',
-    autoBackground: true,
-  }, narration.durationFor('intro'));
+  await showOverlay(page, 'intro', narration.durationFor('intro'));
 
   narration.mark('action');
-  await withOverlay(page, 'action', {
-    type: 'headline-card',
-    title: 'Watch this',
-    placement: 'top-right',
-    motion: 'slide-in',
-  }, async () => {
+  await withOverlay(page, 'action', async () => {
     await page.click('#get-started');
     await page.waitForTimeout(narration.durationFor('action'));
   });
 
   narration.mark('done');
-  await showOverlay(page, 'done', {
-    type: 'callout',
-    text: "That's it!",
-    placement: 'top-left',
-    motion: 'fade-in',
-  }, narration.durationFor('done'));
+  await showOverlay(page, 'done', narration.durationFor('done'));
 });
 ```
 
-### Voiceover manifest (`demos/my-feature.voiceover.json`)
+### Scenes manifest (`demos/my-feature.scenes.json`)
 
 ```json
 [
-  { "scene": "intro", "text": "Welcome to our product — let me show you around." },
-  { "scene": "action", "text": "Just click get started and you're off." },
-  { "scene": "done", "text": "And that's all there is to it.", "voice": "af_heart" }
+  {
+    "scene": "intro",
+    "text": "Welcome to our product — let me show you around.",
+    "overlay": { "type": "lower-third", "text": "Welcome to our product", "placement": "bottom-center", "motion": "fade-in", "autoBackground": true }
+  },
+  {
+    "scene": "action",
+    "text": "Just click get started and you're off.",
+    "overlay": { "type": "headline-card", "title": "Watch this", "placement": "top-right", "motion": "slide-in" }
+  },
+  {
+    "scene": "done",
+    "text": "And that's all there is to it.",
+    "voice": "af_heart",
+    "overlay": { "type": "callout", "text": "That's it!", "placement": "top-left", "motion": "fade-in" }
+  }
 ]
 ```
 
-Each `scene` in the manifest maps to a `narration.mark()` call in the script. Argo records the timestamp of each mark, generates TTS clips, and aligns them to produce the final narrated video.
+Each `scene` in the manifest maps to a `narration.mark()` call in the script. The `text` field is spoken narration; the optional `overlay` sub-object defines what appears on screen. Argo records the timestamp of each mark, generates TTS clips, and aligns them to produce the final narrated video.
 
 ## Configuration
 
@@ -268,7 +265,7 @@ choco install ffmpeg       # Windows
    bash $(npm root)/@argo-video/cli/scripts/voice-clone-preview.sh \
      --ref-audio assets/ref-voice.wav \
      --ref-text "Transcript of what I said." \
-     --voiceover demos/showcase.voiceover.json --play
+     --voiceover demos/showcase.scenes.json --play
    ```
 
    ```js

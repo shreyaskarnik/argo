@@ -1,6 +1,6 @@
 ---
 name: argo-guide
-description: Guide for using Argo to create polished product demo videos from Playwright scripts with AI voiceover and animated overlays. Use this skill whenever the user mentions Argo, demo videos, product demos, screen recordings with narration, Playwright video demos, voiceover generation, or wants to automate creating marketing/sales/onboarding videos from a web app. Also use when you see imports from '@argo-video/cli', files named '*.demo.ts' or '*.voiceover.json', or an 'argo.config.js' in the project. Even if the user just says "record a demo" or "make a video of my app", this skill applies.
+description: Guide for using Argo to create polished product demo videos from Playwright scripts with AI voiceover and animated overlays. Use this skill whenever the user mentions Argo, demo videos, product demos, screen recordings with narration, Playwright video demos, voiceover generation, or wants to automate creating marketing/sales/onboarding videos from a web app. Also use when you see imports from '@argo-video/cli', files named '*.demo.ts' or '*.scenes.json', or an 'argo.config.js' in the project. Even if the user just says "record a demo" or "make a video of my app", this skill applies.
 ---
 
 # Argo — Playwright Demo Videos with AI Voiceover
@@ -30,12 +30,11 @@ Before writing or running any demo, verify:
 1. Check installation — look for `@argo-video/cli` in `package.json`. Install if absent.
 2. Check config — look for `argo.config.js`. Run `npx argo init` if absent.
 3. Ask the user for the app's base URL (e.g., `http://localhost:3000`). Set as `baseURL` in config.
-4. **If the user already has a Playwright test:** Run `npx argo init --from <path>` to auto-generate demo script + skeleton manifests. Then fill in voiceover text (use `_hint` fields as context) and refine overlays. Skip to step 8.
+4. **If the user already has a Playwright test:** Run `npx argo init --from <path>` to auto-generate demo script + skeleton manifest. Then fill in voiceover text (use `_hint` fields as context) and refine overlays. Skip to step 8.
 5. Explore the app — navigate routes and features to plan a meaningful demo script.
 6. Write `demos/<name>.demo.ts` — Playwright actions with `narration.mark()` scene boundaries.
-7. Write `demos/<name>.voiceover.json` — narration text per scene. Scene names must exactly match `narration.mark()` arguments.
-8. Optionally write `demos/<name>.overlays.json` — overlay cues keyed to scenes.
-9. Run: `npx argo pipeline <name>`
+7. Write `demos/<name>.scenes.json` — unified manifest with narration text and optional overlay per scene. Scene names must exactly match `narration.mark()` arguments.
+8. Run: `npx argo pipeline <name>`
 10. Report output — finished MP4 is in `videos/` (or configured `outputDir`).
 
 ---
@@ -57,25 +56,12 @@ test('my-demo', async ({ page, narration }) => {
 
   // Scene 1: Intro
   narration.mark('intro');
-  await showOverlay(page, 'intro', {
-    type: 'lower-third',
-    text: 'Welcome to our app',
-    placement: 'top-left',
-    motion: 'fade-in',
-    autoBackground: true,
-  }, narration.durationFor('intro'));
+  await showOverlay(page, 'intro', narration.durationFor('intro'));
 
   // Scene 2: Feature walkthrough
   narration.mark('feature');
   await page.click('#start-button');
-  await withOverlay(page, 'feature', {
-    type: 'headline-card',
-    title: 'One-Click Setup',
-    body: 'Get started in seconds',
-    placement: 'top-right',
-    motion: 'slide-in',
-    autoBackground: true,
-  }, async () => {
+  await withOverlay(page, 'feature', async () => {
     await page.waitForTimeout(narration.durationFor('feature'));
   });
 
@@ -89,7 +75,7 @@ test('my-demo', async ({ page, narration }) => {
 
 | API | Description |
 |-----|-------------|
-| `narration.mark(scene)` | Record a timestamp for this scene. Every scene in voiceover/overlay manifests must have a matching mark. |
+| `narration.mark(scene)` | Record a timestamp for this scene. Every scene in the scenes manifest must have a matching mark. |
 | `narration.durationFor(scene, opts?)` | Compute how long to hold this scene based on the TTS clip length. Replaces hardcoded `waitForTimeout(ms)` values. |
 | `showOverlay(page, scene, cue, durationMs)` | Show overlay for N ms, then auto-remove. |
 | `withOverlay(page, scene, cue, action)` | Show overlay during an async action, auto-remove when done (even on throw). |
@@ -120,12 +106,12 @@ test('demo', async ({ page, narration }) => {
 
   // ON-CAMERA — demo starts at first mark
   narration.mark('intro');
-  await showOverlay(page, 'intro', { ... }, narration.durationFor('intro'));
+  await showOverlay(page, 'intro', narration.durationFor('intro'));
 
   // ... more scenes ...
 
   narration.mark('closing');
-  await showOverlay(page, 'closing', { ... }, narration.durationFor('closing'));
+  await showOverlay(page, 'closing', narration.durationFor('closing'));
 
   // OFF-CAMERA TEARDOWN — clean up after video ends
   await page.goto('/admin');
@@ -203,15 +189,30 @@ Detection skips `position: fixed/sticky` elements (e.g., navbars) so it reads th
 
 ---
 
-## Voiceover Manifest
+## Scenes Manifest
 
-File: `demos/<name>.voiceover.json` — JSON array of entries.
+File: `demos/<name>.scenes.json` — unified JSON array of entries combining voiceover and overlay definitions.
 
 ```json
 [
-  { "scene": "intro", "text": "Welcome to our application." },
-  { "scene": "feature", "text": "This feature simplifies everything.", "voice": "af_heart", "speed": 1.0 },
-  { "scene": "closing", "text": "Thanks for watching.", "voice": "am_michael", "speed": 0.9 }
+  {
+    "scene": "intro",
+    "text": "Welcome to our application.",
+    "overlay": { "type": "lower-third", "text": "Welcome", "placement": "bottom-center", "motion": "fade-in" }
+  },
+  {
+    "scene": "feature",
+    "text": "This feature simplifies everything.",
+    "voice": "af_heart",
+    "speed": 1.0,
+    "overlay": { "type": "headline-card", "title": "One-Click Setup", "placement": "top-right", "motion": "slide-in" }
+  },
+  {
+    "scene": "closing",
+    "text": "Thanks for watching.",
+    "voice": "am_michael",
+    "speed": 0.9
+  }
 ]
 ```
 
@@ -221,6 +222,9 @@ File: `demos/<name>.voiceover.json` — JSON array of entries.
 | `text` | yes | — | Spoken narration text |
 | `voice` | no | `af_heart` | Kokoro voice: `af_heart` (female), `am_michael` (male) |
 | `speed` | no | `1.0` | Playback speed (0.9 = slightly slower, good for narration) |
+| `lang` | no | — | Language code for multilingual TTS engines |
+| `_hint` | no | — | LLM hint describing scene context (generated by `init --from`, remove before recording) |
+| `overlay` | no | — | Optional overlay cue for this scene (same fields as inline `showOverlay` cue) |
 
 TTS runs locally via Kokoro by default — no API keys needed. Clips are content-addressed cached in `.argo/<demo>/clips/` by SHA256 of `{scene, text, voice, speed}`. Clear the cache (`rm -rf .argo/<demo>/clips`) if voiceover text changes and stale clips persist.
 
@@ -266,7 +270,7 @@ engines.mlxAudio({
 
 Helper scripts (use `$(npm root)/@argo-video/cli/scripts/` for npm installs, or `./scripts/` if cloned from repo):
 - `record-voice-ref.sh assets/ref-voice.wav` — record reference clip (macOS)
-- `voice-clone-preview.sh --ref-audio ... --voiceover ... --play` — preview cloned voice
+- `voice-clone-preview.sh --ref-audio ... --voiceover demos/<name>.scenes.json --play` — preview cloned voice
 
 Qwen3-TTS produces the best voice clone quality. CSM is supported but lower quality.
 
@@ -315,10 +319,10 @@ The voiceover `text` is only spoken, never displayed — overlay text in the dem
 
 Two ways to add overlays — use **one or the other**, not both for the same scene:
 
-- **Inline** (recommended): `showOverlay()` / `withOverlay()` in the demo script. Full control over timing, camera effect pairing, and conditional logic.
-- **Manifest** (`.overlays.json`): Static overlay definitions loaded at recording time. Useful for simple demos where overlays don't need to interact with camera effects or page actions.
+- **Manifest** (recommended for most scenes): Define an `overlay` sub-object in the `scenes.json` entry. Argo injects it automatically at recording time. `showOverlay(page, scene, durationMs)` — no inline cue needed.
+- **Inline**: `showOverlay(page, scene, cue, durationMs)` / `withOverlay(page, scene, cue, action)` in the demo script with an explicit cue object. Use this when overlays need to interact with camera effects or conditional logic.
 
-Most real demos use inline overlays exclusively. The manifest is mainly useful as a starting point from `init --from`.
+The manifest overlay is simpler and keeps cue definitions co-located with voiceover text. Inline is more flexible for advanced orchestration.
 
 ---
 
@@ -388,7 +392,7 @@ npx argo validate <name>    # checks scene name consistency across script + mani
 ### Individual steps (for debugging)
 ```bash
 # Step 1: TTS — IMPORTANT: takes a FILE PATH, not a bare name
-npx argo tts generate demos/<name>.voiceover.json
+npx argo tts generate demos/<name>.scenes.json
 
 # Step 2: Record — takes a bare demo name
 npx argo record <name>
@@ -427,8 +431,7 @@ npx argo init --from tests/checkout.spec.ts --demo my-demo  # custom demo name
 
 This parses the Playwright test and generates:
 - `demos/<name>.demo.ts` — fixture swapped to `@argo-video/cli`, `narration.mark()` + `durationFor()` inserted at scene boundaries
-- `demos/<name>.voiceover.json` — skeleton with `_hint` fields describing what each scene does (for LLM-assisted text generation)
-- `demos/<name>.overlays.json` — lower-third placeholders per scene
+- `demos/<name>.scenes.json` — skeleton with `_hint` fields describing what each scene does, and lower-third overlay placeholders per scene
 
 **Scene detection heuristics:** `test.step()` names (strongest signal), `page.goto()` navigations, `// comments`, form fills grouped together, click + assertion pairs.
 
@@ -436,9 +439,9 @@ This parses the Playwright test and generates:
 
 **LLM workflow after `init --from`:**
 
-1. **Fill in voiceover text** — open `<name>.voiceover.json`. Each entry has a `_hint` field describing what happens in that scene. Write natural narration text for each `text` field using the hint as context. Remove `_hint` fields when done.
+1. **Fill in voiceover text** — open `<name>.scenes.json`. Each entry has a `_hint` field describing what happens in that scene. Write natural narration text for each `text` field using the hint as context. Remove `_hint` fields when done.
 2. **Add camera effects** — open `<name>.demo.ts`. Add `spotlight()`, `focusRing()`, `dimAround()` calls at key moments. Derive durations from `narration.durationFor()` (e.g., `Math.floor(durationFor('scene') / 3)`).
-3. **Refine overlays** — the generated `<name>.overlays.json` has basic lower-third placeholders. Upgrade to `headline-card`, `callout`, or `image-card` where appropriate. Add `motion: 'slide-in'` and `autoBackground: true`.
+3. **Refine overlays** — the `overlay` sub-object in each `<name>.scenes.json` entry has basic lower-third placeholders. Upgrade to `headline-card`, `callout`, or `image-card` where appropriate. Add `motion: 'slide-in'` and `autoBackground: true`.
 4. **Add `test.setTimeout()`** — if the demo is longer than 30 seconds, add `test.setTimeout(90000)` at the top.
 5. **Apply phonetic fixes** — if using Kokoro, spell tricky words phonetically in voiceover text (e.g., "sass" for SaaS). Not needed for OpenAI.
 6. **Validate** — run `npx argo validate <name>` to check scene name consistency before recording.
@@ -454,7 +457,7 @@ After a successful run, the pipeline produces:
 - `videos/<name>.vtt` — WebVTT subtitle file
 - `.argo/<name>/scene-report.json` — scene timing report (durations, overflow)
 
-TTS clips are cached by content hash for faster rebuilds. Subtitles are derived from voiceover manifest text + alignment placements.
+TTS clips are cached by content hash for faster rebuilds. Subtitles are derived from scenes manifest text + alignment placements.
 
 ---
 
@@ -469,7 +472,7 @@ TTS clips are cached by content hash for faster rebuilds. Subtitles are derived 
 | Stale voiceover audio | TTS cache not cleared after text change | `rm -rf .argo/<demo>/clips` |
 | Scene names not matching | Mismatch between manifest and `mark()` calls | Scene names are case-sensitive exact strings |
 | Timeout during recording | Demo exceeds Playwright's 30s default | Add `test.setTimeout(90000)` at start of test |
-| `tts generate` fails silently | Passed bare name instead of file path | Use `demos/<name>.voiceover.json`, not just `<name>` |
+| `tts generate` fails silently | Passed bare name instead of file path | Use `demos/<name>.scenes.json`, not just `<name>` |
 
 ---
 
@@ -479,8 +482,7 @@ TTS clips are cached by content hash for faster rebuilds. Subtitles are derived 
 project/
 ├── demos/
 │   ├── <name>.demo.ts           # Demo script
-│   ├── <name>.voiceover.json    # Voiceover manifest
-│   ├── <name>.overlays.json     # Overlay manifest (optional)
+│   ├── <name>.scenes.json       # Unified manifest (voiceover + overlays)
 │   └── assets/                  # Images for image-card overlays
 ├── videos/                      # Output MP4s
 ├── .argo/                       # Working directory (auto-created)

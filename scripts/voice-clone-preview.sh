@@ -7,7 +7,7 @@
 #   ./scripts/voice-clone-preview.sh \
 #     --ref-audio ./assets/ref-voice.wav \
 #     --ref-text "Hi, my name is Shreyas. I build developer tools." \
-#     --voiceover demos/showcase.voiceover.json
+#     --voiceover demos/showcase.scenes.json
 #
 #   # Single line of text (no manifest):
 #   ./scripts/voice-clone-preview.sh \

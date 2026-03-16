@@ -159,14 +159,14 @@ describe('CLI', () => {
 
   describe('tts generate demoName derivation', () => {
     it('derives demoName from manifest filename using basename', async () => {
-      await run('tts', 'generate', 'demos/signup.voiceover.json');
+      await run('tts', 'generate', 'demos/signup.scenes.json');
       expect(mockedGenerateClips).toHaveBeenCalledWith(
         expect.objectContaining({ demoName: 'signup' }),
       );
     });
 
     it('strips nested directory paths', async () => {
-      await run('tts', 'generate', 'path/to/demos/foo.voiceover.json');
+      await run('tts', 'generate', 'path/to/demos/foo.scenes.json');
       expect(mockedGenerateClips).toHaveBeenCalledWith(
         expect.objectContaining({ demoName: 'foo' }),
       );
