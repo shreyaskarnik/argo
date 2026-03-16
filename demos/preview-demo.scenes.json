@@ -2,6 +2,7 @@
   {
     "scene": "intro",
     "text": "Argo preview. After your first pipeline run, open a browser-based viewer to iterate on voiceover, overlays, and timing without re-recording a single frame.",
+    "voice": "nova",
     "speed": 0.9,
     "overlay": {
       "type": "headline-card",
@@ -16,6 +17,7 @@
   {
     "scene": "play-video",
     "text": "Your recorded video plays right in the browser, with aligned audio synced to the timeline. Scrub anywhere to jump to any moment.",
+    "voice": "nova",
     "speed": 0.9,
     "overlay": {
       "type": "lower-third",
@@ -28,6 +30,7 @@
   {
     "scene": "browse-scenes",
     "text": "Every scene from your demo appears in the sidebar. Click any scene card to jump directly to it. The active scene highlights automatically as the video plays.",
+    "voice": "nova",
     "speed": 0.9,
     "overlay": {
       "type": "callout",
@@ -40,6 +43,7 @@
   {
     "scene": "edit-text",
     "text": "Edit voiceover text right in the browser. Change a word, rephrase a sentence, fix pronunciation. The save button turns amber when you have unsaved changes.",
+    "voice": "nova",
     "speed": 0.9,
     "overlay": {
       "type": "lower-third",
@@ -52,6 +56,7 @@
   {
     "scene": "edit-overlay",
     "text": "Swap overlay templates and zones with simple dropdowns. Switch from a lower-third to a headline card, move it from bottom center to top right. The preview updates live as you type.",
+    "voice": "nova",
     "speed": 0.9,
     "overlay": {
       "type": "lower-third",
@@ -63,7 +68,8 @@
   },
   {
     "scene": "regen-tts",
-    "text": "Hit Regen tee tee ess on any scene to regenerate just that clip. No need to re-run the entire pipeline for a single word change. Surgical updates in seconds.",
+    "text": "Hit Regen TTS on any scene to regenerate just that clip. No need to re-run the entire pipeline for a single word change. Surgical updates in seconds.",
+    "voice": "nova",
     "speed": 0.9,
     "overlay": {
       "type": "headline-card",
@@ -78,6 +84,7 @@
   {
     "scene": "save",
     "text": "Hit Save and your changes write directly to your scenes manifest on disk. Or hit Re-record to run the full pipeline with your edits and get a fresh video.",
+    "voice": "nova",
     "speed": 0.9,
     "overlay": {
       "type": "lower-third",
@@ -90,6 +97,7 @@
   {
     "scene": "controls",
     "text": "Toggle audio and overlay visibility with the switches. Preview the video with or without narration, with or without overlays, however you like.",
+    "voice": "nova",
     "speed": 0.9,
     "overlay": {
       "type": "callout",
@@ -101,8 +109,8 @@
   },
   {
     "scene": "closing",
-    "text": "That's argo preview. Edit, regen, save, repeat. All from your browser. Try it with npx argo preview.",
-    "voice": "am_michael",
+    "text": "That's Argo preview. Edit, regen, save, repeat. All from your browser. Try it with npx argo preview.",
+    "voice": "nova",
     "speed": 0.9,
     "overlay": {
       "type": "headline-card",

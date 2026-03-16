@@ -2,16 +2,21 @@ import type { TTSEngine, TTSEngineOptions } from '../engine.js';
 
 export interface OpenAIEngineOptions {
   apiKey?: string;
-  model?: 'tts-1' | 'tts-1-hd';
+  /** TTS model: 'tts-1', 'tts-1-hd', 'gpt-4o-mini-tts', or any future model. */
+  model?: string;
+  /** System instructions for the model (supported by gpt-4o-mini-tts and newer). */
+  instructions?: string;
 }
 
 export class OpenAIEngine implements TTSEngine {
   private apiKey: string;
   private model: string;
+  private instructions?: string;
 
   constructor(options?: OpenAIEngineOptions) {
     this.apiKey = options?.apiKey ?? '';
     this.model = options?.model ?? 'tts-1';
+    this.instructions = options?.instructions;
   }
 
   private resolveApiKey(): string {
@@ -41,13 +46,15 @@ export class OpenAIEngine implements TTSEngine {
     const client = new OpenAI({ apiKey: this.resolveApiKey() });
 
     // Request raw PCM so we can build an exact WAV without ffmpeg pipe artifacts
-    const response = await client.audio.speech.create({
+    const params: Record<string, unknown> = {
       model: this.model,
       voice: options.voice ?? 'alloy',
       input: text,
       speed: options.speed ?? 1.0,
       response_format: 'pcm',
-    });
+    };
+    if (this.instructions) params.instructions = this.instructions;
+    const response = await client.audio.speech.create(params as any);
 
     const arrayBuffer = await response.arrayBuffer();
     const pcmBuffer = Buffer.from(arrayBuffer);
