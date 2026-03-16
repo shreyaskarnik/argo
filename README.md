@@ -15,7 +15,7 @@
 
 **Turn Playwright demo scripts into polished product demo videos with AI voiceover.**
 
-Write a demo script with Playwright. Add a voiceover manifest. Run one command. Get an MP4 with overlays and narration.
+Write a demo script with Playwright. Add a scenes manifest. Run one command. Get an MP4 with overlays and narration.
 
 ## Showcase
 
@@ -178,6 +178,7 @@ argo tts generate <manifest>       Generate TTS clips from manifest
 argo export <demo>                 Merge video + audio to MP4
 argo pipeline <demo>               Run all steps end-to-end
 argo validate <demo>               Check scene name consistency (no TTS/recording)
+argo preview <demo>                Browser-based editor for voiceover, overlays, timing
 argo doctor                        Check environment (ffmpeg, Playwright, config)
 argo --config <path> <command>     Use a custom config file
 
@@ -185,6 +186,7 @@ Options:
   --browser <engine>               chromium | webkit | firefox (overrides config)
   --base-url <url>                 Override baseURL from config
   --headed                         Run browser in visible mode
+  --port <number>                  Preview server port (default: auto)
 ```
 
 ## API
@@ -205,8 +207,10 @@ import { defineConfig, demosProject, engines } from '@argo-video/cli';
 | `test` | Playwright `test` with `narration` fixture injected |
 | `expect` | Re-exported from Playwright |
 | `demoType(page, selectorOrLocator, text, delay?)` | Type character-by-character — accepts CSS selector or Playwright Locator |
-| `showOverlay(page, scene, cue, durationMs)` | Show a templated overlay (lower-third, headline-card, callout, image-card) |
-| `withOverlay(page, scene, cue, action)` | Show overlay during an async action |
+| `showOverlay(page, scene, durationMs)` | Show overlay from manifest for a fixed duration |
+| `showOverlay(page, scene, cue, durationMs)` | Show overlay with inline cue (backward compat) |
+| `withOverlay(page, scene, action)` | Show overlay from manifest during an async action |
+| `withOverlay(page, scene, cue, action)` | Show overlay with inline cue during action (backward compat) |
 | `hideOverlay(page, zone?)` | Remove overlay from a zone |
 | `showConfetti(page, opts?)` | Non-blocking confetti animation (`spread: 'burst' \| 'rain'`, `wait: true` to block) |
 | `spotlight(page, selector, opts?)` | Dark overlay with hole around target element |
@@ -237,7 +241,7 @@ choco install ffmpeg       # Windows
 
 ## How the pipeline works
 
-1. **TTS** — Generates WAV clips from the voiceover manifest. Kokoro is the default (local, free), but you can swap in OpenAI, ElevenLabs, Gemini, Sarvam, or mlx-audio via `engines.*` factories. Clips are cached by content hash in `.argo/<demo>/clips/`.
+1. **TTS** — Generates WAV clips from the scenes manifest. Kokoro is the default (local, free), but you can swap in OpenAI, ElevenLabs, Gemini, Sarvam, or mlx-audio via `engines.*` factories. Clips are cached by content hash in `.argo/<demo>/clips/`.
 
    ```js
    import { defineConfig, engines } from '@argo-video/cli';
@@ -303,7 +307,7 @@ Argo ships as a **Claude Code skill** so LLMs can create demo videos autonomousl
 /plugin marketplace add shreyaskarnik/argo
 ```
 
-The skill teaches Claude how to write demo scripts, voiceover manifests, overlay cues, and run the pipeline — no manual guidance needed.
+The skill teaches Claude how to write demo scripts, scenes manifests, overlay cues, and run the pipeline — no manual guidance needed.
 
 ## License
 

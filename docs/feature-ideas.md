@@ -4,9 +4,9 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 
 ## Near Term
 
-- ~~Manifest-driven overlays.~~ **SHIPPED** — `.overlays.json` is a first-class authoring path.
+- ~~Manifest-driven overlays.~~ **SHIPPED** — overlays defined in `.scenes.json` manifest, resolved at runtime by `showOverlay`/`withOverlay`.
 - ~~`argo doctor`.~~ **SHIPPED** — checks ffmpeg, ffprobe, Playwright browsers, config, baseURL, demosDir, thumbnail, video settings, and DPI issues.
-- ~~`argo lint`.~~ **SHIPPED** as `argo validate` — checks scene name consistency between demo script, voiceover manifest, and overlay manifest.
+- ~~`argo lint`.~~ **SHIPPED** as `argo validate` — checks scene name consistency between demo script and scenes manifest.
 - ~~Subtitle export.~~ **SHIPPED** — `.srt` and `.vtt` generated alongside the MP4.
 - ~~Scene report.~~ **SHIPPED** — JSON + formatted console output with per-scene durations, overflow, and output path.
 
@@ -20,7 +20,7 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 
 ## Developer Experience
 
-- `argo preview`. Hot-reload mode that watches `.demo.ts`, `.overlays.json`, and `.voiceover.json` for changes and re-runs only affected pipeline steps. Massive iteration speed win.
+- ~~`argo preview`.~~ **SHIPPED** — browser-based editor for voiceover, overlays, and timing. Edit `.scenes.json` inline, regen TTS per scene, preview without re-recording.
 - `argo diff <demo>`. Compare two pipeline runs side-by-side: timing deltas, overlay changes, duration drift. Catches regressions when editing demos.
 - ~~Dry-run mode (`--dry-run`).~~ **SHIPPED** as `argo validate` — validates without running TTS or recording.
 - `argo tts preview`. Play back generated TTS clips in the terminal without running the full pipeline. Quick way to iterate on script copy and voice selection.
@@ -53,7 +53,7 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 
 ## Content & Accessibility
 
-- i18n and multi-language support. Support locale variants of voiceover manifests (`showcase.voiceover.en.json`, `showcase.voiceover.ja.json`) and batch-render localized versions from the same demo script.
+- i18n and multi-language support. Support locale variants of scenes manifests (`showcase.scenes.en.json`, `showcase.scenes.ja.json`) and batch-render localized versions from the same demo script.
 
 ## Pipeline Robustness
 
@@ -68,7 +68,7 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 
 ## Longer Horizon
 
-- Timeline preview UI. A lightweight local viewer showing scenes, overlays, and narration lengths before rendering.
+- Timeline preview UI. Visual overlay representations on the `argo preview` timeline bar (like a video editor's track view).
 - AI assist for demo polish. Suggest shorter copy, better scene splits, improved pacing, and stronger overlay placement.
 - Auto social package. Export MP4 plus thumbnail, transcript, title ideas, subtitle variants, and aspect-ratio cuts in one command.
 
@@ -85,11 +85,15 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 - Self-contained `example/` directory
 - LLM skill (`skills/argo-guide/`) + Agent Skills cross-client support (`.agents/skills/`)
 - `argo validate` command
+- `argo preview` — browser-based editor with per-scene TTS regen, live overlay preview, motion dropdown
+- Unified `.scenes.json` manifest (replaces separate `.voiceover.json` + `.overlays.json`)
+- Manifest-based `showOverlay`/`withOverlay` — overlay content resolved from manifest at runtime
+- Voice cloning with mlx-audio (`refAudio` + `refText`)
 
 ## Suggested Priority
 
 Next up from what's remaining:
 
-1. `argo preview` (hot-reload)
-2. Per-scene transitions (fades, wipes)
-3. Theme packs for overlays
+1. Per-scene transitions (fades, wipes)
+2. Theme packs for overlays
+3. Timeline preview UI with overlay thumbnails
