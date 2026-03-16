@@ -1,4 +1,4 @@
-import type { TTSEngine, TTSEngineOptions } from '../engine.js';
+import type { TTSEngine, TTSEngineOptions, TTSEngineMetadata } from '../engine.js';
 
 export interface KokoroEngineOptions {
   modelId?: string;
@@ -20,6 +20,10 @@ export class KokoroEngine implements TTSEngine {
     this.dtype = options?.dtype ?? 'q8';
     this.device = options?.device ?? null;
     this.onProgress = options?.onProgress;
+  }
+
+  describe(): TTSEngineMetadata {
+    return { engine: 'kokoro', model: this.modelId, dtype: this.dtype };
   }
 
   private async getTTS(): Promise<any> {

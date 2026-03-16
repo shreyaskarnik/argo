@@ -369,6 +369,27 @@ Set `video.deviceScaleFactor: 2` to capture at 2x resolution. The export step au
 
 **Known issue**: `deviceScaleFactor: 2` may cause rendering issues with webkit (viewport at 1/4 of the frame). Stick to `deviceScaleFactor: 1` until this is fixed.
 
+### 5K Displays and 4K Exports
+
+On a `5K` monitor, a `1080p` or `1440p` export can look soft when viewed fullscreen even if the recording itself is fine. Judge quality at `1:1` size or export a higher-resolution master for flagship demos.
+
+Recommended presets:
+
+- Everyday demos / social clips: `1920x1080` or `2560x1440`
+- Landing pages / showcase videos on large Retina displays: `3840x2160`, `deviceScaleFactor: 1`
+
+Example `4K` showcase config:
+
+```javascript
+video: {
+  width: 3840,
+  height: 2160,
+  fps: 30,
+  browser: 'webkit',
+  deviceScaleFactor: 1,
+}
+```
+
 ### Config File Extension
 
 Use `.mjs` for the config file in projects without `"type": "module"` in their `package.json` to avoid Node ESM warnings. The `argo init` scaffold generates `.js` by default — rename to `argo.config.mjs` if you see `MODULE_TYPELESS_PACKAGE_JSON` warnings.

@@ -1,4 +1,4 @@
-import type { TTSEngine, TTSEngineOptions } from '../engine.js';
+import type { TTSEngine, TTSEngineOptions, TTSEngineMetadata } from '../engine.js';
 
 export interface OpenAIEngineOptions {
   apiKey?: string;
@@ -17,6 +17,12 @@ export class OpenAIEngine implements TTSEngine {
     this.apiKey = options?.apiKey ?? '';
     this.model = options?.model ?? 'tts-1';
     this.instructions = options?.instructions;
+  }
+
+  describe(): TTSEngineMetadata {
+    const meta: TTSEngineMetadata = { engine: 'openai', model: this.model };
+    if (this.instructions) meta.instructions = this.instructions;
+    return meta;
   }
 
   private resolveApiKey(): string {

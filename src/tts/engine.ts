@@ -10,8 +10,17 @@ export interface TTSEngineOptions {
   lang?: string;
 }
 
+export interface TTSEngineMetadata {
+  engine: string;
+  model?: string;
+  instructions?: string;
+  [key: string]: unknown;
+}
+
 export interface TTSEngine {
   generate(text: string, options: TTSEngineOptions): Promise<Buffer>;
+  /** Return metadata about this engine for pipeline provenance tracking. */
+  describe?(): TTSEngineMetadata;
 }
 
 /**

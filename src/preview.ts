@@ -52,6 +52,8 @@ interface PreviewData {
   sceneReport: PreviewSceneReport | null;
   /** Pre-rendered overlay HTML/CSS for each scene (keyed by scene name). */
   renderedOverlays: Record<string, { html: string; styles: Record<string, string>; zone: Zone }>;
+  /** Pipeline metadata from last recording (voices, resolution, engine). */
+  pipelineMeta: Record<string, unknown> | null;
 }
 
 const MIME_TYPES: Record<string, string> = {
@@ -220,7 +222,13 @@ function loadPreviewData(demoName: string, argoDir: string, demosDir: string): P
   const sceneReport = buildPreviewSceneReport(timing, sceneDurations, persistedReport);
   const renderedOverlays = buildRenderedOverlays(overlays);
 
-  return { demoName, timing, voiceover, overlays, sceneDurations, sceneReport, renderedOverlays };
+  // Pipeline metadata (from last recording)
+  const projectRoot = dirname(resolve(argoDir));
+  const metaCandidates = ['videos', 'output'].map(d => join(projectRoot, d, `${demoName}.meta.json`));
+  const metaPath = metaCandidates.find(p => existsSync(p));
+  const pipelineMeta = metaPath ? readJsonFile<Record<string, unknown>>(metaPath, {}) : null;
+
+  return { demoName, timing, voiceover, overlays, sceneDurations, sceneReport, renderedOverlays, pipelineMeta };
 }
 
 /** List WAV clip files available for a demo. */
@@ -887,15 +895,27 @@ const PREVIEW_HTML = `<!DOCTYPE html>
     display: flex;
     flex-direction: column;
   }
-  .sidebar-header {
-    padding: 12px 16px;
+  .sidebar-tabs {
+    display: flex;
     border-bottom: 1px solid var(--border);
-    font-size: 13px;
+  }
+  .sidebar-tab {
+    flex: 1;
+    padding: 10px 16px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color var(--transition), border-color var(--transition);
   }
+  .sidebar-tab:hover { color: var(--text); }
+  .sidebar-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .sidebar-panel { overflow-y: auto; flex: 1; }
   .scene-card {
     padding: 14px 16px;
     border-bottom: 1px solid var(--border);
@@ -905,6 +925,8 @@ const PREVIEW_HTML = `<!DOCTYPE html>
   }
   .scene-card:hover { background: var(--surface2); }
   .scene-card.active { background: var(--accent-glow); border-left-color: var(--accent); }
+  .scene-card.modified { border-left-color: var(--warning); }
+  .scene-card.active.modified { border-left-color: var(--warning); }
   .scene-card .scene-body { display: none; }
   .scene-card.expanded .scene-body { display: block; }
   .scene-card .scene-name .expand-icon {
@@ -1174,8 +1196,16 @@ const PREVIEW_HTML = `<!DOCTYPE html>
 </div>
 
 <div class="sidebar">
-  <div class="sidebar-header">Scenes</div>
-  <div id="scene-list"></div>
+  <div class="sidebar-tabs">
+    <button class="sidebar-tab active" data-tab="scenes">Scenes</button>
+    <button class="sidebar-tab" data-tab="metadata">Metadata</button>
+  </div>
+  <div class="sidebar-panel" id="panel-scenes">
+    <div id="scene-list"></div>
+  </div>
+  <div class="sidebar-panel" id="panel-metadata" style="display:none">
+    <div id="metadata-content" style="padding:16px;font-family:var(--mono);font-size:12px;color:var(--text-muted);white-space:pre-wrap;word-break:break-word;"></div>
+  </div>
   <div class="status" id="status">Ready</div>
 </div>
 
@@ -1990,9 +2020,10 @@ function isSceneModified(sceneName) {
 
 function updateUndoButton(sceneName) {
   const btn = document.querySelector('.btn-undo[data-scene="' + sceneName + '"]');
-  if (!btn) return;
+  const card = document.querySelector('.scene-card[data-scene="' + sceneName + '"]');
   const modified = isSceneModified(sceneName);
-  btn.style.display = modified ? '' : 'none';
+  if (btn) btn.style.display = modified ? '' : 'none';
+  if (card) card.classList.toggle('modified', modified);
 }
 
 function updateAllUndoButtons() {
@@ -2137,6 +2168,57 @@ function updateSceneDuration(sceneName) {
   const durationMs = DATA.sceneDurations[sceneName];
   if (!badge || !durationMs) return;
   badge.textContent = (durationMs / 1000).toFixed(1) + 's';
+}
+
+// ─── Sidebar tabs ──────────────────────────────────────────────────────────
+document.querySelectorAll('.sidebar-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.sidebar-panel').forEach(p => p.style.display = 'none');
+    document.getElementById('panel-' + tab.dataset.tab).style.display = '';
+  });
+});
+
+// Render metadata if available
+if (DATA.pipelineMeta) {
+  const meta = DATA.pipelineMeta;
+  const lines = [];
+  lines.push('Created: ' + (meta.createdAt || 'unknown'));
+  lines.push('');
+  if (meta.tts) {
+    lines.push('TTS Engine');
+    const tts = meta.tts;
+    for (const [k, v] of Object.entries(tts)) {
+      lines.push('  ' + k + ': ' + v);
+    }
+    lines.push('');
+  }
+  if (meta.video) {
+    lines.push('Video');
+    const vid = meta.video;
+    lines.push('  resolution: ' + vid.width + 'x' + vid.height);
+    lines.push('  fps: ' + vid.fps);
+    lines.push('  browser: ' + vid.browser);
+    if (vid.deviceScaleFactor > 1) lines.push('  scale: ' + vid.deviceScaleFactor + 'x');
+    lines.push('');
+  }
+  if (meta.export) {
+    lines.push('Export');
+    lines.push('  preset: ' + meta.export.preset);
+    lines.push('  crf: ' + meta.export.crf);
+    lines.push('');
+  }
+  if (meta.scenes) {
+    lines.push('Scenes');
+    for (const s of meta.scenes) {
+      const dur = s.durationMs ? ' (' + (s.durationMs / 1000).toFixed(1) + 's)' : '';
+      lines.push('  ' + s.scene + ': voice=' + (s.voice || 'default') + ' speed=' + (s.speed || 1) + dur);
+    }
+  }
+  document.getElementById('metadata-content').textContent = lines.join('\\n');
+} else {
+  document.getElementById('metadata-content').textContent = 'No pipeline metadata found.\\n\\nRun argo pipeline to generate metadata.';
 }
 
 // ─── Init ──────────────────────────────────────────────────────────────────

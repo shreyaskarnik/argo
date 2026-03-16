@@ -1,7 +1,8 @@
 node_modules/
 dist/
 .argo/
-videos/
+videos/*.srt
+videos/*.vtt
 argo.config.*
 playwright.config.ts
 test-results/
@@ -12,3 +13,4 @@ voice-preview*/
 .superpowers/
 .DS_Store
 assets/ref-voice.wav
+*.bak

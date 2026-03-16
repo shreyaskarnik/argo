@@ -1,4 +1,4 @@
-import type { TTSEngine, TTSEngineOptions } from '../engine.js';
+import type { TTSEngine, TTSEngineOptions, TTSEngineMetadata } from '../engine.js';
 
 export interface ElevenLabsEngineOptions {
   apiKey?: string;
@@ -29,6 +29,11 @@ export class ElevenLabsEngine implements TTSEngine {
       );
     }
     return key;
+  }
+
+
+  describe(): TTSEngineMetadata {
+    return { engine: 'elevenlabs', model: this.model };
   }
 
   async generate(text: string, options: TTSEngineOptions): Promise<Buffer> {

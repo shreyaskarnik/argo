@@ -191,6 +191,35 @@ export async function runPipeline(
   writeFileSync(join(argoDir, 'scene-report.json'), JSON.stringify(report, null, 2), 'utf-8');
   console.log(formatSceneReport(report));
 
+  // Pipeline metadata — provenance tracking for voices, settings, resolution
+  const manifest: Array<{ scene: string; voice?: string; speed?: number }> = (() => {
+    try { return JSON.parse(readFileSync(manifestPath, 'utf-8')); } catch { return []; }
+  })();
+  const pipelineMeta = {
+    demo: demoName,
+    createdAt: new Date().toISOString(),
+    video: {
+      width: config.video.width,
+      height: config.video.height,
+      fps: config.video.fps,
+      browser: config.video.browser,
+      deviceScaleFactor: config.video.deviceScaleFactor ?? 1,
+    },
+    tts: config.tts.engine?.describe?.() ?? { engine: 'unknown' },
+    scenes: manifest.map((entry) => ({
+      scene: entry.scene,
+      voice: entry.voice ?? config.tts.defaultVoice,
+      speed: entry.speed ?? config.tts.defaultSpeed,
+      durationMs: sceneDurations[entry.scene] ?? 0,
+    })),
+    export: {
+      preset: config.export.preset,
+      crf: config.export.crf,
+    },
+    output: outputPath,
+  };
+  writeFileSync(join(config.outputDir, `${demoName}.meta.json`), JSON.stringify(pipelineMeta, null, 2) + '\n', 'utf-8');
+
   console.log(`\n✓ That's a wrap! Video saved to: ${outputPath}`);
   return outputPath;
 }

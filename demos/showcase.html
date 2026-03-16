@@ -963,7 +963,7 @@
   <span class="syn-kw">await</span> <span class="syn-obj">page</span><span class="syn-punc">.</span><span class="syn-fn">goto</span><span class="syn-punc">(</span><span class="syn-str">'/'</span><span class="syn-punc">);</span>
 
   <span class="syn-obj">narration</span><span class="syn-punc">.</span><span class="syn-fn">mark</span><span class="syn-punc">(</span><span class="syn-str">'intro'</span><span class="syn-punc">);</span>
-  <span class="syn-fn">spotlight</span><span class="syn-punc">(</span><span class="syn-obj">page</span><span class="syn-punc">, </span><span class="syn-str">'#hero'</span><span class="syn-punc">, { </span><span class="syn-prop">duration</span><span class="syn-punc">: </span><span class="syn-num">3000</span><span class="syn-punc"> });</span>
+  <span class="syn-kw">void</span> <span class="syn-fn">spotlight</span><span class="syn-punc">(</span><span class="syn-obj">page</span><span class="syn-punc">, </span><span class="syn-str">'#hero'</span><span class="syn-punc">, { </span><span class="syn-prop">duration</span><span class="syn-punc">: </span><span class="syn-num">3000</span><span class="syn-punc"> });</span>
   <span class="syn-kw">await</span> <span class="syn-fn">showOverlay</span><span class="syn-punc">(</span><span class="syn-obj">page</span><span class="syn-punc">, </span><span class="syn-str">'intro'</span><span class="syn-punc">, </span><span class="syn-obj">narration</span><span class="syn-punc">.</span><span class="syn-fn">durationFor</span><span class="syn-punc">(</span><span class="syn-str">'intro'</span><span class="syn-punc">));</span>
 <span class="syn-punc">});</span>
 </code></pre>

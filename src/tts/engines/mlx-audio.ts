@@ -1,4 +1,4 @@
-import type { TTSEngine, TTSEngineOptions } from '../engine.js';
+import type { TTSEngine, TTSEngineOptions, TTSEngineMetadata } from '../engine.js';
 
 export interface MlxAudioEngineOptions {
   /** mlx-audio server URL. Default: http://localhost:8000 */
@@ -67,6 +67,12 @@ export class MlxAudioEngine implements TTSEngine {
     if (options?.streamingInterval != null) this.serverOptions.streaming_interval = options.streamingInterval;
     if (options?.maxTokens != null) this.serverOptions.max_tokens = options.maxTokens;
     if (options?.verbose != null) this.serverOptions.verbose = options.verbose;
+  }
+
+  describe(): TTSEngineMetadata {
+    const meta: TTSEngineMetadata = { engine: 'mlx-audio', model: this.model };
+    if (this.serverOptions.ref_audio) meta.refAudio = this.serverOptions.ref_audio as string;
+    return meta;
   }
 
   async generate(text: string, options: TTSEngineOptions): Promise<Buffer> {

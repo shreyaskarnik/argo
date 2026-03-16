@@ -1,0 +1,20 @@
+{
+  "demo": "test-demo",
+  "createdAt": "2026-03-16T22:25:07.274Z",
+  "video": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "browser": "chromium",
+    "deviceScaleFactor": 1
+  },
+  "tts": {
+    "engine": "unknown"
+  },
+  "scenes": [],
+  "export": {
+    "preset": "slow",
+    "crf": 16
+  },
+  "output": "videos/test-demo.mp4"
+}
