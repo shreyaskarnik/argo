@@ -64,6 +64,17 @@ export type OverlayManifestEntry = OverlayCue & {
   scene: string;
 };
 
+/** A single entry in the unified .scenes.json manifest. */
+export interface SceneEntry {
+  scene: string;
+  text: string;
+  voice?: string;
+  speed?: number;
+  lang?: string;
+  _hint?: string;
+  overlay?: OverlayCue;
+}
+
 export function isValidZone(value: string): value is Zone {
   return (ZONES as readonly string[]).includes(value);
 }
