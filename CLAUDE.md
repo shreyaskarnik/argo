@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## About
 
-Argo turns Playwright demo scripts into polished product demo videos with AI voiceover. Users write a Playwright test, add a voiceover JSON manifest, and run `argo pipeline` to get an MP4 with screen recording, overlays, and narration — all locally, no cloud services required.
+Argo turns Playwright demo scripts into polished product demo videos with AI voiceover. Users write a Playwright test, add a scenes manifest (`.scenes.json`), and run `argo pipeline` to get an MP4 with screen recording, overlays, and narration — all locally, no cloud services required.
 
 ## Build & Test
 
@@ -33,11 +33,11 @@ Argo turns Playwright demo scripts into polished product demo videos with AI voi
 
 The system is a 4-step pipeline: **TTS → Record → Align → Export**
 
-- **TTS** (`src/tts/`): Generates voice clips from JSON manifests. Pluggable engine system with 6 built-in adapters in `src/tts/engines/`: Kokoro (default), OpenAI, ElevenLabs, Gemini, Sarvam, mlx-audio. Selected via `engines.*` factory functions in config. Cloud engines lazy-load their SDKs. All audio normalized to mono Float32 24kHz WAV via `convertToWav()` (ffmpeg). Clips are content-addressed cached (SHA256 of scene+text+voice+speed+lang) in `.argo/<demo>/clips/`. Cloud engine API keys are validated lazily at `generate()` time, not constructor — so non-TTS commands like `argo validate` work without keys. Kokoro's ONNX runtime is not safe for concurrent `generate()` calls — clips generate sequentially despite shared init promise.
+- **TTS** (`src/tts/`): Generates voice clips from `.scenes.json` manifests. Pluggable engine system with 6 built-in adapters in `src/tts/engines/`: Kokoro (default), OpenAI, ElevenLabs, Gemini, Sarvam, mlx-audio. Selected via `engines.*` factory functions in config. Cloud engines lazy-load their SDKs. All audio normalized to mono Float32 24kHz WAV via `convertToWav()` (ffmpeg). Clips are content-addressed cached (SHA256 of scene+text+voice+speed+lang) in `.argo/<demo>/clips/`. Cloud engine API keys are validated lazily at `generate()` time, not constructor — so non-TTS commands like `argo validate` work without keys. Kokoro's ONNX runtime is not safe for concurrent `generate()` calls — clips generate sequentially despite shared init promise.
 - **Record** (`src/record.ts`): Runs Playwright demo script, captures video (WebM) and timing marks (`.timing.json`). Generates a dynamic Playwright config on-the-fly.
 - **Align** (`src/tts/align.ts`): Places audio clips at scene timestamps from timing data. Prevents overlap with 100ms gaps. Mixes into single WAV (Float32, 24kHz).
 - **Export** (`src/export.ts`): Merges video + aligned audio via ffmpeg into final MP4. Supports optional MP4 thumbnail embedding via `export.thumbnailPath` config (ffmpeg attached_pic stream). CRITICAL: `-shortest` must be skipped when thumbnail is present — PNG has 0 duration and truncates the entire output. Embeds chapter markers from scene placements via ffmpeg metadata. Input indices are dynamic based on presence of chapters/thumbnail.
-- **Subtitles** (`src/subtitles.ts`): Generates `.srt` and `.vtt` files from alignment placements + voiceover manifest text. Best-effort — won't fail the pipeline.
+- **Subtitles** (`src/subtitles.ts`): Generates `.srt` and `.vtt` files from alignment placements + scenes manifest text. Best-effort — won't fail the pipeline.
 - **Chapters** (`src/chapters.ts`): Generates ffmpeg metadata format (`TIMEBASE=1/1000`) for MP4 chapter markers from scene placements.
 - **Report** (`src/report.ts`): Builds scene timing report (JSON + formatted console output) with per-scene durations, overflow, and output path.
 
@@ -47,7 +47,7 @@ Pipeline orchestration: `src/pipeline.ts` → CLI entry: `src/cli.ts` (Commander
 
 Injected into the browser during recording via `page.evaluate()`. Uses a zone-based positioning system (6 fixed positions) with template rendering (lower-third, headline-card, callout, image-card) and CSS motion presets (fade-in, slide-in).
 
-Overlay cues use discriminated unions — each template type has its own TypeScript type with `type` as the discriminant field.
+Overlay cues use discriminated unions — each template type has its own TypeScript type with `type` as the discriminant field. `showOverlay`/`withOverlay` resolve overlay content from the `.scenes.json` manifest at runtime via `ARGO_OVERLAYS_PATH` env var. Demo scripts only provide duration/action — overlay content lives in the manifest. Full inline cues are still supported for backward compatibility.
 
 ### Effects (`src/effects.ts`)
 
@@ -64,21 +64,20 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 ## Argo Pipeline
 
 - Order: TTS → Record → Align → Export (not Record first)
-- `argo tts generate` takes a file path (`demos/name.voiceover.json`), not a bare demo name
+- `argo tts generate` takes a file path (`demos/name.scenes.json`), not a bare demo name
 - `argo record/export/pipeline/validate` take bare demo names (e.g., `argo pipeline example`)
-- `argo validate <demo>` checks scene name consistency between script, voiceover, and overlay manifests (no TTS/recording)
+- `argo validate <demo>` checks scene name consistency between script and scenes manifest, validates overlay fields (no TTS/recording)
 - `--base-url <url>` flag on `record` and `pipeline` overrides `config.baseURL`
 - `--headed` flag on `record` and `pipeline` runs the browser in visible mode
 - `argo init --from <test.spec.ts>` converts existing Playwright tests into Argo demos (parses scene boundaries from `test.step()`, `page.goto()`, comments, and action clusters)
 - README config/CLI/API snippets must stay in sync with code changes (check after modifying config schema, CLI options, or scaffold templates)
 - Demo names are validated at the CLI boundary: only `[a-zA-Z0-9][a-zA-Z0-9_-]*` allowed. This prevents path traversal — maintain this validation if adding new commands that accept demo names.
-- `tts generate` derives demoName via `basename()` from the manifest path — do not use `/`-only regex (breaks on Windows paths)
+- `tts generate` derives demoName via `basename()` from the manifest path (strips `.scenes.json` suffix) — do not use `/`-only regex (breaks on Windows paths)
 
 ## Demo Authoring
 
 - Demo scripts: `demos/<name>.demo.ts`
-- Voiceover manifests: `demos/<name>.voiceover.json`
-- Overlay manifests: `demos/<name>.overlays.json`
+- Scenes manifest: `demos/<name>.scenes.json` (unified voiceover + overlay data per scene)
 - TTS engine: Kokoro (local, no API keys). Voices: `af_heart` (female default), `am_michael` (male)
 - Long demos need `test.setTimeout()` — Playwright default is 30s
 - Showcase demo (`demos/showcase.demo.ts`) requires a local HTTP server serving `demos/`: `python3 -m http.server 8976 --directory demos` then `BASE_URL=http://127.0.0.1:8976 npx tsx bin/argo.js pipeline showcase --browser webkit`
@@ -97,6 +96,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 ## Env Vars Bridging Config to Playwright
 
 - `ARGO_SCENE_DURATIONS_PATH` — path to `.scene-durations.json` (loaded by narration fixture)
+- `ARGO_OVERLAYS_PATH` — path to `.scenes.json` manifest (loaded by overlay functions for manifest-based resolution)
 - `ARGO_AUTO_BACKGROUND` — set to `'1'` when config `overlays.autoBackground` is true
 - `ARGO_OUTPUT_DIR` — output directory for timing JSON
 
@@ -104,7 +104,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 
 - Uses `elementsFromPoint()` at zone coordinates, skipping `position: fixed/sticky` elements (e.g., navbars)
 - Dark background → light overlay theme; light background → dark overlay theme
-- Enable per-cue (`autoBackground: true` on overlay options) or globally via `overlays.autoBackground` in config
+- Enable per-cue (`autoBackground: true` on overlay in `.scenes.json`) or globally via `overlays.autoBackground` in config
 
 ## Thumbnail
 

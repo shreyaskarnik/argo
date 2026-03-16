@@ -69,7 +69,7 @@ export async function runPipeline(
 
   if (clipResults.length === 0) {
     throw new Error(
-      `No TTS clips were generated from ${config.demosDir}/${demoName}.voiceover.json. ` +
+      `No TTS clips were generated from ${config.demosDir}/${demoName}.scenes.json. ` +
       `Ensure the manifest contains at least one entry.`
     );
   }
