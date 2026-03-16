@@ -1389,9 +1389,6 @@ function renderSceneList() {
       seekToScene(s);
     });
 
-    // Live preview: update overlay on the video layer when editing
-    wireOverlayListeners(s.name);
-
     const scrub = card.querySelector('[data-field="scene-scrub"]');
     if (scrub) {
       scrub.addEventListener('input', (event) => {
@@ -1403,6 +1400,9 @@ function renderSceneList() {
     }
 
     sceneList.appendChild(card);
+
+    // Wire overlay listeners AFTER appendChild so document.querySelector can find the card
+    wireOverlayListeners(s.name);
   }
 }
 
