@@ -21,15 +21,15 @@ test('preview-demo', async ({ page, narration }) => {
 
   // Scene 2: Video player — hit play and show playback
   narration.mark('play-video');
-  await spotlight(page, '#video', {
+  await spotlight(page, '.video-container', {
     duration: narration.durationFor('play-video') / 2,
     padding: 8,
     wait: true,
   });
-  await page.click('#btn-play');
+  await page.locator('#btn-play').click({ force: true });
   await showOverlay(page, 'play-video', narration.durationFor('play-video') / 2);
   // Pause after showing playback
-  await page.click('#btn-play');
+  await page.locator('#btn-play').click({ force: true });
 
   // Scene 3: Browse scenes — click through scene cards in sidebar
   narration.mark('browse-scenes');
@@ -110,18 +110,19 @@ test('preview-demo', async ({ page, narration }) => {
 
   // Scene 8: Toggle controls — show audio and overlay toggles
   narration.mark('controls');
-  const audioCheckbox = page.locator('#cb-audio');
-  const overlayCheckbox = page.locator('#cb-overlays');
+  // Toggle switches use hidden inputs — click the parent label to toggle
+  const audioToggle = page.locator('label.toggle-switch[title="Audio"]');
+  const overlayToggle = page.locator('label.toggle-switch[title="Overlays"]');
   await withOverlay(page, 'controls', async () => {
     const toggleDur = Math.floor(narration.durationFor('controls') / 3);
-    focusRing(page, '#cb-overlays', { color: '#f59e0b', duration: toggleDur });
-    await overlayCheckbox.uncheck();
+    focusRing(page, 'label[title="Overlays"]', { color: '#f59e0b', duration: toggleDur });
+    await overlayToggle.click();
     await page.waitForTimeout(toggleDur);
-    await overlayCheckbox.check();
-    focusRing(page, '#cb-audio', { color: '#f59e0b', duration: toggleDur });
-    await audioCheckbox.uncheck();
+    await overlayToggle.click();
+    focusRing(page, 'label[title="Audio"]', { color: '#f59e0b', duration: toggleDur });
+    await audioToggle.click();
     await page.waitForTimeout(toggleDur);
-    await audioCheckbox.check();
+    await audioToggle.click();
   });
 
   // Scene 9: Closing — confetti + wrap up
