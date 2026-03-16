@@ -642,6 +642,7 @@ const PREVIEW_HTML = `<!DOCTYPE html>
     max-width: 100%;
     max-height: 100%;
     display: block;
+    cursor: pointer;
   }
 
   /* Overlay preview layer — positioned over the video */
@@ -1121,16 +1122,20 @@ timelineBar.addEventListener('click', (e) => {
 
 // Play/pause icon toggling
 function showPlayIcon() {
-  document.getElementById('icon-play').style.display = '';
-  document.getElementById('icon-pause').style.display = 'none';
+  const p = document.getElementById('icon-play');
+  const s = document.getElementById('icon-pause');
+  if (p) p.style.display = '';
+  if (s) s.style.display = 'none';
 }
 function showPauseIcon() {
-  document.getElementById('icon-play').style.display = 'none';
-  document.getElementById('icon-pause').style.display = '';
+  const p = document.getElementById('icon-play');
+  const s = document.getElementById('icon-pause');
+  if (p) p.style.display = 'none';
+  if (s) s.style.display = '';
 }
 
-// Play/pause
-document.getElementById('btn-play').addEventListener('click', async () => {
+// Play/pause toggle (shared by button and video click)
+async function togglePlayPause() {
   if (video.paused) {
     await video.play();
     if (document.getElementById('cb-audio').checked) await playAudio();
@@ -1140,7 +1145,9 @@ document.getElementById('btn-play').addEventListener('click', async () => {
     stopAudio();
     showPlayIcon();
   }
-});
+}
+document.getElementById('btn-play').addEventListener('click', togglePlayPause);
+video.addEventListener('click', togglePlayPause);
 
 video.addEventListener('pause', () => {
   if (!video.ended) {
@@ -1537,7 +1544,7 @@ async function previewScene(sceneName) {
   scenePlaybackEndMs = endMs;
   await video.play();
   if (document.getElementById('cb-audio').checked) await playAudio();
-  document.getElementById('btn-play').textContent = 'Pause';
+  showPauseIcon();
 }
 
 async function regenClip(sceneName, btn) {
