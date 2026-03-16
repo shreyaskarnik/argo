@@ -16,7 +16,7 @@ async function scaffoldDemo(dir: string, demoName: string) {
   await mkdir(join(argoDir, 'clips'), { recursive: true });
   await mkdir(demosDir, { recursive: true });
 
-  // Fake video.webm (just needs to exist)
+  // Fake fallback recording (preview serves this via /video when no MP4 exists)
   writeFileSync(join(argoDir, 'video.webm'), Buffer.from('fake-webm'));
 
   // Timing
@@ -122,6 +122,9 @@ describePreview('preview server', () => {
     expect(html).toContain('welcome');
     expect(html).toContain('feature');
     expect(html).toContain('closing');
+    expect(html).toContain('previewScene');
+    expect(html).toContain('Scene scrub');
+    expect(html).toContain('data-field="scene-scrub"');
   });
 
   it('serves /api/data with timing, voiceover, overlays', async () => {
@@ -146,7 +149,7 @@ describePreview('preview server', () => {
     expect(data.renderedOverlays.welcome.html).toContain('Welcome');
   });
 
-  it('serves /video.webm', async () => {
+  it('serves /video using the preview video artifact', async () => {
     const { argoDir, demosDir } = await scaffoldDemo(dir, 'test-demo');
     const server = await startPreviewServer({
       demoName: 'test-demo',
@@ -155,9 +158,62 @@ describePreview('preview server', () => {
     });
     close = server.close;
 
-    const resp = await fetch(`${server.url}/video.webm`);
+    const resp = await fetch(`${server.url}/video`);
     expect(resp.status).toBe(200);
     expect(resp.headers.get('content-type')).toBe('video/webm');
+  });
+
+  it('supports HTTP Range requests on /video for browser seeking', async () => {
+    const { argoDir, demosDir } = await scaffoldDemo(dir, 'test-demo');
+    const server = await startPreviewServer({
+      demoName: 'test-demo',
+      argoDir,
+      demosDir,
+    });
+    close = server.close;
+
+    const resp = await fetch(`${server.url}/video`, {
+      headers: { Range: 'bytes=0-3' },
+    });
+
+    expect(resp.status).toBe(206);
+    expect(resp.headers.get('accept-ranges')).toBe('bytes');
+    expect(resp.headers.get('content-range')).toBe('bytes 0-3/9');
+    expect(await resp.text()).toBe('fake');
+  });
+
+  it('returns 416 for invalid /video byte ranges', async () => {
+    const { argoDir, demosDir } = await scaffoldDemo(dir, 'test-demo');
+    const server = await startPreviewServer({
+      demoName: 'test-demo',
+      argoDir,
+      demosDir,
+    });
+    close = server.close;
+
+    const resp = await fetch(`${server.url}/video`, {
+      headers: { Range: 'bytes=99-120' },
+    });
+
+    expect(resp.status).toBe(416);
+    expect(resp.headers.get('content-range')).toBe('bytes */9');
+  });
+
+  it('prefers an exported MP4 for /video when one exists', async () => {
+    const { argoDir, demosDir } = await scaffoldDemo(dir, 'test-demo');
+    await mkdir(join(dir, 'videos'), { recursive: true });
+    writeFileSync(join(dir, 'videos', 'test-demo.mp4'), Buffer.from('fake-mp4'));
+
+    const server = await startPreviewServer({
+      demoName: 'test-demo',
+      argoDir,
+      demosDir,
+    });
+    close = server.close;
+
+    const resp = await fetch(`${server.url}/video`);
+    expect(resp.status).toBe(200);
+    expect(resp.headers.get('content-type')).toBe('video/mp4');
   });
 
   it('POST /api/voiceover saves the manifest file', async () => {
@@ -188,6 +244,33 @@ describePreview('preview server', () => {
     // Overlay sub-object should be preserved
     expect(saved[0].overlay).toBeDefined();
     expect(saved[0].overlay.type).toBe('lower-third');
+  });
+
+  it('POST /api/voiceover does not rewrite the manifest when nothing changed', async () => {
+    const { argoDir, demosDir } = await scaffoldDemo(dir, 'test-demo');
+    const server = await startPreviewServer({
+      demoName: 'test-demo',
+      argoDir,
+      demosDir,
+    });
+    close = server.close;
+
+    const scenesPath = join(demosDir, 'test-demo.scenes.json');
+    const before = readFileSync(scenesPath, 'utf-8');
+
+    const resp = await fetch(`${server.url}/api/voiceover`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([
+        { scene: 'welcome', text: 'Welcome to the demo.' },
+        { scene: 'feature', text: 'Check out this feature.' },
+        { scene: 'closing', text: 'Thanks for watching.' },
+      ]),
+    });
+
+    expect(resp.status).toBe(200);
+    await expect(resp.json()).resolves.toMatchObject({ ok: true, changed: false });
+    expect(readFileSync(scenesPath, 'utf-8')).toBe(before);
   });
 
   it('POST /api/overlays saves and returns re-rendered overlays', async () => {
@@ -222,6 +305,32 @@ describePreview('preview server', () => {
     expect(saved[1].overlay).toBeUndefined();
     // voiceover fields should be preserved
     expect(saved[0].text).toBe('Welcome to the demo.');
+  });
+
+  it('POST /api/overlays does not rewrite the manifest for unchanged overlays', async () => {
+    const { argoDir, demosDir } = await scaffoldDemo(dir, 'test-demo');
+    const server = await startPreviewServer({
+      demoName: 'test-demo',
+      argoDir,
+      demosDir,
+    });
+    close = server.close;
+
+    const scenesPath = join(demosDir, 'test-demo.scenes.json');
+    const before = readFileSync(scenesPath, 'utf-8');
+
+    const resp = await fetch(`${server.url}/api/overlays`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([
+        { scene: 'welcome', type: 'lower-third', text: 'Welcome', placement: 'bottom-center' },
+        { scene: 'feature', type: 'headline-card', title: 'Feature', placement: 'top-right' },
+      ]),
+    });
+
+    expect(resp.status).toBe(200);
+    await expect(resp.json()).resolves.toMatchObject({ ok: true, changed: false });
+    expect(readFileSync(scenesPath, 'utf-8')).toBe(before);
   });
 
   it('returns 404 for unknown routes', async () => {

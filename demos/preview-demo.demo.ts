@@ -19,7 +19,7 @@ test('preview-demo', async ({ page, narration }) => {
   narration.mark('intro');
   await showOverlay(page, 'intro', narration.durationFor('intro', { maxMs: 8000 }));
 
-  // Scene 2: Video player — hit play and show playback
+  // Scene 2: Video player — hit play icon and show playback
   narration.mark('play-video');
   await spotlight(page, '.video-container', {
     duration: narration.durationFor('play-video') / 2,
@@ -28,7 +28,7 @@ test('preview-demo', async ({ page, narration }) => {
   });
   await page.locator('#btn-play').click({ force: true });
   await showOverlay(page, 'play-video', narration.durationFor('play-video') / 2);
-  // Pause after showing playback
+  // Pause via the main play button
   await page.locator('#btn-play').click({ force: true });
 
   // Scene 3: Browse scenes — click through scene cards in sidebar
@@ -38,21 +38,19 @@ test('preview-demo', async ({ page, narration }) => {
   if (cardCount >= 3) {
     await withOverlay(page, 'browse-scenes', async () => {
       const browseDur = Math.floor(narration.durationFor('browse-scenes') / 4);
-      // Click through first few scene cards
       await sceneCards.nth(1).click();
       focusRing(page, '.scene-card.active', { color: '#8b5cf6', duration: browseDur });
       await page.waitForTimeout(browseDur);
       await sceneCards.nth(3).click();
       focusRing(page, '.scene-card.active', { color: '#8b5cf6', duration: browseDur });
       await page.waitForTimeout(browseDur);
-      // Click back to first scene
       await sceneCards.nth(0).click();
       focusRing(page, '.scene-card.active', { color: '#8b5cf6', duration: browseDur });
       await page.waitForTimeout(browseDur);
     });
   }
 
-  // Scene 4: Edit voiceover text — focus on a textarea and type
+  // Scene 4: Edit voiceover text — type replacement, show dirty + undo
   narration.mark('edit-text');
   const firstScene = page.locator('.scene-card').first();
   await firstScene.scrollIntoViewIfNeeded();
@@ -62,13 +60,19 @@ test('preview-demo', async ({ page, narration }) => {
     color: '#06b6d4',
     duration: narration.durationFor('edit-text'),
   });
-  // Select all text and type a replacement
   await textarea.click();
   await textarea.selectText();
   await demoType(page, textarea, 'Meet Argo — the fastest way to create polished product demos with AI voiceover.', 30);
+  // Show the undo button that appeared + dirty save indicator
+  await page.waitForTimeout(500);
+  const undoBtn = firstScene.locator('.btn-undo');
+  if (await undoBtn.isVisible()) {
+    focusRing(page, '.btn-undo', { color: '#f59e0b', duration: 1500 });
+    await page.waitForTimeout(1500);
+  }
   await showOverlay(page, 'edit-text', narration.durationFor('edit-text', { minMs: 2000, leadOutMs: 300 }));
 
-  // Scene 5: Edit overlay — change the overlay type and placement
+  // Scene 5: Edit overlay — change type and placement, live preview updates
   narration.mark('edit-overlay');
   const overlayType = firstScene.locator('select[data-field="overlay-type"]');
   await overlayType.scrollIntoViewIfNeeded();
@@ -89,7 +93,7 @@ test('preview-demo', async ({ page, narration }) => {
     await page.waitForTimeout(800);
   });
 
-  // Scene 6: Regen TTS — hit the regen button
+  // Scene 6: Regen TTS
   narration.mark('regen-tts');
   const regenBtn = firstScene.locator('button', { hasText: 'Regen TTS' });
   await regenBtn.scrollIntoViewIfNeeded();
@@ -99,18 +103,21 @@ test('preview-demo', async ({ page, narration }) => {
   });
   await showOverlay(page, 'regen-tts', narration.durationFor('regen-tts'));
 
-  // Scene 7: Save — hit the save button
+  // Scene 7: Save + Re-record — show both buttons
   narration.mark('save');
   const saveBtn = page.locator('#btn-save');
+  const rerecordBtn = page.locator('#btn-rerecord');
   await saveBtn.scrollIntoViewIfNeeded();
-  spotlight(page, '#btn-save', { duration: 2000, padding: 8 });
+  // Highlight save (should be amber/dirty) then re-record
+  spotlight(page, '#btn-save', { duration: 1500, padding: 8 });
+  await page.waitForTimeout(1500);
+  spotlight(page, '#btn-rerecord', { duration: 1500, padding: 8 });
   await page.waitForTimeout(1000);
   await saveBtn.click();
   await showOverlay(page, 'save', narration.durationFor('save'));
 
-  // Scene 8: Toggle controls — show audio and overlay toggles
+  // Scene 8: Toggle controls — audio and overlay switches
   narration.mark('controls');
-  // Toggle switches use hidden inputs — click the parent label to toggle
   const audioToggle = page.locator('label.toggle-switch[title="Audio"]');
   const overlayToggle = page.locator('label.toggle-switch[title="Overlays"]');
   await withOverlay(page, 'controls', async () => {

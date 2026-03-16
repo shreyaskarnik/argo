@@ -1304,6 +1304,15 @@ async function togglePlayPause() {
     showPlayIcon();
   }
 }
+function pausePreview() {
+  if (!video.paused) {
+    video.pause();
+    stopAudio();
+    showPlayIcon();
+  }
+  scenePlaybackEndMs = null;
+}
+
 document.getElementById('btn-play').addEventListener('click', togglePlayPause);
 video.addEventListener('click', togglePlayPause);
 
@@ -1425,7 +1434,7 @@ function renderSceneList() {
       \${renderOverlayFields(s)}
       <div class="btn-row">
         <button class="btn btn-undo" data-scene="\${esc(s.name)}" onclick="undoScene('\${esc(s.name)}')" style="display:none" title="Revert to last saved state">Undo</button>
-        <button class="btn" onclick="previewScene('\${esc(s.name)}')">Preview scene</button>
+        <span class="btn-group"><button class="btn" onclick="previewScene('\${esc(s.name)}')" title="Play this scene">&#9654;</button><button class="btn" onclick="pausePreview()" title="Pause">&#9646;&#9646;</button></span>
         <span class="btn-group"><button class="btn" onclick="nudgeScene('\${esc(s.name)}', -250)">-250ms</button><button class="btn" onclick="nudgeScene('\${esc(s.name)}', 250)">+250ms</button></span>
         <button class="btn btn-accent" onclick="regenClip('\${esc(s.name)}', this)">Regen TTS</button>
       </div>
