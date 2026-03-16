@@ -1538,9 +1538,13 @@ async function previewScene(sceneName) {
   if (!s) return;
   const { startMs, endMs, durationMs } = getSceneBounds(s);
   if (!durationMs) return;
-  seekAbsoluteMs(startMs);
+  video.currentTime = startMs / 1000;
+  // Wait for seek to complete before playing
+  await new Promise(resolve => { video.addEventListener('seeked', resolve, { once: true }); });
   activeScene = s;
   updateActiveSceneUI();
+  updateOverlayVisibility(startMs);
+  updateSceneScrubUI(startMs);
   scenePlaybackEndMs = endMs;
   await video.play();
   if (document.getElementById('cb-audio').checked) await playAudio();
