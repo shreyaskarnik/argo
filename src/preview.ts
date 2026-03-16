@@ -1481,7 +1481,10 @@ function renderSceneList() {
     if (chevron) {
       chevron.addEventListener('click', (e) => {
         e.stopPropagation();
+        const willCollapse = card.classList.contains('expanded');
         card.classList.toggle('expanded');
+        if (willCollapse) manuallyCollapsed.add(s.name);
+        else manuallyCollapsed.delete(s.name);
       });
     }
     // Click on scene name area (not chevron, not fields) expands + seeks
@@ -1491,6 +1494,7 @@ function renderSceneList() {
       if (e.target.closest('.scene-body')) return;
       if (e.target.closest('.expand-icon')) return;
       card.classList.add('expanded');
+      manuallyCollapsed.delete(s.name);
       seekToScene(s);
     });
 
@@ -1637,6 +1641,8 @@ function wireOverlayListeners(sceneName) {
   }
 }
 
+const manuallyCollapsed = new Set();
+
 // ─── Actions ───────────────────────────────────────────────────────────────
 function seekToScene(s) {
   scenePlaybackEndMs = null;
@@ -1652,11 +1658,13 @@ function updateActiveSceneUI() {
     const card = document.querySelector('.scene-card[data-scene="' + activeScene.name + '"]');
     if (card) {
       card.classList.add('active');
-      // Auto-expand active scene, collapse others
+      // Auto-expand active scene (unless user manually collapsed it), collapse others
       document.querySelectorAll('.scene-card.expanded').forEach(c => {
         if (c !== card) c.classList.remove('expanded');
       });
-      card.classList.add('expanded');
+      if (!manuallyCollapsed.has(activeScene.name)) {
+        card.classList.add('expanded');
+      }
       card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
     const marker = document.querySelector('.timeline-scene[data-scene="' + activeScene.name + '"]');
