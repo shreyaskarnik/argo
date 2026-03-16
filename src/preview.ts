@@ -905,6 +905,15 @@ const PREVIEW_HTML = `<!DOCTYPE html>
   }
   .scene-card:hover { background: var(--surface2); }
   .scene-card.active { background: var(--accent-glow); border-left-color: var(--accent); }
+  .scene-card .scene-body { display: none; }
+  .scene-card.expanded .scene-body { display: block; }
+  .scene-card .scene-name .expand-icon {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text-dim);
+    transition: transform var(--transition);
+  }
+  .scene-card.expanded .scene-name .expand-icon { transform: rotate(90deg); }
   .scene-card .scene-name {
     font-family: var(--mono);
     font-size: 13px;
@@ -1415,7 +1424,9 @@ function renderSceneList() {
         \${esc(s.name)}
         <span class="scene-time">\${formatTime(s.startMs)}</span>
         \${durationMs ? '<span class="scene-duration">' + (durationMs / 1000).toFixed(1) + 's</span>' : ''}
+        <span class="expand-icon">&#9654;</span>
       </div>
+      <div class="scene-body">
       <div class="field-group">
         <label>Voiceover text</label>
         <textarea data-field="text" data-scene="\${esc(s.name)}">\${esc(s.vo?.text ?? '')}</textarea>
@@ -1455,11 +1466,15 @@ function renderSceneList() {
           <span data-scene-scrub-total="\${esc(s.name)}">\${(durationMs / 1000).toFixed(1)}s</span>
         </div>
       </div>
+      </div>
     \`;
 
     card.addEventListener('click', (e) => {
       if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' ||
           e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return;
+      // Click on scene name area toggles expand + seeks
+      if (e.target.closest('.scene-body')) return;
+      card.classList.toggle('expanded');
       seekToScene(s);
     });
 
@@ -1621,6 +1636,11 @@ function updateActiveSceneUI() {
     const card = document.querySelector('.scene-card[data-scene="' + activeScene.name + '"]');
     if (card) {
       card.classList.add('active');
+      // Auto-expand active scene, collapse others
+      document.querySelectorAll('.scene-card.expanded').forEach(c => {
+        if (c !== card) c.classList.remove('expanded');
+      });
+      card.classList.add('expanded');
       card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
     const marker = document.querySelector('.timeline-scene[data-scene="' + activeScene.name + '"]');
