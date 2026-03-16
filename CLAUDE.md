@@ -73,12 +73,14 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - README config/CLI/API snippets must stay in sync with code changes (check after modifying config schema, CLI options, or scaffold templates)
 - Demo names are validated at the CLI boundary: only `[a-zA-Z0-9][a-zA-Z0-9_-]*` allowed. This prevents path traversal — maintain this validation if adding new commands that accept demo names.
 - `tts generate` derives demoName via `basename()` from the manifest path (strips `.scenes.json` suffix) — do not use `/`-only regex (breaks on Windows paths)
+- Pipeline writes `<demo>.meta.json` alongside the video with TTS engine, voices, resolution, and export settings for provenance tracking
 
 ## Demo Authoring
 
 - Demo scripts: `demos/<name>.demo.ts`
 - Scenes manifest: `demos/<name>.scenes.json` (unified voiceover + overlay data per scene)
 - TTS engine: Kokoro (local, no API keys). Voices: `af_heart` (female default), `am_michael` (male)
+- OpenAI engine supports `instructions` option for system-prompt-capable models like `gpt-4o-mini-tts`: `engines.openai({ model: 'gpt-4o-mini-tts', instructions: '...' })`
 - Long demos need `test.setTimeout()` — Playwright default is 30s
 - Showcase demo (`demos/showcase.demo.ts`) requires a local HTTP server serving `demos/`: `python3 -m http.server 8976 --directory demos` then `BASE_URL=http://127.0.0.1:8976 npx tsx bin/argo.js pipeline showcase --browser webkit`
 - Browser default is `chromium`. Video quality ranking on macOS: **webkit > firefox > chromium**. Chromium has a known video capture quality issue (see [playwright#31424](https://github.com/microsoft/playwright/issues/31424)). Use `--browser webkit` for best results.
@@ -106,6 +108,17 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - Dark background → light overlay theme; light background → dark overlay theme
 - Enable per-cue (`autoBackground: true` on overlay in `.scenes.json`) or globally via `overlays.autoBackground` in config
 
+## Preview Server (`src/preview.ts`)
+
+- `argo preview <demo>` starts a local server (does not open browser) — user opens the printed URL
+- Prefers exported MP4 over raw WebM for video seeking (WebM from Playwright lacks cue points)
+- Serves video with HTTP Range requests (required for browser seeking)
+- Overlay edits update the preview layer live but do NOT write to disk until Save is clicked
+- Scene cards are collapsible; active scene auto-expands during playback (respects manual collapse)
+- `<demo>.meta.json` displayed in the Metadata sidebar tab when available
+- IMPORTANT: `bin/argo.js` loads from `dist/`, not source — always run `npm run build` before restarting the preview server after code changes
+- The preview HTML/CSS/JS is a single inline template string in `src/preview.ts` (~1600 lines) — `wireOverlayListeners` must be called AFTER `sceneList.appendChild(card)` or DOM queries fail silently
+
 ## Thumbnail
 
 - `export.thumbnailPath` in config points to a PNG embedded as MP4 cover art
@@ -130,6 +143,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - OpenAI engine requests raw PCM (`response_format: 'pcm'`) and converts to Float32 directly — do not use `convertToWav` (ffmpeg pipe introduces 0xFFFFFFFF data size artifacts).
 - `convertToWav` (ffmpeg pipe to stdout) writes WAV with `0xFFFFFFFF` data size — `parseWavHeader` falls back to actual buffer length. All engines using `convertToWav` are affected.
 - Showcase demo video hosted via GitHub gist comment upload: https://gist.github.com/shreyaskarnik/6a0996942a96528a984010f36de76079
+- `tsc` build may silently fail if `tsconfig.json` is missing — verify it exists before trusting `npm run build` output
 
 ## Security Invariants
 
