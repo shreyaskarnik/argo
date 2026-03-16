@@ -21,11 +21,11 @@ export interface RecordResult {
   timingPath: string;
 }
 
-function findVideoInResults(testResultsDir: string): string | undefined {
+function findFileInResults(testResultsDir: string, extension: string): string | undefined {
   if (!existsSync(testResultsDir)) return undefined;
   for (const entry of readdirSync(testResultsDir, { recursive: true })) {
     const name = typeof entry === 'string' ? entry : entry.toString();
-    if (name.endsWith('.webm')) {
+    if (name.endsWith(extension)) {
       return path.join(testResultsDir, name);
     }
   }
@@ -64,6 +64,7 @@ export default defineConfig({
           mode: 'on',
           size: { width: ${captureWidth}, height: ${captureHeight} },
         },
+        trace: 'on',
       },
     },
   ],
@@ -122,7 +123,7 @@ export async function record(demoName: string, options: RecordOptions): Promise<
         }
 
         // Copy the video from test-results/ to .argo/<demo>/video.webm
-        const found = findVideoInResults(testResultsDir);
+        const found = findFileInResults(testResultsDir, '.webm');
         if (!found) {
           reject(new Error(
             `No video recording found in test-results/. ` +
@@ -131,6 +132,13 @@ export async function record(demoName: string, options: RecordOptions): Promise<
           return;
         }
         copyFileSync(found, videoPath);
+
+        // Copy trace if captured
+        const traceFile = findFileInResults(testResultsDir, '.zip');
+        if (traceFile) {
+          const traceDest = path.join(argoDir, 'trace.zip');
+          copyFileSync(traceFile, traceDest);
+        }
 
         // Verify timing file was written by the narration fixture
         if (!existsSync(timingPath)) {

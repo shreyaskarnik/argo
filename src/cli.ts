@@ -6,6 +6,7 @@ import { generateClips } from './tts/generate.js';
 import { exportVideo } from './export.js';
 import { runPipeline } from './pipeline.js';
 import { init, initFrom } from './init.js';
+import { startPreviewServer } from './preview.js';
 import { validateDemo } from './validate.js';
 import { runDoctor, formatDoctorResults } from './doctor.js';
 
@@ -154,6 +155,26 @@ export function createProgram(): Command {
       console.log(formatDoctorResults(results));
       const fails = results.filter(r => r.status === 'fail').length;
       if (fails > 0) process.exitCode = 1;
+    });
+
+  program
+    .command('preview <demo>')
+    .description('Open a browser-based preview to tweak voiceover, overlays, and timing without re-recording')
+    .option('--port <number>', 'server port (default: auto)', parseInt)
+    .action(async (demo: string, cmdOpts: { port?: number }) => {
+      validateDemoName(demo);
+      const configPath = program.opts().config;
+      const config = await loadConfig(process.cwd(), configPath);
+      const { url } = await startPreviewServer({
+        demoName: demo,
+        argoDir: '.argo',
+        demosDir: config.demosDir,
+        port: cmdOpts.port,
+      });
+      console.log(`\nArgo Preview running at: ${url}`);
+      console.log('Press Ctrl+C to stop.\n');
+      // Keep process alive
+      await new Promise(() => {});
     });
 
   program

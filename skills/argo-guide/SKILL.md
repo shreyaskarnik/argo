@@ -398,6 +398,22 @@ npx argo record <name> --browser webkit --base-url http://localhost:4000
 npx argo export <name>
 ```
 
+### Preview (interactive replay viewer)
+```bash
+npx argo preview <name>              # opens browser-based preview at localhost
+npx argo preview <name> --port 3333  # custom port
+```
+
+Preview lets you iterate on voiceover text, overlay content, and timing without re-recording. It serves a local web page that plays the recorded video.webm alongside aligned audio, renders overlay cues on a DOM layer, and provides:
+- Scene timeline with clickable markers
+- Editable voiceover text, voice, and speed per scene
+- Editable overlay type, zone, and text per scene
+- Per-scene TTS regeneration (re-generates just that clip)
+- Save button persists changes back to manifests on disk
+- Trace viewer link (traces are captured during recording)
+
+**Workflow:** Run `argo pipeline <name>` once, then `argo preview <name>` to iterate on voiceover and overlays. Only re-run `argo pipeline` when the demo script itself changes.
+
 ### Scaffold
 ```bash
 npx argo init    # creates example demo, config (.mjs), playwright config
