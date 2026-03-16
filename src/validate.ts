@@ -45,73 +45,56 @@ export function validateDemo(options: ValidateOptions): ValidateResult {
     warnings.push('No narration.mark() calls found in demo script. The video will have no scene timing.');
   }
 
-  // Check voiceover manifest
-  const voiceoverPath = join(demosDir, `${demoName}.voiceover.json`);
-  if (existsSync(voiceoverPath)) {
+  // Check unified scenes manifest
+  const scenesPath = join(demosDir, `${demoName}.scenes.json`);
+  if (existsSync(scenesPath)) {
     try {
-      const voiceover = JSON.parse(readFileSync(voiceoverPath, 'utf-8'));
-      if (!Array.isArray(voiceover)) {
-        errors.push(`Voiceover manifest must be a JSON array, got ${typeof voiceover}`);
-      } else {
-        for (let i = 0; i < voiceover.length; i++) {
-          const entry = voiceover[i];
-          if (!entry.scene) errors.push(`Voiceover entry ${i}: missing "scene" field`);
-          if (!entry.text) errors.push(`Voiceover entry ${i}: missing "text" field`);
-          if (entry.scene && !scriptScenes.has(entry.scene)) {
-            warnings.push(
-              `Voiceover scene "${entry.scene}" has no matching narration.mark('${entry.scene}') in the demo script`
-            );
-          }
-        }
-
-        // Check for script scenes missing voiceover
-        const voiceoverScenes = new Set(voiceover.map((e: any) => e.scene).filter(Boolean));
-        for (const scene of scriptScenes) {
-          if (!voiceoverScenes.has(scene)) {
-            warnings.push(`Script scene "${scene}" has no voiceover entry — it will be silent`);
-          }
-        }
-      }
-    } catch (err) {
-      errors.push(`Voiceover manifest is not valid JSON: ${(err as Error).message}`);
-    }
-  } else {
-    warnings.push(`No voiceover manifest found at ${voiceoverPath} — the video will have no narration`);
-  }
-
-  // Check overlay manifest (optional)
-  const overlayPath = join(demosDir, `${demoName}.overlays.json`);
-  if (existsSync(overlayPath)) {
-    try {
-      const overlays = JSON.parse(readFileSync(overlayPath, 'utf-8'));
-      if (!Array.isArray(overlays)) {
-        errors.push(`Overlay manifest must be a JSON array, got ${typeof overlays}`);
+      const scenes = JSON.parse(readFileSync(scenesPath, 'utf-8'));
+      if (!Array.isArray(scenes)) {
+        errors.push(`Scenes manifest must be a JSON array`);
       } else {
         const validTypes = new Set(['lower-third', 'headline-card', 'callout', 'image-card']);
         const validPlacements = new Set(['bottom-center', 'top-left', 'top-right', 'bottom-left', 'bottom-right', 'center']);
         const validMotions = new Set(['none', 'fade-in', 'slide-in']);
 
-        for (let i = 0; i < overlays.length; i++) {
-          const entry = overlays[i];
-          if (!entry.scene) errors.push(`Overlay entry ${i}: missing "scene" field`);
-          if (!entry.type) errors.push(`Overlay entry ${i}: missing "type" field`);
-          if (entry.type && !validTypes.has(entry.type)) {
-            errors.push(`Overlay entry ${i}: unknown type "${entry.type}" (valid: ${[...validTypes].join(', ')})`);
-          }
-          if (entry.placement && !validPlacements.has(entry.placement)) {
-            errors.push(`Overlay entry ${i}: unknown placement "${entry.placement}" (valid: ${[...validPlacements].join(', ')})`);
-          }
-          if (entry.motion && !validMotions.has(entry.motion)) {
-            errors.push(`Overlay entry ${i}: unknown motion "${entry.motion}" (valid: ${[...validMotions].join(', ')})`);
-          }
+        // Validate root-level voiceover fields
+        for (let i = 0; i < scenes.length; i++) {
+          const entry = scenes[i];
+          if (!entry.scene) errors.push(`Scene entry ${i}: missing "scene" field`);
+          if (!entry.text) errors.push(`Scene entry ${i}: missing "text" field`);
           if (entry.scene && !scriptScenes.has(entry.scene)) {
-            warnings.push(`Overlay scene "${entry.scene}" has no matching narration.mark() in the demo script`);
+            warnings.push(`Scene "${entry.scene}" has no matching narration.mark() in the demo script`);
+          }
+
+          // Validate overlay sub-object if present
+          if (entry.overlay) {
+            const ov = entry.overlay;
+            if (!ov.type) errors.push(`Scene "${entry.scene}" overlay: missing "type" field`);
+            if (ov.type && !validTypes.has(ov.type)) {
+              errors.push(`Scene "${entry.scene}" overlay: unknown type "${ov.type}"`);
+            }
+            if (ov.placement && !validPlacements.has(ov.placement)) {
+              errors.push(`Scene "${entry.scene}" overlay: unknown placement "${ov.placement}"`);
+            }
+            if (ov.motion && !validMotions.has(ov.motion)) {
+              errors.push(`Scene "${entry.scene}" overlay: unknown motion "${ov.motion}"`);
+            }
+          }
+        }
+
+        // Check for script scenes missing from manifest
+        const manifestScenes = new Set(scenes.map((e: any) => e.scene).filter(Boolean));
+        for (const scene of scriptScenes) {
+          if (!manifestScenes.has(scene)) {
+            warnings.push(`Script scene "${scene}" has no entry in scenes manifest — it will be silent`);
           }
         }
       }
     } catch (err) {
-      errors.push(`Overlay manifest is not valid JSON: ${(err as Error).message}`);
+      errors.push(`Scenes manifest is not valid JSON: ${(err as Error).message}`);
     }
+  } else {
+    warnings.push(`No scenes manifest found at ${scenesPath}`);
   }
 
   return { errors, warnings };

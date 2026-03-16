@@ -45,7 +45,7 @@ describe('validateDemo', () => {
     expect(result.warnings.some(w => w.includes('No narration.mark()'))).toBe(true);
   });
 
-  it('warns when voiceover manifest is missing', async () => {
+  it('warns when scenes manifest is missing', async () => {
     await writeFile(join(dir, 'demos', 'novoice.demo.ts'), `
       import { test } from '@argo-video/cli';
       test('novoice', async ({ page, narration }) => {
@@ -53,10 +53,10 @@ describe('validateDemo', () => {
       });
     `);
     const result = validateDemo({ demoName: 'novoice', demosDir: join(dir, 'demos') });
-    expect(result.warnings.some(w => w.includes('No voiceover manifest'))).toBe(true);
+    expect(result.warnings.some(w => w.includes('No scenes manifest found'))).toBe(true);
   });
 
-  it('warns on scene name mismatch between script and voiceover', async () => {
+  it('warns on scene name mismatch between script and scenes manifest', async () => {
     await writeFile(join(dir, 'demos', 'mismatch.demo.ts'), `
       import { test } from '@argo-video/cli';
       test('mismatch', async ({ page, narration }) => {
@@ -64,32 +64,36 @@ describe('validateDemo', () => {
         narration.mark('ending');
       });
     `);
-    await writeFile(join(dir, 'demos', 'mismatch.voiceover.json'), JSON.stringify([
+    await writeFile(join(dir, 'demos', 'mismatch.scenes.json'), JSON.stringify([
       { scene: 'intro', text: 'Hello' },
       { scene: 'typo-scene', text: 'Oops' },
     ]));
     const result = validateDemo({ demoName: 'mismatch', demosDir: join(dir, 'demos') });
-    expect(result.warnings.some(w => w.includes('"typo-scene" has no matching narration.mark'))).toBe(true);
-    expect(result.warnings.some(w => w.includes('"ending" has no voiceover entry'))).toBe(true);
+    expect(result.warnings.some(w => w.includes('"typo-scene" has no matching narration.mark()'))).toBe(true);
+    expect(result.warnings.some(w => w.includes('"ending" has no entry in scenes manifest'))).toBe(true);
   });
 
-  it('errors on invalid voiceover JSON', async () => {
+  it('errors on invalid scenes manifest JSON', async () => {
     await writeFile(join(dir, 'demos', 'badjson.demo.ts'), `
       import { test } from '@argo-video/cli';
       test('badjson', async ({ page, narration }) => { narration.mark('a'); });
     `);
-    await writeFile(join(dir, 'demos', 'badjson.voiceover.json'), '{ not valid json');
+    await writeFile(join(dir, 'demos', 'badjson.scenes.json'), '{ not valid json');
     const result = validateDemo({ demoName: 'badjson', demosDir: join(dir, 'demos') });
     expect(result.errors.some(e => e.includes('not valid JSON'))).toBe(true);
   });
 
-  it('errors on invalid overlay type/placement/motion', async () => {
+  it('errors on invalid overlay type/placement/motion in scenes manifest', async () => {
     await writeFile(join(dir, 'demos', 'badoverlay.demo.ts'), `
       import { test } from '@argo-video/cli';
       test('badoverlay', async ({ page, narration }) => { narration.mark('a'); });
     `);
-    await writeFile(join(dir, 'demos', 'badoverlay.overlays.json'), JSON.stringify([
-      { scene: 'a', type: 'invalid-type', placement: 'invalid-zone', motion: 'invalid-motion' },
+    await writeFile(join(dir, 'demos', 'badoverlay.scenes.json'), JSON.stringify([
+      {
+        scene: 'a',
+        text: 'Hello',
+        overlay: { type: 'invalid-type', placement: 'invalid-zone', motion: 'invalid-motion' },
+      },
     ]));
     const result = validateDemo({ demoName: 'badoverlay', demosDir: join(dir, 'demos') });
     expect(result.errors.some(e => e.includes('unknown type'))).toBe(true);
@@ -97,7 +101,7 @@ describe('validateDemo', () => {
     expect(result.errors.some(e => e.includes('unknown motion'))).toBe(true);
   });
 
-  it('passes cleanly with valid demo + voiceover', async () => {
+  it('passes cleanly with valid demo + scenes manifest', async () => {
     await writeFile(join(dir, 'demos', 'good.demo.ts'), `
       import { test } from '@argo-video/cli';
       import { showOverlay } from '@argo-video/cli';
@@ -106,11 +110,30 @@ describe('validateDemo', () => {
         narration.mark('done');
       });
     `);
-    await writeFile(join(dir, 'demos', 'good.voiceover.json'), JSON.stringify([
+    await writeFile(join(dir, 'demos', 'good.scenes.json'), JSON.stringify([
       { scene: 'intro', text: 'Welcome' },
       { scene: 'done', text: 'Goodbye' },
     ]));
     const result = validateDemo({ demoName: 'good', demosDir: join(dir, 'demos') });
+    expect(result.errors).toHaveLength(0);
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  it('passes cleanly with valid demo + scenes manifest including overlays', async () => {
+    await writeFile(join(dir, 'demos', 'withoverlay.demo.ts'), `
+      import { test } from '@argo-video/cli';
+      test('withoverlay', async ({ page, narration }) => {
+        narration.mark('intro');
+      });
+    `);
+    await writeFile(join(dir, 'demos', 'withoverlay.scenes.json'), JSON.stringify([
+      {
+        scene: 'intro',
+        text: 'Welcome to the demo',
+        overlay: { type: 'lower-third', placement: 'bottom-center', motion: 'fade-in' },
+      },
+    ]));
+    const result = validateDemo({ demoName: 'withoverlay', demosDir: join(dir, 'demos') });
     expect(result.errors).toHaveLength(0);
     expect(result.warnings).toHaveLength(0);
   });
