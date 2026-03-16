@@ -523,11 +523,51 @@ function serveFileWithRanges(req: IncomingMessage, res: ServerResponse, filePath
   const range = req.headers.range;
 
   if (range) {
-    const parts = range.replace(/bytes=/, '').split('-');
-    const start = parseInt(parts[0], 10);
-    const end = parts[1] ? parseInt(parts[1], 10) : total - 1;
+    const match = /^bytes=(\d*)-(\d*)$/.exec(range.trim());
+    if (!match) {
+      res.writeHead(416, { 'Content-Range': `bytes */${total}` });
+      res.end();
+      return;
+    }
+
+    let start: number;
+    let end: number;
+
+    if (match[1] === '' && match[2] === '') {
+      res.writeHead(416, { 'Content-Range': `bytes */${total}` });
+      res.end();
+      return;
+    }
+
+    if (match[1] === '') {
+      const suffixLength = Number.parseInt(match[2], 10);
+      if (!Number.isFinite(suffixLength) || suffixLength <= 0) {
+        res.writeHead(416, { 'Content-Range': `bytes */${total}` });
+        res.end();
+        return;
+      }
+      start = Math.max(0, total - suffixLength);
+      end = total - 1;
+    } else {
+      start = Number.parseInt(match[1], 10);
+      end = match[2] ? Number.parseInt(match[2], 10) : total - 1;
+    }
+
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || start >= total || end < start) {
+      res.writeHead(416, { 'Content-Range': `bytes */${total}` });
+      res.end();
+      return;
+    }
+
+    end = Math.min(end, total - 1);
     const chunkSize = end - start + 1;
     const stream = createReadStream(filePath, { start, end });
+    stream.on('error', () => {
+      if (!res.headersSent) {
+        res.writeHead(500);
+      }
+      res.end('Failed to read file');
+    });
     res.writeHead(206, {
       'Content-Range': `bytes ${start}-${end}/${total}`,
       'Accept-Ranges': 'bytes',
@@ -1529,28 +1569,21 @@ async function seekAbsoluteMs(absoluteMs) {
   const targetSec = targetMs / 1000;
   const requestId = ++latestSeekRequest;
 
-  console.log('[seekAbsoluteMs] target=' + targetMs + 'ms, currentTime=' + video.currentTime + ', readyState=' + video.readyState + ', seeking=' + video.seeking + ', requestId=' + requestId);
 
   if (video.readyState < 1) {
-    console.log('[seekAbsoluteMs] waiting for loadedmetadata');
     await new Promise(resolve => video.addEventListener('loadedmetadata', resolve, { once: true }));
-    console.log('[seekAbsoluteMs] loadedmetadata fired, readyState=' + video.readyState);
   }
 
   if (Math.abs(video.currentTime - targetSec) > 0.01 || video.seeking) {
-    console.log('[seekAbsoluteMs] seeking to ' + targetSec + 's (delta=' + Math.abs(video.currentTime - targetSec) + ')');
     await new Promise(resolve => {
       const onSeeked = () => resolve();
       video.addEventListener('seeked', onSeeked, { once: true });
       video.currentTime = targetSec;
     });
-    console.log('[seekAbsoluteMs] seeked fired, video.currentTime=' + video.currentTime);
   } else {
-    console.log('[seekAbsoluteMs] skipping seek (already at target)');
   }
 
   if (requestId !== latestSeekRequest) {
-    console.log('[seekAbsoluteMs] STALE request ' + requestId + ' vs latest ' + latestSeekRequest + ', bailing');
     return;
   }
 
@@ -1621,36 +1654,27 @@ function nudgeScene(sceneName, deltaMs) {
 }
 
 async function previewScene(sceneName) {
-  console.log('[previewScene] START scene=' + sceneName);
   await initAudio();
   const s = scenes.find(s => s.name === sceneName);
   if (!s) return;
   const { startMs, endMs, durationMs } = getSceneBounds(s);
-  console.log('[previewScene] bounds: startMs=' + startMs + ' endMs=' + endMs + ' durationMs=' + durationMs);
   if (!durationMs) return;
   // Pause first to prevent timeupdate race, then seek, then play
   video.pause();
   stopAudio();
   scenePlaybackEndMs = null;
-  console.log('[previewScene] before seekAbsoluteMs, video.currentTime=' + video.currentTime + ' readyState=' + video.readyState);
   await seekAbsoluteMs(startMs);
-  console.log('[previewScene] after seekAbsoluteMs, video.currentTime=' + video.currentTime);
   // Verify seek landed — some browsers reset on play()
   if (Math.abs(video.currentTime - startMs / 1000) > 0.1) {
-    console.log('[previewScene] VERIFY FAILED, re-seeking. currentTime=' + video.currentTime + ' expected=' + (startMs/1000));
     video.currentTime = startMs / 1000;
     await new Promise(r => video.addEventListener('seeked', r, { once: true }));
-    console.log('[previewScene] after re-seek, video.currentTime=' + video.currentTime);
   }
   activeScene = s;
   updateActiveSceneUI();
   scenePlaybackEndMs = endMs;
-  console.log('[previewScene] calling video.play(), currentTime=' + video.currentTime);
   await video.play();
-  console.log('[previewScene] after video.play(), currentTime=' + video.currentTime);
   if (document.getElementById('cb-audio').checked) await playAudio();
   showPauseIcon();
-  console.log('[previewScene] DONE, currentTime=' + video.currentTime);
 }
 
 async function regenClip(sceneName, btn) {
