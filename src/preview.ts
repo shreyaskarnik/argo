@@ -1476,26 +1476,19 @@ function renderSceneList() {
       </div>
     \`;
 
-    // Chevron toggles expand/collapse only
-    const chevron = card.querySelector('.expand-icon');
-    if (chevron) {
-      chevron.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const willCollapse = card.classList.contains('expanded');
-        card.classList.toggle('expanded');
-        if (willCollapse) manuallyCollapsed.add(s.name);
-        else manuallyCollapsed.delete(s.name);
-      });
-    }
-    // Click on scene name area (not chevron, not fields) expands + seeks
+    // Click on scene header row toggles expand/collapse + seeks
     card.addEventListener('click', (e) => {
       if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' ||
           e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return;
       if (e.target.closest('.scene-body')) return;
-      if (e.target.closest('.expand-icon')) return;
-      card.classList.add('expanded');
-      manuallyCollapsed.delete(s.name);
-      seekToScene(s);
+      const willCollapse = card.classList.contains('expanded');
+      card.classList.toggle('expanded');
+      if (willCollapse) {
+        manuallyCollapsed.add(s.name);
+      } else {
+        manuallyCollapsed.delete(s.name);
+        seekToScene(s);
+      }
     });
 
     const scrub = card.querySelector('[data-field="scene-scrub"]');
