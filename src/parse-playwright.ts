@@ -287,6 +287,25 @@ export function generateDemoScript(parsed: ParsedPlaywrightTest): string {
 }
 
 /**
+ * Generate a unified scenes skeleton from parsed scenes.
+ * Combines voiceover text, hints, and overlay config into one manifest.
+ */
+export function generateScenesSkeleton(
+  parsed: ParsedPlaywrightTest,
+): Array<{ scene: string; text: string; _hint: string; overlay: { type: string; text: string } }> {
+  return parsed.scenes.map((s) => ({
+    scene: s.name,
+    text: '',
+    _hint: s.hint,
+    overlay: {
+      type: 'lower-third',
+      text: humanize(s.name),
+    },
+  }));
+}
+
+/**
+ * @deprecated Use generateScenesSkeleton instead.
  * Generate a skeleton voiceover manifest from parsed scenes.
  * Includes _hint fields for LLM-assisted text generation.
  */
@@ -301,6 +320,7 @@ export function generateVoiceoverSkeleton(
 }
 
 /**
+ * @deprecated Use generateScenesSkeleton instead.
  * Generate a skeleton overlays manifest from parsed scenes.
  * Creates a lower-third for each scene as a starting point.
  */

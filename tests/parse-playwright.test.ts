@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parsePlaywrightTest,
   generateDemoScript,
+  generateScenesSkeleton,
   generateVoiceoverSkeleton,
   generateOverlaysSkeleton,
 } from '../src/parse-playwright.js';
@@ -164,6 +165,34 @@ describe('generateDemoScript', () => {
     expect(script).toContain("page.goto('http://localhost:3000/login')");
     expect(script).toContain("page.fill('#email'");
     expect(script).toContain("page.click('button[type=\"submit\"]')");
+  });
+});
+
+describe('generateScenesSkeleton', () => {
+  it('creates unified entries with scene, text, _hint, and overlay for each scene', () => {
+    const parsed = parsePlaywrightTest(TEST_WITH_STEPS);
+    const scenes = generateScenesSkeleton(parsed);
+
+    expect(scenes.length).toBe(parsed.scenes.length);
+    for (const entry of scenes) {
+      expect(entry).toHaveProperty('scene');
+      expect(entry).toHaveProperty('text', '');
+      expect(entry).toHaveProperty('_hint');
+      expect(entry._hint.length).toBeGreaterThan(0);
+      expect(entry).toHaveProperty('overlay');
+      expect(entry.overlay.type).toBe('lower-third');
+      expect(entry.overlay.text).toMatch(/^[A-Z]/);
+    }
+  });
+
+  it('humanizes overlay text from kebab-case scene names', () => {
+    const parsed = parsePlaywrightTest(TEST_WITH_STEPS);
+    const scenes = generateScenesSkeleton(parsed);
+    const texts = scenes.map((s) => s.overlay.text);
+
+    expect(texts).toContain('Browse Products');
+    expect(texts).toContain('Add To Cart');
+    expect(texts).toContain('Complete Purchase');
   });
 });
 

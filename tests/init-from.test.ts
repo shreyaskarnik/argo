@@ -43,9 +43,9 @@ describe('initFrom', () => {
     expect(content).toContain('async ({ page, narration })');
   });
 
-  it('creates voiceover skeleton with _hint fields', async () => {
+  it('creates scenes skeleton with _hint fields and overlay config', async () => {
     await initFrom({ from: testFile, cwd: dir });
-    const content = await readFile(join(dir, 'demos', 'checkout.voiceover.json'), 'utf-8');
+    const content = await readFile(join(dir, 'demos', 'checkout.scenes.json'), 'utf-8');
     const parsed = JSON.parse(content);
 
     expect(Array.isArray(parsed)).toBe(true);
@@ -54,20 +54,8 @@ describe('initFrom', () => {
       expect(entry).toHaveProperty('scene');
       expect(entry).toHaveProperty('text', '');
       expect(entry).toHaveProperty('_hint');
-    }
-  });
-
-  it('creates overlays skeleton', async () => {
-    await initFrom({ from: testFile, cwd: dir });
-    const content = await readFile(join(dir, 'demos', 'checkout.overlays.json'), 'utf-8');
-    const parsed = JSON.parse(content);
-
-    expect(Array.isArray(parsed)).toBe(true);
-    expect(parsed.length).toBeGreaterThan(0);
-    for (const entry of parsed) {
-      expect(entry).toHaveProperty('scene');
-      expect(entry).toHaveProperty('type', 'lower-third');
-      expect(entry).toHaveProperty('text');
+      expect(entry).toHaveProperty('overlay');
+      expect(entry.overlay.type).toBe('lower-third');
     }
   });
 
@@ -89,8 +77,8 @@ describe('initFrom', () => {
     await initFrom({ from: testFile, demo: 'my-flow', cwd: dir });
     const content = await readFile(join(dir, 'demos', 'my-flow.demo.ts'), 'utf-8');
     expect(content).toBeTruthy();
-    const vo = await readFile(join(dir, 'demos', 'my-flow.voiceover.json'), 'utf-8');
-    expect(vo).toBeTruthy();
+    const scenes = await readFile(join(dir, 'demos', 'my-flow.scenes.json'), 'utf-8');
+    expect(scenes).toBeTruthy();
   });
 
   it('does not overwrite existing files', async () => {
@@ -119,22 +107,17 @@ describe('initFrom', () => {
     expect(content).toBeTruthy();
   });
 
-  it('scene names in voiceover match scene names in demo script', async () => {
+  it('scene names in scenes.json match scene names in demo script', async () => {
     await initFrom({ from: testFile, cwd: dir });
 
     const demoContent = await readFile(join(dir, 'demos', 'checkout.demo.ts'), 'utf-8');
-    const voContent = await readFile(join(dir, 'demos', 'checkout.voiceover.json'), 'utf-8');
-    const overlayContent = await readFile(join(dir, 'demos', 'checkout.overlays.json'), 'utf-8');
+    const scenesContent = await readFile(join(dir, 'demos', 'checkout.scenes.json'), 'utf-8');
 
-    const voScenes = JSON.parse(voContent).map((e: any) => e.scene);
-    const overlayScenes = JSON.parse(overlayContent).map((e: any) => e.scene);
+    const sceneNames = JSON.parse(scenesContent).map((e: any) => e.scene);
 
-    // Every voiceover scene should appear as a mark() in the demo
-    for (const scene of voScenes) {
+    // Every scene should appear as a mark() in the demo
+    for (const scene of sceneNames) {
       expect(demoContent).toContain(`narration.mark('${scene}')`);
     }
-
-    // Overlays should match voiceover scenes
-    expect(overlayScenes).toEqual(voScenes);
   });
 });

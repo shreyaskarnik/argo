@@ -33,26 +33,18 @@ describe('init', () => {
     expect(content).toContain('narration.durationFor(');
   });
 
-  it('creates example.voiceover.json with valid JSON array', async () => {
+  it('creates example.scenes.json with valid JSON array', async () => {
     await init(dir);
-    const content = await readFile(join(dir, 'demos', 'example.voiceover.json'), 'utf-8');
+    const content = await readFile(join(dir, 'demos', 'example.scenes.json'), 'utf-8');
     const parsed = JSON.parse(content);
     expect(Array.isArray(parsed)).toBe(true);
     expect(parsed.length).toBe(3);
     expect(parsed[0]).toHaveProperty('scene');
     expect(parsed[0]).toHaveProperty('text');
-  });
-
-  it('creates example.overlays.json with valid JSON array', async () => {
-    await init(dir);
-    const content = await readFile(join(dir, 'demos', 'example.overlays.json'), 'utf-8');
-    const parsed = JSON.parse(content);
-    expect(Array.isArray(parsed)).toBe(true);
-    expect(parsed.length).toBe(2);
-    expect(parsed[0]).toHaveProperty('scene');
-    expect(parsed[0]).toHaveProperty('type');
-    expect(parsed[1].type).toBe('headline-card');
-    expect(parsed[1].placement).toBe('top-left');
+    expect(parsed[0]).toHaveProperty('overlay');
+    expect(parsed[0].overlay.type).toBe('lower-third');
+    expect(parsed[1].overlay.type).toBe('headline-card');
+    expect(parsed[1].overlay.placement).toBe('top-left');
   });
 
   it('creates argo.config.mjs with defineConfig and comments', async () => {
