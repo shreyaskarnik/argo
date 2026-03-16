@@ -1538,9 +1538,11 @@ async function previewScene(sceneName) {
   if (!s) return;
   const { startMs, endMs, durationMs } = getSceneBounds(s);
   if (!durationMs) return;
-  video.currentTime = startMs / 1000;
-  // Wait for seek to complete before playing
-  await new Promise(resolve => { video.addEventListener('seeked', resolve, { once: true }); });
+  const targetSec = startMs / 1000;
+  if (Math.abs(video.currentTime - targetSec) > 0.01) {
+    video.currentTime = targetSec;
+    await new Promise(resolve => { video.addEventListener('seeked', resolve, { once: true }); });
+  }
   activeScene = s;
   updateActiveSceneUI();
   updateOverlayVisibility(startMs);
