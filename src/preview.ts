@@ -1315,10 +1315,9 @@ function updateOverlayVisibility(currentMs) {
     const el = overlayLayer.querySelector('[data-scene="' + s.name + '"]');
     if (!el) continue;
 
-    // Show overlay during this scene's time range
-    const sceneIdx = scenes.indexOf(s);
-    const nextStart = sceneIdx + 1 < scenes.length ? scenes[sceneIdx + 1].startMs : video.duration * 1000;
-    const isActive = currentMs >= s.startMs && currentMs < nextStart;
+    // Show overlay only during this scene's own duration (not bleeding into next scene)
+    const { startMs, endMs } = getSceneBounds(s);
+    const isActive = currentMs >= startMs && currentMs < endMs;
     el.classList.toggle('visible', isActive);
   }
 }
