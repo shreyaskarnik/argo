@@ -912,6 +912,13 @@ const PREVIEW_HTML = `<!DOCTYPE html>
     font-size: 10px;
     color: var(--text-dim);
     transition: transform var(--transition);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+  }
+  .scene-card .scene-name .expand-icon:hover {
+    color: var(--text);
+    background: var(--surface3);
   }
   .scene-card.expanded .scene-name .expand-icon { transform: rotate(90deg); }
   .scene-card .scene-name {
@@ -1469,12 +1476,21 @@ function renderSceneList() {
       </div>
     \`;
 
+    // Chevron toggles expand/collapse only
+    const chevron = card.querySelector('.expand-icon');
+    if (chevron) {
+      chevron.addEventListener('click', (e) => {
+        e.stopPropagation();
+        card.classList.toggle('expanded');
+      });
+    }
+    // Click on scene name area (not chevron, not fields) expands + seeks
     card.addEventListener('click', (e) => {
       if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' ||
           e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return;
-      // Click on scene name area toggles expand + seeks
       if (e.target.closest('.scene-body')) return;
-      card.classList.toggle('expanded');
+      if (e.target.closest('.expand-icon')) return;
+      card.classList.add('expanded');
       seekToScene(s);
     });
 
