@@ -3,6 +3,7 @@ dist/
 .argo/
 videos/*.srt
 videos/*.vtt
+videos/*.json
 argo.config.*
 playwright.config.ts
 test-results/
