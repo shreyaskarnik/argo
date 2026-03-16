@@ -1039,6 +1039,16 @@ const PREVIEW_HTML = `<!DOCTYPE html>
     border-color: var(--success);
     color: var(--success);
   }
+  .btn-undo {
+    background: transparent;
+    border-color: var(--warning);
+    color: var(--warning);
+    font-size: 11px;
+    padding: 4px 10px;
+  }
+  .btn-undo:hover:not(:disabled) {
+    background: rgba(245, 158, 11, 0.1);
+  }
   .btn-rerecord {
     background: transparent;
     border-color: var(--accent);
@@ -1414,6 +1424,7 @@ function renderSceneList() {
       </div>
       \${renderOverlayFields(s)}
       <div class="btn-row">
+        <button class="btn btn-undo" data-scene="\${esc(s.name)}" onclick="undoScene('\${esc(s.name)}')" style="display:none" title="Revert to last saved state">Undo</button>
         <button class="btn" onclick="previewScene('\${esc(s.name)}')">Preview scene</button>
         <span class="btn-group"><button class="btn" onclick="nudgeScene('\${esc(s.name)}', -250)">-250ms</button><button class="btn" onclick="nudgeScene('\${esc(s.name)}', 250)">+250ms</button></span>
         <button class="btn btn-accent" onclick="regenClip('\${esc(s.name)}', this)">Regen TTS</button>
@@ -1881,15 +1892,120 @@ async function saveOverlays() {
   }
 }
 
+// ─── Scene snapshots (for per-scene undo) ──────────────────────────────────
+const sceneSnapshots = new Map();
+
+function snapshotAllScenes() {
+  for (const s of scenes) {
+    sceneSnapshots.set(s.name, {
+      text: s.vo?.text ?? '',
+      voice: s.vo?.voice ?? '',
+      speed: s.vo?.speed ?? '',
+      overlay: s.overlay ? JSON.parse(JSON.stringify(s.overlay)) : null,
+    });
+  }
+}
+
+function getSceneSnapshot(sceneName) {
+  return sceneSnapshots.get(sceneName);
+}
+
+function isSceneModified(sceneName) {
+  const snap = getSceneSnapshot(sceneName);
+  if (!snap) return false;
+  const card = document.querySelector('.scene-card[data-scene="' + sceneName + '"]');
+  if (!card) return false;
+  const text = card.querySelector('[data-field="text"]')?.value ?? '';
+  const voice = card.querySelector('[data-field="voice"]')?.value ?? '';
+  const speed = card.querySelector('[data-field="speed"]')?.value ?? '';
+  if (text !== snap.text || voice !== snap.voice || String(speed) !== String(snap.speed)) return true;
+  // Check overlay fields
+  const type = card.querySelector('[data-field="overlay-type"]')?.value ?? '';
+  const snapType = snap.overlay?.type ?? '';
+  if (type !== snapType) return true;
+  if (type) {
+    const placement = card.querySelector('[data-field="overlay-placement"]')?.value ?? '';
+    const motion = card.querySelector('[data-field="overlay-motion"]')?.value ?? '';
+    const overlayText = card.querySelector('[data-field="overlay-text"]')?.value ?? '';
+    const body = card.querySelector('[data-field="overlay-body"]')?.value ?? '';
+    const kicker = card.querySelector('[data-field="overlay-kicker"]')?.value ?? '';
+    const src = card.querySelector('[data-field="overlay-src"]')?.value ?? '';
+    const so = snap.overlay || {};
+    if (placement !== (so.placement ?? 'bottom-center')) return true;
+    if (motion !== (so.motion ?? 'none')) return true;
+    const snapText = so.type === 'lower-third' || so.type === 'callout' ? (so.text ?? '') : (so.title ?? '');
+    if (overlayText !== snapText) return true;
+    if (body !== (so.body ?? '')) return true;
+    if (kicker !== (so.kicker ?? '')) return true;
+    if (src !== (so.src ?? '')) return true;
+  }
+  return false;
+}
+
+function updateUndoButton(sceneName) {
+  const btn = document.querySelector('.btn-undo[data-scene="' + sceneName + '"]');
+  if (!btn) return;
+  const modified = isSceneModified(sceneName);
+  btn.style.display = modified ? '' : 'none';
+}
+
+function updateAllUndoButtons() {
+  for (const s of scenes) updateUndoButton(s.name);
+}
+
+function undoScene(sceneName) {
+  const snap = getSceneSnapshot(sceneName);
+  if (!snap) return;
+  const card = document.querySelector('.scene-card[data-scene="' + sceneName + '"]');
+  if (!card) return;
+  // Restore voiceover fields
+  const textEl = card.querySelector('[data-field="text"]');
+  if (textEl) textEl.value = snap.text;
+  const voiceEl = card.querySelector('[data-field="voice"]');
+  if (voiceEl) voiceEl.value = snap.voice;
+  const speedEl = card.querySelector('[data-field="speed"]');
+  if (speedEl) speedEl.value = snap.speed;
+  // Restore overlay type (triggers field re-render)
+  const typeEl = card.querySelector('[data-field="overlay-type"]');
+  if (typeEl) {
+    typeEl.value = snap.overlay?.type ?? '';
+    updateOverlayFieldsForScene(sceneName);
+  }
+  // Restore overlay field values after re-render
+  setTimeout(() => {
+    const so = snap.overlay || {};
+    const textField = card.querySelector('[data-field="overlay-text"]');
+    if (textField) {
+      textField.value = so.type === 'lower-third' || so.type === 'callout' ? (so.text ?? '') : (so.title ?? '');
+    }
+    const bodyField = card.querySelector('[data-field="overlay-body"]');
+    if (bodyField) bodyField.value = so.body ?? '';
+    const kickerField = card.querySelector('[data-field="overlay-kicker"]');
+    if (kickerField) kickerField.value = so.kicker ?? '';
+    const srcField = card.querySelector('[data-field="overlay-src"]');
+    if (srcField) srcField.value = so.src ?? '';
+    const placementField = card.querySelector('[data-field="overlay-placement"]');
+    if (placementField) placementField.value = so.placement ?? 'bottom-center';
+    const motionField = card.querySelector('[data-field="overlay-motion"]');
+    if (motionField) motionField.value = so.motion ?? 'none';
+    // Re-render overlay preview
+    previewOverlays();
+    updateUndoButton(sceneName);
+    // Check if all scenes are back to saved state
+    const anyModified = scenes.some(s => isSceneModified(s.name));
+    if (!anyModified) clearDirty();
+  }, 0);
+}
+
 // ─── Dirty state ───────────────────────────────────────────────────────────
 let isDirty = false;
 
 function markDirty() {
-  if (isDirty) return;
   isDirty = true;
   const saveBtn = document.getElementById('btn-save');
   saveBtn.classList.add('dirty');
   saveBtn.textContent = '\\u25cf Save';
+  updateAllUndoButtons();
 }
 
 function clearDirty() {
@@ -1897,6 +2013,8 @@ function clearDirty() {
   const saveBtn = document.getElementById('btn-save');
   saveBtn.classList.remove('dirty');
   saveBtn.textContent = 'Save';
+  snapshotAllScenes();
+  updateAllUndoButtons();
 }
 
 // Save button
@@ -1977,6 +2095,7 @@ function updateSceneDuration(sceneName) {
 
 // ─── Init ──────────────────────────────────────────────────────────────────
 renderSceneList();
+snapshotAllScenes();
 initAudio();
 updateSceneScrubUI(0);
 
