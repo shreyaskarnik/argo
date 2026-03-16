@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { startPreviewServer } from '../src/preview.js';
+import { ClipCache } from '../src/tts/cache.js';
+import { createWavBuffer, parseWavHeader } from '../src/tts/engine.js';
 
 /** Create a minimal .argo/<demo> directory with the files preview needs. */
 async function scaffoldDemo(dir: string, demoName: string) {
@@ -46,23 +49,47 @@ async function scaffoldDemo(dir: string, demoName: string) {
     output: 'videos/test.mp4',
   }));
 
-  // Voiceover manifest
-  writeFileSync(join(demosDir, `${demoName}.voiceover.json`), JSON.stringify([
-    { scene: 'welcome', text: 'Welcome to the demo.' },
-    { scene: 'feature', text: 'Check out this feature.' },
+  // Unified scenes manifest
+  writeFileSync(join(demosDir, `${demoName}.scenes.json`), JSON.stringify([
+    { scene: 'welcome', text: 'Welcome to the demo.', overlay: { type: 'lower-third', text: 'Welcome' } },
+    { scene: 'feature', text: 'Check out this feature.', overlay: { type: 'headline-card', title: 'Feature', placement: 'top-right' } },
     { scene: 'closing', text: 'Thanks for watching.' },
-  ], null, 2));
-
-  // Overlay manifest
-  writeFileSync(join(demosDir, `${demoName}.overlays.json`), JSON.stringify([
-    { scene: 'welcome', type: 'lower-third', text: 'Welcome' },
-    { scene: 'feature', type: 'headline-card', title: 'Feature', placement: 'top-right' },
   ], null, 2));
 
   return { argoDir: join(dir, '.argo'), demosDir };
 }
 
-describe('preview server', () => {
+function cacheClip(
+  projectRoot: string,
+  demoName: string,
+  entry: { scene: string; text: string; voice?: string; speed?: number; lang?: string },
+  durationMs: number,
+) {
+  const sampleRate = 24_000;
+  const samples = new Float32Array(Math.round((durationMs / 1000) * sampleRate));
+  const cache = new ClipCache(projectRoot);
+  cache.cacheClip(demoName, entry, createWavBuffer(samples, sampleRate));
+}
+
+async function canBindLocalhost(): Promise<boolean> {
+  const server = createServer();
+  return await new Promise<boolean>((resolve, reject) => {
+    server.once('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EPERM' || error.code === 'EACCES') {
+        resolve(false);
+      } else {
+        reject(error);
+      }
+    });
+    server.listen(0, '127.0.0.1', () => {
+      server.close(() => resolve(true));
+    });
+  });
+}
+
+const describePreview = (await canBindLocalhost()) ? describe : describe.skip;
+
+describePreview('preview server', () => {
   let dir: string;
   let close: (() => void) | undefined;
 
@@ -155,9 +182,12 @@ describe('preview server', () => {
     });
     expect(resp.status).toBe(200);
 
-    // Verify file on disk
-    const saved = JSON.parse(readFileSync(join(demosDir, 'test-demo.voiceover.json'), 'utf-8'));
+    // Verify file on disk — voiceover fields updated in unified .scenes.json
+    const saved = JSON.parse(readFileSync(join(demosDir, 'test-demo.scenes.json'), 'utf-8'));
     expect(saved[0].text).toBe('Updated welcome text.');
+    // Overlay sub-object should be preserved
+    expect(saved[0].overlay).toBeDefined();
+    expect(saved[0].overlay.type).toBe('lower-third');
   });
 
   it('POST /api/overlays saves and returns re-rendered overlays', async () => {
@@ -183,10 +213,15 @@ describe('preview server', () => {
     expect(result.ok).toBe(true);
     expect(result.renderedOverlays.welcome.html).toContain('New callout!');
 
-    // Verify file on disk
-    const saved = JSON.parse(readFileSync(join(demosDir, 'test-demo.overlays.json'), 'utf-8'));
-    expect(saved).toHaveLength(1);
-    expect(saved[0].type).toBe('callout');
+    // Verify file on disk — overlay sub-objects updated in unified .scenes.json
+    const saved = JSON.parse(readFileSync(join(demosDir, 'test-demo.scenes.json'), 'utf-8'));
+    // welcome scene should have the callout overlay
+    expect(saved[0].overlay).toBeDefined();
+    expect(saved[0].overlay.type).toBe('callout');
+    // feature scene should have no overlay (was not in posted data)
+    expect(saved[1].overlay).toBeUndefined();
+    // voiceover fields should be preserved
+    expect(saved[0].text).toBe('Welcome to the demo.');
   });
 
   it('returns 404 for unknown routes', async () => {
@@ -229,5 +264,103 @@ describe('preview server', () => {
     expect(data.renderedOverlays.feature.zone).toBe('top-right');
     // The 'welcome' overlay defaults to bottom-center
     expect(data.renderedOverlays.welcome.zone).toBe('bottom-center');
+  });
+
+  it('renders richer overlay editing fields in the preview UI', async () => {
+    const { argoDir, demosDir } = await scaffoldDemo(dir, 'test-demo');
+    // Overwrite scenes.json with an image-card overlay on the feature scene
+    const scenes = JSON.parse(readFileSync(join(demosDir, 'test-demo.scenes.json'), 'utf-8'));
+    for (const s of scenes) delete s.overlay;
+    const featureScene = scenes.find((s: any) => s.scene === 'feature');
+    featureScene.overlay = {
+      type: 'image-card',
+      title: 'Feature',
+      body: 'Body copy',
+      src: 'assets/feature.png',
+    };
+    writeFileSync(join(demosDir, 'test-demo.scenes.json'), JSON.stringify(scenes, null, 2));
+
+    const server = await startPreviewServer({
+      demoName: 'test-demo',
+      argoDir,
+      demosDir,
+    });
+    close = server.close;
+
+    const html = await fetch(server.url).then((resp) => resp.text());
+    expect(html).toContain('data-field="overlay-body"');
+    expect(html).toContain('data-field="overlay-kicker"');
+    expect(html).toContain('data-field="overlay-src"');
+  });
+
+  it('POST /api/regen-clip refreshes scene durations and aligned audio for preview playback', async () => {
+    const { argoDir, demosDir } = await scaffoldDemo(dir, 'test-demo');
+    const projectRoot = dir;
+    const demoName = 'test-demo';
+
+    const server = await startPreviewServer({
+      demoName,
+      argoDir,
+      demosDir,
+      regenerateTts: async () => {
+        const scenes = JSON.parse(readFileSync(join(demosDir, `${demoName}.scenes.json`), 'utf-8'));
+        for (const s of scenes) {
+          const entry = { scene: s.scene, text: s.text, voice: s.voice, speed: s.speed, lang: s.lang };
+          const durationMs = s.scene === 'feature' ? 3500 : 900;
+          cacheClip(projectRoot, demoName, entry, durationMs);
+        }
+      },
+    });
+    close = server.close;
+
+    const resp = await fetch(`${server.url}/api/regen-clip`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scene: 'feature' }),
+    });
+    expect(resp.status).toBe(200);
+    const result = await resp.json();
+    expect(result.durationMs).toBe(3500);
+    expect(result.sceneDurations.feature).toBe(3500);
+    expect(result.sceneReport.scenes.find((scene: any) => scene.scene === 'feature').durationMs).toBe(3500);
+
+    const durationsOnDisk = JSON.parse(readFileSync(join(argoDir, demoName, '.scene-durations.json'), 'utf-8'));
+    expect(durationsOnDisk.feature).toBe(3500);
+
+    const aligned = readFileSync(join(argoDir, demoName, 'narration-aligned.wav'));
+    expect(parseWavHeader(aligned).durationMs).toBeGreaterThan(5000);
+  });
+
+  it('rejects startup when the requested port is already in use', async () => {
+    const { argoDir, demosDir } = await scaffoldDemo(dir, 'test-demo');
+    const first = await startPreviewServer({
+      demoName: 'test-demo',
+      argoDir,
+      demosDir,
+    });
+    close = first.close;
+    const port = Number(new URL(first.url).port);
+
+    await expect(
+      startPreviewServer({
+        demoName: 'test-demo',
+        argoDir,
+        demosDir,
+        port,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('does not allow clip path traversal outside the demo clips directory', async () => {
+    const { argoDir, demosDir } = await scaffoldDemo(dir, 'test-demo');
+    const server = await startPreviewServer({
+      demoName: 'test-demo',
+      argoDir,
+      demosDir,
+    });
+    close = server.close;
+
+    const resp = await fetch(`${server.url}/clips/../../package.json`);
+    expect(resp.status).toBe(404);
   });
 });

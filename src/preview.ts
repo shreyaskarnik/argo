@@ -7,10 +7,14 @@
  * user edit voiceover text + overlay props inline with per-scene TTS regen.
  */
 
+import { execFile } from 'node:child_process';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync, existsSync, readdirSync, writeFileSync } from 'node:fs';
-import { join, extname } from 'node:path';
+import { dirname, extname, join, relative, resolve } from 'node:path';
 import { renderTemplate } from './overlays/templates.js';
+import { alignClips, schedulePlacements, type ClipInfo, type Placement } from './tts/align.js';
+import { ClipCache, type ManifestEntry } from './tts/cache.js';
+import { createWavBuffer, parseWavHeader } from './tts/engine.js';
 import type { OverlayManifestEntry, Zone } from './overlays/types.js';
 
 export interface PreviewOptions {
@@ -19,15 +23,32 @@ export interface PreviewOptions {
   demosDir?: string;
   port?: number;
   open?: boolean;
+  ttsDefaults?: { voice?: string; speed?: number };
+  regenerateTts?: (args: { manifestPath: string; scene: string }) => Promise<void>;
+}
+
+interface PreviewVoiceoverEntry {
+  scene: string;
+  text: string;
+  voice?: string;
+  speed?: number;
+  lang?: string;
+  _hint?: string;
+}
+
+interface PreviewSceneReport {
+  totalDurationMs: number;
+  overflowMs: number;
+  scenes: Array<{ scene: string; startMs: number; endMs: number; durationMs: number }>;
 }
 
 interface PreviewData {
   demoName: string;
   timing: Record<string, number>;
-  voiceover: Array<{ scene: string; text: string; voice?: string; speed?: number; _hint?: string }>;
+  voiceover: PreviewVoiceoverEntry[];
   overlays: OverlayManifestEntry[];
   sceneDurations: Record<string, number>;
-  sceneReport: { scenes: Array<{ scene: string; startMs: number; endMs: number; durationMs: number }> } | null;
+  sceneReport: PreviewSceneReport | null;
   /** Pre-rendered overlay HTML/CSS for each scene (keyed by scene name). */
   renderedOverlays: Record<string, { html: string; styles: Record<string, string>; zone: Zone }>;
 }
@@ -43,6 +64,55 @@ const MIME_TYPES: Record<string, string> = {
   '.zip': 'application/zip',
 };
 
+function readJsonFile<T>(filePath: string, fallback: T): T {
+  if (!existsSync(filePath)) return fallback;
+  return JSON.parse(readFileSync(filePath, 'utf-8')) as T;
+}
+
+function buildRenderedOverlays(overlays: OverlayManifestEntry[]): PreviewData['renderedOverlays'] {
+  const renderedOverlays: PreviewData['renderedOverlays'] = {};
+  for (const entry of overlays) {
+    const { scene, ...cue } = entry;
+    const zone: Zone = cue.placement ?? 'bottom-center';
+    const { contentHtml, styles } = renderTemplate(cue, 'dark');
+    renderedOverlays[scene] = { html: contentHtml, styles, zone };
+  }
+  return renderedOverlays;
+}
+
+function buildPreviewSceneReport(
+  timing: Record<string, number>,
+  sceneDurations: Record<string, number>,
+  persisted?: { totalDurationMs?: number; overflowMs?: number } | null,
+): PreviewSceneReport | null {
+  const scheduled = Object.entries(timing)
+    .filter(([scene]) => sceneDurations[scene] && sceneDurations[scene] > 0)
+    .map(([scene, startMs]) => ({ scene, startMs, durationMs: sceneDurations[scene] }));
+
+  if (scheduled.length === 0) return null;
+
+  const placements = schedulePlacements(scheduled);
+  return createSceneReportFromPlacements(placements, persisted);
+}
+
+function createSceneReportFromPlacements(
+  placements: Placement[],
+  persisted?: { totalDurationMs?: number; overflowMs?: number } | null,
+): PreviewSceneReport {
+  const lastEndMs = placements.length > 0 ? placements[placements.length - 1].endMs : 0;
+  const baseDurationMs = persisted?.totalDurationMs ?? lastEndMs;
+  return {
+    totalDurationMs: Math.max(baseDurationMs, lastEndMs),
+    overflowMs: Math.max(persisted?.overflowMs ?? 0, lastEndMs - baseDurationMs),
+    scenes: placements.map((placement) => ({
+      scene: placement.scene,
+      startMs: placement.startMs,
+      endMs: placement.endMs,
+      durationMs: placement.endMs - placement.startMs,
+    })),
+  };
+}
+
 function loadPreviewData(demoName: string, argoDir: string, demosDir: string): PreviewData {
   const demoDir = join(argoDir, demoName);
 
@@ -51,32 +121,36 @@ function loadPreviewData(demoName: string, argoDir: string, demosDir: string): P
   if (!existsSync(timingPath)) {
     throw new Error(`No timing data found at ${timingPath}. Run 'argo pipeline ${demoName}' first.`);
   }
-  const timing = JSON.parse(readFileSync(timingPath, 'utf-8'));
+  const timing = readJsonFile<Record<string, number>>(timingPath, {});
 
-  // Voiceover manifest
-  const voPath = join(demosDir, `${demoName}.voiceover.json`);
-  const voiceover = existsSync(voPath) ? JSON.parse(readFileSync(voPath, 'utf-8')) : [];
+  // Unified scenes manifest
+  const scenesPath = join(demosDir, `${demoName}.scenes.json`);
+  const scenes = readJsonFile<Array<any>>(scenesPath, []);
 
-  // Overlay manifest
-  const ovPath = join(demosDir, `${demoName}.overlays.json`);
-  const overlays: OverlayManifestEntry[] = existsSync(ovPath) ? JSON.parse(readFileSync(ovPath, 'utf-8')) : [];
+  // Derive voiceover and overlay arrays from unified entries
+  const voiceover: PreviewVoiceoverEntry[] = scenes.map((s) => ({
+    scene: s.scene,
+    text: s.text,
+    voice: s.voice,
+    speed: s.speed,
+    lang: s.lang,
+    _hint: s._hint,
+  }));
+
+  const overlays: OverlayManifestEntry[] = scenes
+    .filter((s: any) => s.overlay)
+    .map((s: any) => ({ scene: s.scene, ...s.overlay }));
 
   // Scene durations
   const sdPath = join(demoDir, '.scene-durations.json');
-  const sceneDurations = existsSync(sdPath) ? JSON.parse(readFileSync(sdPath, 'utf-8')) : {};
+  const sceneDurations = readJsonFile<Record<string, number>>(sdPath, {});
 
-  // Scene report (from last pipeline run)
+  // Use persisted report metadata, but derive scene placements from the current
+  // timing + scene durations so preview stays in sync after per-scene regen.
   const reportPath = join(demoDir, 'scene-report.json');
-  const sceneReport = existsSync(reportPath) ? JSON.parse(readFileSync(reportPath, 'utf-8')) : null;
-
-  // Pre-render overlay templates
-  const renderedOverlays: PreviewData['renderedOverlays'] = {};
-  for (const entry of overlays) {
-    const { scene, ...cue } = entry;
-    const zone: Zone = cue.placement ?? 'bottom-center';
-    const { contentHtml, styles } = renderTemplate(cue, 'dark');
-    renderedOverlays[scene] = { html: contentHtml, styles, zone };
-  }
+  const persistedReport = readJsonFile<{ totalDurationMs?: number; overflowMs?: number } | null>(reportPath, null);
+  const sceneReport = buildPreviewSceneReport(timing, sceneDurations, persistedReport);
+  const renderedOverlays = buildRenderedOverlays(overlays);
 
   return { demoName, timing, voiceover, overlays, sceneDurations, sceneReport, renderedOverlays };
 }
@@ -90,6 +164,105 @@ function listClips(argoDir: string, demoName: string): string[] {
 
 function getPreviewHtml(data: PreviewData): string {
   return PREVIEW_HTML.replace('__PREVIEW_DATA__', JSON.stringify(data));
+}
+
+function resolveClipPath(clipsDir: string, clipFile: string): string | null {
+  const decoded = decodeURIComponent(clipFile);
+  const candidate = resolve(clipsDir, decoded);
+  const rel = relative(clipsDir, candidate);
+  if (rel.startsWith('..') || rel.includes(`..${process.platform === 'win32' ? '\\' : '/'}`)) {
+    return null;
+  }
+  return candidate;
+}
+
+function readClipInfo(clipPath: string, scene: string): ClipInfo {
+  const wavBuf = readFileSync(clipPath);
+  const header = parseWavHeader(wavBuf);
+  const sampleCount = header.dataSize / 4;
+  const samples = new Float32Array(sampleCount);
+  for (let i = 0; i < sampleCount && header.dataOffset + i * 4 + 3 < wavBuf.length; i++) {
+    samples[i] = wavBuf.readFloatLE(header.dataOffset + i * 4);
+  }
+  return {
+    scene,
+    durationMs: header.durationMs,
+    samples,
+  };
+}
+
+function refreshPreviewAudioArtifacts(
+  demoName: string,
+  argoDir: string,
+  demosDir: string,
+  defaults?: { voice?: string; speed?: number },
+): { sceneDurations: Record<string, number>; sceneReport: PreviewSceneReport | null } {
+  const demoDir = join(argoDir, demoName);
+  const scenesPath = join(demosDir, `${demoName}.scenes.json`);
+  const timingPath = join(demoDir, '.timing.json');
+  const persistedReportPath = join(demoDir, 'scene-report.json');
+  const projectRoot = dirname(resolve(argoDir));
+  const cache = new ClipCache(projectRoot);
+  const timing = readJsonFile<Record<string, number>>(timingPath, {});
+  const persistedReport = readJsonFile<{ totalDurationMs?: number; overflowMs?: number } | null>(persistedReportPath, null);
+  const scenesRaw = readJsonFile<Array<any>>(scenesPath, []);
+  const manifest: PreviewVoiceoverEntry[] = scenesRaw.map((s) => ({
+    scene: s.scene,
+    text: s.text,
+    voice: s.voice,
+    speed: s.speed,
+    lang: s.lang,
+    _hint: s._hint,
+  }));
+
+  const clips: ClipInfo[] = [];
+  const sceneDurations: Record<string, number> = {};
+
+  for (const entry of manifest) {
+    const cacheEntry: ManifestEntry = {
+      scene: entry.scene,
+      text: entry.text,
+      voice: entry.voice ?? defaults?.voice,
+      speed: entry.speed ?? defaults?.speed,
+      lang: entry.lang,
+    };
+    const clipPath = cache.getClipPath(demoName, cacheEntry);
+    if (!existsSync(clipPath)) {
+      throw new Error(
+        `Expected regenerated clip for scene "${entry.scene}" at ${clipPath}, but it was not found. ` +
+        `Try running: argo tts generate ${scenesPath}`
+      );
+    }
+    const clipInfo = readClipInfo(clipPath, entry.scene);
+    clips.push(clipInfo);
+    sceneDurations[entry.scene] = clipInfo.durationMs;
+  }
+
+  writeFileSync(join(demoDir, '.scene-durations.json'), JSON.stringify(sceneDurations, null, 2), 'utf-8');
+
+  const baseReport = buildPreviewSceneReport(timing, sceneDurations, persistedReport);
+  const totalDurationMs = baseReport?.totalDurationMs ?? 0;
+  const aligned = alignClips(timing, clips, totalDurationMs);
+  writeFileSync(join(demoDir, 'narration-aligned.wav'), createWavBuffer(aligned.samples, 24_000));
+
+  return {
+    sceneDurations,
+    sceneReport: createSceneReportFromPlacements(aligned.placements, persistedReport),
+  };
+}
+
+async function runPreviewTtsGenerate(manifestPath: string): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    execFile('npx', ['argo', 'tts', 'generate', manifestPath], {
+      env: process.env,
+    }, (err, stdout, stderr) => {
+      if (err) {
+        reject(new Error(`TTS regen failed: ${stderr || stdout}`));
+      } else {
+        resolve();
+      }
+    });
+  });
 }
 
 export async function startPreviewServer(options: PreviewOptions): Promise<{ url: string; close: () => void }> {
@@ -127,25 +300,49 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
         return;
       }
 
-      // Save voiceover manifest
+      // Save voiceover fields into unified .scenes.json
       if (url === '/api/voiceover' && req.method === 'POST') {
         const chunks: Buffer[] = [];
         for await (const chunk of req) chunks.push(chunk as Buffer);
-        const body = JSON.parse(Buffer.concat(chunks).toString('utf-8'));
-        const voPath = join(demosDir, `${demoName}.voiceover.json`);
-        writeFileSync(voPath, JSON.stringify(body, null, 2) + '\n', 'utf-8');
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf-8')) as PreviewVoiceoverEntry[];
+        const scenesPath = join(demosDir, `${demoName}.scenes.json`);
+        const scenes = readJsonFile<Array<any>>(scenesPath, []);
+        for (const vo of body) {
+          const existing = scenes.find((s: any) => s.scene === vo.scene);
+          if (existing) {
+            existing.text = vo.text;
+            if (vo.voice) existing.voice = vo.voice; else delete existing.voice;
+            if (vo.speed !== undefined && vo.speed !== null) existing.speed = vo.speed; else delete existing.speed;
+            if (vo.lang) existing.lang = vo.lang; else delete existing.lang;
+            if (vo._hint) existing._hint = vo._hint; else delete existing._hint;
+          }
+        }
+        writeFileSync(scenesPath, JSON.stringify(scenes, null, 2) + '\n', 'utf-8');
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true }));
         return;
       }
 
-      // Save overlay manifest
+      // Save overlay fields into unified .scenes.json
       if (url === '/api/overlays' && req.method === 'POST') {
         const chunks: Buffer[] = [];
         for await (const chunk of req) chunks.push(chunk as Buffer);
-        const body = JSON.parse(Buffer.concat(chunks).toString('utf-8'));
-        const ovPath = join(demosDir, `${demoName}.overlays.json`);
-        writeFileSync(ovPath, JSON.stringify(body, null, 2) + '\n', 'utf-8');
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf-8')) as OverlayManifestEntry[];
+        const scenesPath = join(demosDir, `${demoName}.scenes.json`);
+        const scenes = readJsonFile<Array<any>>(scenesPath, []);
+        // Build a map of posted overlays keyed by scene
+        const ovByScene = new Map<string, OverlayManifestEntry>();
+        for (const ov of body) ovByScene.set(ov.scene, ov);
+        for (const entry of scenes) {
+          const posted = ovByScene.get(entry.scene);
+          if (posted) {
+            const { scene: _s, ...ovFields } = posted;
+            entry.overlay = ovFields;
+          } else {
+            delete entry.overlay;
+          }
+        }
+        writeFileSync(scenesPath, JSON.stringify(scenes, null, 2) + '\n', 'utf-8');
         // Reload and re-render overlays
         const data = loadPreviewData(demoName, argoDir, demosDir);
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -158,29 +355,19 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
         const chunks: Buffer[] = [];
         for await (const chunk of req) chunks.push(chunk as Buffer);
         const { scene } = JSON.parse(Buffer.concat(chunks).toString('utf-8'));
+        const manifestPath = join(demosDir, `${demoName}.scenes.json`);
+        const regenerateTts = options.regenerateTts ?? ((args: { manifestPath: string }) => runPreviewTtsGenerate(args.manifestPath));
+        await regenerateTts({ manifestPath, scene });
 
-        // Save updated voiceover first (client sends full manifest via /api/voiceover before this)
-        // Then regen just this scene via the CLI subprocess
-        const { execFile: execFileCb } = await import('node:child_process');
-        const manifestPath = join(demosDir, `${demoName}.voiceover.json`);
-
-        await new Promise<void>((resolve, reject) => {
-          execFileCb('npx', ['argo', 'tts', 'generate', manifestPath], {
-            env: process.env,
-          }, (err, stdout, stderr) => {
-            if (err) {
-              reject(new Error(`TTS regen failed: ${stderr || stdout}`));
-            } else {
-              resolve();
-            }
-          });
-        });
-
-        // Return updated scene duration
-        const sdPath = join(argoDir, demoName, '.scene-durations.json');
-        const durations = existsSync(sdPath) ? JSON.parse(readFileSync(sdPath, 'utf-8')) : {};
+        const refreshed = refreshPreviewAudioArtifacts(demoName, argoDir, demosDir, options.ttsDefaults);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, scene, durationMs: durations[scene] ?? 0 }));
+        res.end(JSON.stringify({
+          ok: true,
+          scene,
+          durationMs: refreshed.sceneDurations[scene] ?? 0,
+          sceneDurations: refreshed.sceneDurations,
+          sceneReport: refreshed.sceneReport,
+        }));
         return;
       }
 
@@ -201,8 +388,9 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
       // Serve individual clips: /clips/scene-name.wav
       if (url.startsWith('/clips/')) {
         const clipFile = url.slice('/clips/'.length);
-        const clipPath = join(demoDir, 'clips', clipFile);
-        if (existsSync(clipPath)) {
+        const clipsDir = join(demoDir, 'clips');
+        const clipPath = resolveClipPath(clipsDir, clipFile);
+        if (clipPath && existsSync(clipPath)) {
           serveFile(res, clipPath);
         } else {
           res.writeHead(404);
@@ -240,8 +428,10 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
     }
   });
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
+    server.once('error', reject);
     server.listen(port, '127.0.0.1', () => {
+      server.off('error', reject);
       const addr = server.address();
       const assignedPort = typeof addr === 'object' && addr ? addr.port : port;
       const serverUrl = `http://127.0.0.1:${assignedPort}`;
@@ -614,10 +804,9 @@ document.getElementById('demo-name').textContent = DATA.demoName;
 let audioCtx = null;
 let alignedAudioBuffer = null;
 let audioSource = null;
-let audioStartOffset = 0;
 
 async function initAudio() {
-  audioCtx = new AudioContext();
+  if (!audioCtx) audioCtx = new AudioContext();
   try {
     const resp = await fetch('/narration-aligned.wav');
     const buf = await resp.arrayBuffer();
@@ -701,13 +890,20 @@ timelineBar.addEventListener('click', (e) => {
 });
 
 // Play/pause
-document.getElementById('btn-play').addEventListener('click', () => {
+document.getElementById('btn-play').addEventListener('click', async () => {
   if (video.paused) {
-    video.play();
-    if (document.getElementById('cb-audio').checked) playAudio();
+    await video.play();
+    if (document.getElementById('cb-audio').checked) await playAudio();
     document.getElementById('btn-play').textContent = 'Pause';
   } else {
     video.pause();
+    stopAudio();
+    document.getElementById('btn-play').textContent = 'Play';
+  }
+});
+
+video.addEventListener('pause', () => {
+  if (!video.ended) {
     stopAudio();
     document.getElementById('btn-play').textContent = 'Play';
   }
@@ -719,16 +915,20 @@ video.addEventListener('ended', () => {
 });
 
 // Audio checkbox
-document.getElementById('cb-audio').addEventListener('change', (e) => {
+document.getElementById('cb-audio').addEventListener('change', async (e) => {
   if (e.target.checked && !video.paused) {
-    playAudio();
+    await playAudio();
   } else {
     stopAudio();
   }
 });
 
-function playAudio() {
+async function playAudio() {
+  if (!audioCtx || !alignedAudioBuffer) await initAudio();
   if (!audioCtx || !alignedAudioBuffer) return;
+  if (audioCtx.state === 'suspended') {
+    await audioCtx.resume();
+  }
   stopAudio();
   audioSource = audioCtx.createBufferSource();
   audioSource.buffer = alignedAudioBuffer;
@@ -745,7 +945,7 @@ function stopAudio() {
 
 function syncAudio() {
   if (!video.paused && document.getElementById('cb-audio').checked) {
-    playAudio();
+    void playAudio();
   }
 }
 
@@ -794,7 +994,7 @@ function renderSceneList() {
     card.className = 'scene-card';
     card.dataset.scene = s.name;
 
-    const durationMs = s.report?.durationMs ?? DATA.sceneDurations[s.name] ?? 0;
+    const durationMs = DATA.sceneDurations[s.name] ?? s.report?.durationMs ?? 0;
 
     card.innerHTML = \`
       <div class="scene-name">
@@ -833,10 +1033,12 @@ function renderSceneList() {
     // Live preview: update overlay on the video layer when editing
     let debounceTimer;
     card.querySelectorAll('[data-field^="overlay"]').forEach(input => {
-      input.addEventListener('input', () => {
+      const handler = () => {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => saveOverlays(), 300);
-      });
+      };
+      input.addEventListener('input', handler);
+      input.addEventListener('change', handler);
     });
 
     sceneList.appendChild(card);
@@ -872,8 +1074,28 @@ function renderOverlayFields(s) {
         </div>
       </div>
       <div class="field-group">
-        <label>Overlay text</label>
+        <label>Motion</label>
+        <select data-field="overlay-motion" data-scene="\${esc(s.name)}">
+          <option value="none" \${(ov?.motion ?? 'none') === 'none' ? 'selected' : ''}>none</option>
+          <option value="fade-in" \${ov?.motion === 'fade-in' ? 'selected' : ''}>fade-in</option>
+          <option value="slide-in" \${ov?.motion === 'slide-in' ? 'selected' : ''}>slide-in</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label>\${ov?.type === 'lower-third' || ov?.type === 'callout' ? 'Text' : 'Title'}</label>
         <input data-field="overlay-text" data-scene="\${esc(s.name)}" value="\${esc(ov?.type === 'lower-third' || ov?.type === 'callout' ? (ov?.text ?? '') : (ov?.title ?? ''))}">
+      </div>
+      <div class="field-group">
+        <label>Body</label>
+        <input data-field="overlay-body" data-scene="\${esc(s.name)}" value="\${esc(ov?.type === 'headline-card' || ov?.type === 'image-card' ? (ov?.body ?? '') : '')}" placeholder="optional">
+      </div>
+      <div class="field-group">
+        <label>Kicker</label>
+        <input data-field="overlay-kicker" data-scene="\${esc(s.name)}" value="\${esc(ov?.type === 'headline-card' ? (ov?.kicker ?? '') : '')}" placeholder="optional">
+      </div>
+      <div class="field-group">
+        <label>Image src</label>
+        <input data-field="overlay-src" data-scene="\${esc(s.name)}" value="\${esc(ov?.type === 'image-card' ? (ov?.src ?? '') : '')}" placeholder="assets/example.png">
       </div>
     </div>
   \`;
@@ -902,20 +1124,26 @@ function updateActiveSceneUI() {
 }
 
 async function playSceneClip(sceneName) {
-  if (!audioCtx) await initAudio();
-  // Find the clip file — clips are content-addressed so we need to try loading from the API
+  await initAudio();
   const s = scenes.find(s => s.name === sceneName);
-  if (!s?.report) return;
+  if (!s) return;
+  if (audioCtx.state === 'suspended') {
+    await audioCtx.resume();
+  }
 
-  // Play the aligned audio segment for this scene
-  if (alignedAudioBuffer && s.report) {
-    const startSec = s.report.startMs / 1000;
-    const endSec = s.report.endMs / 1000;
+  const durationMs = DATA.sceneDurations[sceneName] ?? s.report?.durationMs ?? 0;
+  const startMs = s.report?.startMs ?? s.startMs;
+  if (!durationMs) return;
+
+  // Play the aligned audio segment for this scene.
+  if (alignedAudioBuffer) {
+    const startSec = startMs / 1000;
+    const clipDurationSec = durationMs / 1000;
     stopAudio();
     audioSource = audioCtx.createBufferSource();
     audioSource.buffer = alignedAudioBuffer;
     audioSource.connect(audioCtx.destination);
-    audioSource.start(0, startSec, endSec - startSec);
+    audioSource.start(0, startSec, clipDurationSec);
   }
 }
 
@@ -937,21 +1165,19 @@ async function regenClip(sceneName, btn) {
     if (!resp.ok) throw new Error(result.error);
 
     // Update local duration data
-    if (result.durationMs) {
-      DATA.sceneDurations[sceneName] = result.durationMs;
-    }
+    if (result.sceneDurations) DATA.sceneDurations = result.sceneDurations;
+    if (result.sceneReport) DATA.sceneReport = result.sceneReport;
 
     // Reload aligned audio
     await initAudio();
-    // Reload data
-    const dataResp = await fetch('/api/data');
-    const newData = await dataResp.json();
-    Object.assign(DATA, newData);
     // Update scene objects
     for (const s of scenes) {
       s.vo = DATA.voiceover.find(v => v.scene === s.name);
+      s.overlay = DATA.overlays.find(o => o.scene === s.name);
+      s.rendered = DATA.renderedOverlays[s.name];
       s.report = DATA.sceneReport?.scenes?.find(r => r.scene === s.name);
     }
+    updateSceneDuration(sceneName);
 
     setStatus('TTS regenerated for ' + sceneName, 'saved');
   } catch (err) {
@@ -967,9 +1193,14 @@ function collectVoiceover() {
     const textEl = document.querySelector('textarea[data-scene="' + s.name + '"][data-field="text"]');
     const voiceEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="voice"]');
     const speedEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="speed"]');
-    const entry = { scene: s.name, text: textEl?.value ?? '' };
+    const entry = { ...(s.vo ?? { scene: s.name }), scene: s.name, text: textEl?.value ?? '' };
     if (voiceEl?.value) entry.voice = voiceEl.value;
-    if (speedEl?.value) entry.speed = parseFloat(speedEl.value);
+    else delete entry.voice;
+
+    const speed = speedEl?.value ? parseFloat(speedEl.value) : undefined;
+    if (Number.isFinite(speed)) entry.speed = speed;
+    else delete entry.speed;
+
     return entry;
   });
 }
@@ -979,12 +1210,36 @@ function collectOverlays() {
     .map(s => {
       const typeEl = document.querySelector('select[data-scene="' + s.name + '"][data-field="overlay-type"]');
       const placeEl = document.querySelector('select[data-scene="' + s.name + '"][data-field="overlay-placement"]');
+      const motionEl = document.querySelector('select[data-scene="' + s.name + '"][data-field="overlay-motion"]');
       const textEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="overlay-text"]');
+      const bodyEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="overlay-body"]');
+      const kickerEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="overlay-kicker"]');
+      const srcEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="overlay-src"]');
       const type = typeEl?.value;
       if (!type) return null;
-      const entry = { scene: s.name, type, placement: placeEl?.value ?? 'bottom-center' };
-      if (type === 'lower-third' || type === 'callout') entry.text = textEl?.value ?? '';
-      else entry.title = textEl?.value ?? '';
+      const entry = {
+        ...(s.overlay ?? {}),
+        scene: s.name,
+        type,
+        placement: placeEl?.value ?? 'bottom-center',
+      };
+      if (motionEl?.value && motionEl.value !== 'none') entry.motion = motionEl.value;
+      else delete entry.motion;
+
+      delete entry.text;
+      delete entry.title;
+      delete entry.body;
+      delete entry.kicker;
+      delete entry.src;
+
+      if (type === 'lower-third' || type === 'callout') {
+        entry.text = textEl?.value ?? '';
+      } else {
+        entry.title = textEl?.value ?? '';
+        if (bodyEl?.value) entry.body = bodyEl.value;
+        if (type === 'headline-card' && kickerEl?.value) entry.kicker = kickerEl.value;
+        if (type === 'image-card' && srcEl?.value) entry.src = srcEl.value;
+      }
       return entry;
     })
     .filter(Boolean);
@@ -1009,7 +1264,9 @@ async function saveOverlays() {
   const result = await resp.json();
   if (result.renderedOverlays) {
     DATA.renderedOverlays = result.renderedOverlays;
+    DATA.overlays = ov;
     for (const s of scenes) {
+      s.overlay = DATA.overlays.find(o => o.scene === s.name);
       s.rendered = DATA.renderedOverlays[s.name];
     }
     renderOverlayElements();
@@ -1045,6 +1302,13 @@ function setStatus(msg, cls) {
   statusEl.textContent = msg;
   statusEl.className = 'status ' + (cls || '');
   if (cls === 'saved') setTimeout(() => { statusEl.textContent = 'Ready'; statusEl.className = 'status'; }, 3000);
+}
+
+function updateSceneDuration(sceneName) {
+  const badge = document.querySelector('.scene-card[data-scene="' + sceneName + '"] .scene-duration');
+  const durationMs = DATA.sceneDurations[sceneName];
+  if (!badge || !durationMs) return;
+  badge.textContent = (durationMs / 1000).toFixed(1) + 's';
 }
 
 // ─── Init ──────────────────────────────────────────────────────────────────
