@@ -394,6 +394,17 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
         return;
       }
 
+      // Render overlay templates without saving to disk (for live preview)
+      if (url === '/api/render-overlays' && req.method === 'POST') {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(chunk as Buffer);
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf-8')) as OverlayManifestEntry[];
+        const renderedOverlays = buildRenderedOverlays(body);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, renderedOverlays }));
+        return;
+      }
+
       // Save overlay fields into unified .scenes.json
       if (url === '/api/overlays' && req.method === 'POST') {
         const chunks: Buffer[] = [];
@@ -437,6 +448,25 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
           sceneDurations: refreshed.sceneDurations,
           sceneReport: refreshed.sceneReport,
         }));
+        return;
+      }
+
+      // Re-record: run the full pipeline
+      if (url === '/api/rerecord' && req.method === 'POST') {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked' });
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const child = execFile('npx', ['argo', 'pipeline', demoName], {
+              env: process.env,
+            }, (err, stdout, stderr) => {
+              if (err) reject(new Error(stderr || stdout || err.message));
+              else resolve();
+            });
+          });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (err) {
+          res.end(JSON.stringify({ ok: false, error: (err as Error).message }));
+        }
         return;
       }
 
@@ -994,10 +1024,33 @@ const PREVIEW_HTML = `<!DOCTYPE html>
     font-weight: 600;
   }
   .btn-save:hover:not(:disabled) { background: #16a34a; }
+  .btn-save.dirty {
+    background: var(--warning);
+    border-color: var(--warning);
+    color: #000;
+    animation: pulse-save 2s ease-in-out infinite;
+  }
+  @keyframes pulse-save {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+    50% { box-shadow: 0 0 8px 2px rgba(245, 158, 11, 0.3); }
+  }
   .btn-save.saved {
     background: transparent;
     border-color: var(--success);
     color: var(--success);
+  }
+  .btn-rerecord {
+    background: transparent;
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .btn-rerecord:hover:not(:disabled) {
+    background: var(--accent-glow);
+  }
+  .btn-rerecord:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
   .btn-play {
     width: 32px;
@@ -1052,6 +1105,7 @@ const PREVIEW_HTML = `<!DOCTYPE html>
   <div class="actions">
     <a class="trace-link" id="trace-link" href="https://trace.playwright.dev" target="_blank">Open Trace Viewer</a>
     <button class="btn btn-save" id="btn-save" title="Save all changes">Save</button>
+    <button class="btn btn-rerecord" id="btn-rerecord" title="Re-record with current manifest">Re-record</button>
   </div>
 </header>
 
@@ -1518,8 +1572,9 @@ function wireOverlayListeners(sceneName) {
   let debounceTimer;
   card.querySelectorAll('[data-field^="overlay"]').forEach(input => {
     const handler = () => {
+      markDirty();
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => saveOverlays(), 300);
+      debounceTimer = setTimeout(() => previewOverlays(), 300);
     };
     input.addEventListener('input', handler);
     input.addEventListener('change', handler);
@@ -1784,6 +1839,28 @@ async function saveVoiceover() {
   });
 }
 
+// Render-only preview (no disk write) — called on every overlay field edit
+async function previewOverlays() {
+  const ov = collectOverlays();
+  const resp = await fetch('/api/render-overlays', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(ov),
+  });
+  const result = await resp.json();
+  if (result.renderedOverlays) {
+    DATA.renderedOverlays = result.renderedOverlays;
+    DATA.overlays = ov;
+    for (const s of scenes) {
+      s.overlay = DATA.overlays.find(o => o.scene === s.name);
+      s.rendered = DATA.renderedOverlays[s.name];
+    }
+    renderOverlayElements();
+    updateOverlayVisibility(video.currentTime * 1000);
+  }
+}
+
+// Persist to disk — called only by Save button
 async function saveOverlays() {
   const ov = collectOverlays();
   const resp = await fetch('/api/overlays', {
@@ -1804,6 +1881,24 @@ async function saveOverlays() {
   }
 }
 
+// ─── Dirty state ───────────────────────────────────────────────────────────
+let isDirty = false;
+
+function markDirty() {
+  if (isDirty) return;
+  isDirty = true;
+  const saveBtn = document.getElementById('btn-save');
+  saveBtn.classList.add('dirty');
+  saveBtn.textContent = '\\u25cf Save';
+}
+
+function clearDirty() {
+  isDirty = false;
+  const saveBtn = document.getElementById('btn-save');
+  saveBtn.classList.remove('dirty');
+  saveBtn.textContent = 'Save';
+}
+
 // Save button
 document.getElementById('btn-save').addEventListener('click', async () => {
   const saveBtn = document.getElementById('btn-save');
@@ -1811,15 +1906,43 @@ document.getElementById('btn-save').addEventListener('click', async () => {
   try {
     await saveVoiceover();
     await saveOverlays();
+    clearDirty();
     setStatus('All changes saved', 'saved');
     saveBtn.textContent = '\\u2713 Saved';
     saveBtn.classList.add('saved');
     setTimeout(() => {
-      saveBtn.textContent = 'Save';
-      saveBtn.classList.remove('saved');
+      if (!isDirty) {
+        saveBtn.textContent = 'Save';
+        saveBtn.classList.remove('saved');
+      }
     }, 2000);
   } catch (err) {
     setStatus('Save failed: ' + err.message, 'error');
+  }
+});
+
+// Re-record button
+document.getElementById('btn-rerecord').addEventListener('click', async () => {
+  if (isDirty && !confirm('You have unsaved changes. Save before re-recording?')) return;
+  if (isDirty) {
+    await saveVoiceover();
+    await saveOverlays();
+    clearDirty();
+  }
+  const btn = document.getElementById('btn-rerecord');
+  btn.disabled = true;
+  btn.textContent = 'Recording...';
+  setStatus('Re-recording pipeline...', 'saving');
+  try {
+    const resp = await fetch('/api/rerecord', { method: 'POST' });
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error);
+    setStatus('Re-record complete! Reloading...', 'saved');
+    setTimeout(() => location.reload(), 1500);
+  } catch (err) {
+    setStatus('Re-record failed: ' + err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Re-record';
   }
 });
 
@@ -1856,6 +1979,12 @@ function updateSceneDuration(sceneName) {
 renderSceneList();
 initAudio();
 updateSceneScrubUI(0);
+
+// Mark dirty on any voiceover field edit (text, voice, speed)
+sceneList.addEventListener('input', (e) => {
+  const field = e.target?.dataset?.field;
+  if (field === 'text' || field === 'voice' || field === 'speed') markDirty();
+});
 </script>
 </body>
 </html>`;
