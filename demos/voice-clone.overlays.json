@@ -1,0 +1,69 @@
+[
+  {
+    "scene": "hero",
+    "type": "headline-card",
+    "kicker": "VOICE CLONING",
+    "title": "Your voice. Your demos.",
+    "body": "Clone from a 15-second clip — 100% local.",
+    "placement": "top-right",
+    "motion": "slide-in"
+  },
+  {
+    "scene": "workflow",
+    "type": "headline-card",
+    "title": "Record. Preview. Pipeline.",
+    "placement": "top-left",
+    "motion": "slide-in"
+  },
+  {
+    "scene": "features",
+    "type": "callout",
+    "text": "Local, fast, high-fidelity, and manifest-driven",
+    "placement": "top-left",
+    "motion": "fade-in"
+  },
+  {
+    "scene": "record-ref",
+    "type": "lower-third",
+    "text": "One script captures and normalizes your reference voice",
+    "placement": "top-left",
+    "motion": "fade-in"
+  },
+  {
+    "scene": "preview-clips",
+    "type": "lower-third",
+    "text": "Preview each cloned clip before the full pipeline run",
+    "placement": "top-right",
+    "motion": "fade-in"
+  },
+  {
+    "scene": "config",
+    "type": "lower-third",
+    "text": "Point your config at mlx-audio with refAudio — done",
+    "placement": "top-left",
+    "motion": "fade-in"
+  },
+  {
+    "scene": "models",
+    "type": "callout",
+    "text": "Qwen3-TTS delivers the best clone quality",
+    "placement": "top-right",
+    "motion": "fade-in"
+  },
+  {
+    "scene": "argo-preview",
+    "type": "headline-card",
+    "kicker": "NEW",
+    "title": "argo preview",
+    "body": "Edit voiceover, overlays, and timing in your browser.",
+    "placement": "top-right",
+    "motion": "slide-in"
+  },
+  {
+    "scene": "result",
+    "type": "lower-third",
+    "text": "Your voice. Your demos. Powered by Argo.",
+    "placement": "top-left",
+    "motion": "fade-in"
+  }
+]
