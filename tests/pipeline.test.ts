@@ -155,6 +155,8 @@ describe('runPipeline', () => {
       deviceScaleFactor: 1,
       thumbnailPath: 'assets/thumb.png',
       chapterMetadataPath: '.argo/test-demo/chapters.txt',
+      formats: undefined,
+      headTrimMs: 800,
     });
   });
 

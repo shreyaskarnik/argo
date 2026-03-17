@@ -9,6 +9,8 @@ export interface ExportOptions {
   preset?: string;
   crf?: number;
   fps?: number;
+  /** Trim this many ms from the start of the video (skip setup before first scene). */
+  headTrimMs?: number;
   tailPadMs?: number;
   /** Logical output width (e.g. 1920). Used with deviceScaleFactor for downscaling. */
   outputWidth?: number;
@@ -92,10 +94,16 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
   }
   const hasThumbnail = thumbnailPath && existsSync(thumbnailPath);
 
-  const args: string[] = [
-    '-i', videoPath,   // input 0: video
-    '-i', audioPath,   // input 1: audio
-  ];
+  const headTrimMs = options.headTrimMs ?? 0;
+  const headTrimSec = headTrimMs > 0 ? (headTrimMs / 1000).toFixed(3) : '';
+
+  const args: string[] = [];
+
+  // Trim setup/teardown by seeking both inputs to the first scene mark
+  if (headTrimSec) args.push('-ss', headTrimSec);
+  args.push('-i', videoPath);   // input 0: video
+  if (headTrimSec) args.push('-ss', headTrimSec);
+  args.push('-i', audioPath);   // input 1: audio
 
   let nextInput = 2;
   const hasChapters = chapterMetadataPath && existsSync(chapterMetadataPath);

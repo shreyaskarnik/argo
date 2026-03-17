@@ -141,6 +141,21 @@ export async function runPipeline(
     );
   }
 
+  // Auto-trim: skip setup before first scene mark (with 200ms lead-in)
+  const markTimes = Object.values(timing);
+  let headTrimMs = 0;
+  if (markTimes.length > 0) {
+    const firstMarkMs = Math.min(...markTimes);
+    headTrimMs = Math.max(0, firstMarkMs - 200);
+    if (headTrimMs <= 500) headTrimMs = 0; // Don't trim tiny gaps
+  }
+
+  // Shift placements for chapters/subtitles if head-trimming
+  const shiftedPlacements = headTrimMs > 0
+    ? aligned.placements.map(p => ({ ...p, startMs: p.startMs - headTrimMs, endMs: p.endMs - headTrimMs }))
+    : aligned.placements;
+  const shiftedDurationMs = Math.max(totalDurationMs, aligned.requiredDurationMs) - headTrimMs;
+
   // Ensure output directory exists before writing subtitles
   mkdirSync(config.outputDir, { recursive: true });
 
@@ -153,9 +168,9 @@ export async function runPipeline(
       if (entry.scene && entry.text) sceneTexts[entry.scene] = entry.text;
     }
 
-    // Generate subtitles
-    const srt = generateSrt(aligned.placements, sceneTexts);
-    const vtt = generateVtt(aligned.placements, sceneTexts);
+    // Generate subtitles (shifted if head-trimming)
+    const srt = generateSrt(shiftedPlacements, sceneTexts);
+    const vtt = generateVtt(shiftedPlacements, sceneTexts);
     writeFileSync(join(config.outputDir, `${demoName}.srt`), srt, 'utf-8');
     writeFileSync(join(config.outputDir, `${demoName}.vtt`), vtt, 'utf-8');
   } catch {
@@ -164,7 +179,7 @@ export async function runPipeline(
 
   // Generate chapter metadata for ffmpeg
   const chapterMetadataPath = join(argoDir, 'chapters.txt');
-  const chapterMetadata = generateChapterMetadata(aligned.placements, Math.max(totalDurationMs, aligned.requiredDurationMs));
+  const chapterMetadata = generateChapterMetadata(shiftedPlacements, shiftedDurationMs);
   writeFileSync(chapterMetadataPath, chapterMetadata, 'utf-8');
 
   // Step 4: Export final video
@@ -184,10 +199,12 @@ export async function runPipeline(
     formats: config.export.formats,
   };
   if (tailPadMs !== undefined) exportOptions.tailPadMs = tailPadMs;
+  if (headTrimMs > 0) exportOptions.headTrimMs = headTrimMs;
+
   const outputPath = await exportVideo(exportOptions);
 
   // Scene report
-  const report = buildSceneReport(demoName, aligned.placements, aligned.overflowMs, totalDurationMs, outputPath);
+  const report = buildSceneReport(demoName, shiftedPlacements, aligned.overflowMs, shiftedDurationMs, outputPath);
   writeFileSync(join(argoDir, 'scene-report.json'), JSON.stringify(report, null, 2), 'utf-8');
   console.log(formatSceneReport(report));
 
