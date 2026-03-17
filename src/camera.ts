@@ -32,6 +32,35 @@ export interface ZoomToOptions extends CameraOptions {
   scale?: number;
 }
 
+export type SelectorOrLocator =
+  | string
+  | { boundingBox: () => Promise<{ x: number; y: number; width: number; height: number } | null> };
+
+async function resolveRect(
+  page: Page,
+  selectorOrLocator: SelectorOrLocator,
+): Promise<{
+  selector: string | null;
+  rect: { left: number; top: number; right: number; bottom: number; width: number; height: number } | null;
+}> {
+  if (typeof selectorOrLocator === 'string') {
+    return { selector: selectorOrLocator, rect: null };
+  }
+  const box = await selectorOrLocator.boundingBox();
+  if (!box) return { selector: null, rect: null };
+  return {
+    selector: null,
+    rect: {
+      left: box.x,
+      top: box.y,
+      right: box.x + box.width,
+      bottom: box.y + box.height,
+      width: box.width,
+      height: box.height,
+    },
+  };
+}
+
 async function runCameraEffect(
   page: Page,
   fn: Function,
@@ -54,7 +83,7 @@ async function runCameraEffect(
 
 export async function spotlight(
   page: Page,
-  selector: string,
+  selectorOrLocator: SelectorOrLocator,
   opts?: SpotlightOptions,
 ): Promise<void> {
   const duration = opts?.duration ?? 3000;
@@ -64,10 +93,15 @@ export async function spotlight(
   const padding = opts?.padding ?? 12;
   const wait = opts?.wait ?? false;
 
-  await runCameraEffect(page, ({ selector, duration, fadeIn, fadeOut, opacity, padding, attr }: any) => {
-    const target = document.querySelector(selector);
-    if (!target) return;
-    const rect = target.getBoundingClientRect();
+  const { selector, rect: preRect } = await resolveRect(page, selectorOrLocator);
+
+  await runCameraEffect(page, ({ selector, preRect, duration, fadeIn, fadeOut, opacity, padding, attr }: any) => {
+    const rect = preRect ?? (() => {
+      const target = document.querySelector(selector);
+      if (!target) { console.warn('[argo] camera effect: no element found for selector "' + selector + '"'); return null; }
+      return target.getBoundingClientRect();
+    })();
+    if (!rect) return;
 
     const overlay = document.createElement('div');
     overlay.setAttribute(attr, 'spotlight');
@@ -92,12 +126,12 @@ export async function spotlight(
       overlay.style.opacity = '0';
       setTimeout(() => overlay.remove(), fadeOut);
     }, duration);
-  }, { selector, duration, fadeIn, fadeOut, opacity, padding, attr: CAMERA_ATTR }, duration + fadeOut, wait);
+  }, { selector, preRect, duration, fadeIn, fadeOut, opacity, padding, attr: CAMERA_ATTR }, duration + fadeOut, wait);
 }
 
 export async function focusRing(
   page: Page,
-  selector: string,
+  selectorOrLocator: SelectorOrLocator,
   opts?: FocusRingOptions,
 ): Promise<void> {
   const duration = opts?.duration ?? 3000;
@@ -108,10 +142,15 @@ export async function focusRing(
   const pulse = opts?.pulse ?? true;
   const wait = opts?.wait ?? false;
 
-  await runCameraEffect(page, ({ selector, duration, fadeIn, fadeOut, color, ringWidth, pulse, attr }: any) => {
-    const target = document.querySelector(selector);
-    if (!target) return;
-    const rect = target.getBoundingClientRect();
+  const { selector, rect: preRect } = await resolveRect(page, selectorOrLocator);
+
+  await runCameraEffect(page, ({ selector, preRect, duration, fadeIn, fadeOut, color, ringWidth, pulse, attr }: any) => {
+    const rect = preRect ?? (() => {
+      const target = document.querySelector(selector);
+      if (!target) { console.warn('[argo] camera effect: no element found for selector "' + selector + '"'); return null; }
+      return target.getBoundingClientRect();
+    })();
+    if (!rect) return;
 
     // Inject pulse animation if needed
     if (pulse) {
@@ -128,11 +167,13 @@ export async function focusRing(
 
     const ring = document.createElement('div');
     ring.setAttribute(attr, 'focus-ring');
+    // When using pre-resolved rect, we don't have a DOM target to read borderRadius from
+    const borderRadius = preRect ? ringWidth : Math.min(8, parseInt(getComputedStyle(document.querySelector(selector) as Element).borderRadius) || 0) + ringWidth;
     ring.style.cssText = `
       position: fixed; z-index: 99990; pointer-events: none;
       left: ${rect.left - ringWidth}px; top: ${rect.top - ringWidth}px;
       width: ${rect.width + ringWidth * 2}px; height: ${rect.height + ringWidth * 2}px;
-      border-radius: ${Math.min(8, parseInt(getComputedStyle(target as Element).borderRadius) || 0) + ringWidth}px;
+      border-radius: ${borderRadius}px;
       box-shadow: 0 0 0 ${ringWidth}px ${color}66, 0 0 0 ${ringWidth * 2}px ${color}26;
       ${pulse ? 'animation: argo-focus-pulse 1.5s ease-in-out infinite;' : ''}
       opacity: 0; transition: opacity ${fadeIn}ms ease-out;
@@ -148,12 +189,12 @@ export async function focusRing(
         document.querySelectorAll(`[${attr}="focus-ring-style"]`).forEach(el => el.remove());
       }, fadeOut);
     }, duration);
-  }, { selector, duration, fadeIn, fadeOut, color, ringWidth, pulse, attr: CAMERA_ATTR }, duration + fadeOut, wait);
+  }, { selector, preRect, duration, fadeIn, fadeOut, color, ringWidth, pulse, attr: CAMERA_ATTR }, duration + fadeOut, wait);
 }
 
 export async function dimAround(
   page: Page,
-  selector: string,
+  selectorOrLocator: SelectorOrLocator,
   opts?: DimAroundOptions,
 ): Promise<void> {
   const duration = opts?.duration ?? 3000;
@@ -162,9 +203,45 @@ export async function dimAround(
   const dimOpacity = opts?.dimOpacity ?? 0.3;
   const wait = opts?.wait ?? false;
 
+  const { selector, rect: preRect } = await resolveRect(page, selectorOrLocator);
+
+  // When a Locator is passed (preRect != null), we don't have a DOM element reference,
+  // so sibling-dimming is not possible. Fall back to a spotlight-style full-page dim.
+  if (preRect !== null) {
+    console.warn('[argo] dimAround: Locator passed — falling back to spotlight-style dim (sibling dimming requires a CSS selector)');
+    await runCameraEffect(page, ({ preRect, duration, fadeIn, fadeOut, dimOpacity, attr }: any) => {
+      const rect = preRect;
+      const padding = 0;
+      const overlay = document.createElement('div');
+      overlay.setAttribute(attr, 'dim-around');
+      overlay.style.cssText = `
+        position: fixed; inset: 0; z-index: 99990; pointer-events: none;
+        background: rgba(0,0,0,${1 - dimOpacity});
+        clip-path: polygon(
+          0% 0%, 0% 100%, 100% 100%, 100% 0%, 0% 0%,
+          ${rect.left - padding}px ${rect.top - padding}px,
+          ${rect.left - padding}px ${rect.bottom + padding}px,
+          ${rect.right + padding}px ${rect.bottom + padding}px,
+          ${rect.right + padding}px ${rect.top - padding}px,
+          ${rect.left - padding}px ${rect.top - padding}px
+        );
+        opacity: 0; transition: opacity ${fadeIn}ms ease-out;
+      `;
+      document.body.appendChild(overlay);
+      requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+
+      setTimeout(() => {
+        overlay.style.transition = `opacity ${fadeOut}ms ease-out`;
+        overlay.style.opacity = '0';
+        setTimeout(() => overlay.remove(), fadeOut);
+      }, duration);
+    }, { preRect, duration, fadeIn, fadeOut, dimOpacity, attr: CAMERA_ATTR }, duration + fadeOut, wait);
+    return;
+  }
+
   await runCameraEffect(page, ({ selector, duration, fadeIn, fadeOut, dimOpacity, attr }: any) => {
     const target = document.querySelector(selector);
-    if (!target) return;
+    if (!target) { console.warn('[argo] camera effect: no element found for selector "' + selector + '"'); return; }
 
     // Find siblings to dim — walk up to a reasonable container
     const parent = target.parentElement;
@@ -216,7 +293,7 @@ export async function dimAround(
 
 export async function zoomTo(
   page: Page,
-  selector: string,
+  selectorOrLocator: SelectorOrLocator,
   opts?: ZoomToOptions,
 ): Promise<void> {
   const duration = opts?.duration ?? 3000;
@@ -225,8 +302,11 @@ export async function zoomTo(
   const scale = opts?.scale ?? 1.5;
   const wait = opts?.wait ?? false;
 
+  const { selector, rect: preRect } = await resolveRect(page, selectorOrLocator);
+
   await runCameraEffect(page, ({
     selector,
+    preRect,
     duration,
     fadeIn,
     fadeOut,
@@ -236,9 +316,13 @@ export async function zoomTo(
     confettiId,
     wrapperId,
   }: any) => {
-    const target = document.querySelector(selector);
-    if (!target) return;
-    const rect = target.getBoundingClientRect();
+    const rect = preRect ?? (() => {
+      const target = document.querySelector(selector);
+      if (!target) { console.warn('[argo] camera effect: no element found for selector "' + selector + '"'); return null; }
+      return target.getBoundingClientRect();
+    })();
+    if (!rect) return;
+
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
 
@@ -334,6 +418,7 @@ export async function zoomTo(
     }, duration);
   }, {
     selector,
+    preRect,
     duration,
     fadeIn,
     fadeOut,

@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { spotlight, focusRing, dimAround, zoomTo, resetCamera } from '../src/camera.js';
 import type { Page } from '@playwright/test';
 
+function createMockLocator(box: { x: number; y: number; width: number; height: number } | null = { x: 10, y: 20, width: 100, height: 50 }) {
+  return {
+    boundingBox: vi.fn().mockResolvedValue(box),
+  };
+}
+
 const ZOOM_WRAPPER_ID = 'argo-camera-zoom-wrapper';
 
 function createMockPage() {
@@ -175,6 +181,24 @@ describe('spotlight', () => {
     expect(args.opacity).toBe(0.5);
     expect(args.padding).toBe(20);
   });
+
+  it('accepts a Locator and pre-resolves bounding box', async () => {
+    const locator = createMockLocator({ x: 50, y: 100, width: 200, height: 80 });
+    await spotlight(page, locator);
+    expect(locator.boundingBox).toHaveBeenCalledTimes(1);
+    const [, args] = (page.evaluate as any).mock.calls[0];
+    expect(args.selector).toBeNull();
+    expect(args.preRect).toEqual({ left: 50, top: 100, right: 250, bottom: 180, width: 200, height: 80 });
+  });
+
+  it('does not call page.evaluate when Locator boundingBox returns null', async () => {
+    const locator = createMockLocator(null);
+    await spotlight(page, locator);
+    // resolveRect returns rect: null — evaluate is still called, but preRect is null
+    const [, args] = (page.evaluate as any).mock.calls[0];
+    expect(args.preRect).toBeNull();
+    expect(args.selector).toBeNull();
+  });
 });
 
 describe('focusRing', () => {
@@ -201,6 +225,15 @@ describe('focusRing', () => {
     expect(args.color).toBe('#ff0000');
     expect(args.pulse).toBe(false);
   });
+
+  it('accepts a Locator and pre-resolves bounding box', async () => {
+    const locator = createMockLocator({ x: 30, y: 40, width: 150, height: 60 });
+    await focusRing(page, locator);
+    expect(locator.boundingBox).toHaveBeenCalledTimes(1);
+    const [, args] = (page.evaluate as any).mock.calls[0];
+    expect(args.selector).toBeNull();
+    expect(args.preRect).toEqual({ left: 30, top: 40, right: 180, bottom: 100, width: 150, height: 60 });
+  });
 });
 
 describe('dimAround', () => {
@@ -218,6 +251,18 @@ describe('dimAround', () => {
     await dimAround(page, '.target', { dimOpacity: 0.1 });
     const [, args] = (page.evaluate as any).mock.calls[0];
     expect(args.dimOpacity).toBe(0.1);
+  });
+
+  it('accepts a Locator and uses spotlight-style fallback', async () => {
+    const locator = createMockLocator({ x: 10, y: 20, width: 100, height: 50 });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await dimAround(page, locator);
+    expect(locator.boundingBox).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('spotlight-style dim'));
+    const [, args] = (page.evaluate as any).mock.calls[0];
+    expect(args.preRect).toEqual({ left: 10, top: 20, right: 110, bottom: 70, width: 100, height: 50 });
+    expect(args.selector).toBeUndefined(); // spotlight-style path doesn't pass selector
+    warnSpy.mockRestore();
   });
 });
 
@@ -241,6 +286,15 @@ describe('zoomTo', () => {
   it('blocks with wait: true', async () => {
     await zoomTo(page, '.card', { wait: true, duration: 5000, fadeOut: 500 });
     expect(page.waitForTimeout).toHaveBeenCalledWith(5500);
+  });
+
+  it('accepts a Locator and pre-resolves bounding box', async () => {
+    const locator = createMockLocator({ x: 120, y: 180, width: 240, height: 120 });
+    await zoomTo(page, locator);
+    expect(locator.boundingBox).toHaveBeenCalledTimes(1);
+    const [, args] = (page.evaluate as any).mock.calls[0];
+    expect(args.selector).toBeNull();
+    expect(args.preRect).toEqual({ left: 120, top: 180, right: 360, bottom: 300, width: 240, height: 120 });
   });
 
   it('wraps non-Argo content so overlays stay outside the zoomed subtree', async () => {
