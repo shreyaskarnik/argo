@@ -1143,6 +1143,58 @@ const PREVIEW_HTML = `<!DOCTYPE html>
     letter-spacing: 0.04em;
     margin-bottom: 6px;
   }
+
+  /* Recording overlay */
+  .recording-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+    align-items: center;
+    justify-content: center;
+  }
+  .recording-overlay.active { display: flex; }
+  .recording-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 40px 48px;
+    text-align: center;
+    max-width: 400px;
+  }
+  .recording-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .recording-title {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .recording-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .recording-overlay.success .recording-spinner {
+    border-color: var(--success);
+    border-top-color: var(--success);
+    animation: none;
+  }
+  .recording-overlay.error .recording-spinner {
+    border-color: var(--error);
+    border-top-color: var(--error);
+    animation: none;
+  }
 </style>
 </head>
 <body>
@@ -1206,6 +1258,14 @@ const PREVIEW_HTML = `<!DOCTYPE html>
     <div id="metadata-content" style="padding:16px;font-family:var(--mono);font-size:12px;color:var(--text-muted);white-space:pre-wrap;word-break:break-word;"></div>
   </div>
   <div class="status" id="status">Ready</div>
+</div>
+
+<div class="recording-overlay" id="recording-overlay">
+  <div class="recording-card">
+    <div class="recording-spinner"></div>
+    <div class="recording-title" id="recording-title">Re-recording pipeline...</div>
+    <div class="recording-subtitle" id="recording-subtitle">All editing is paused while the pipeline runs.</div>
+  </div>
 </div>
 
 <script>
@@ -2123,20 +2183,29 @@ document.getElementById('btn-rerecord').addEventListener('click', async () => {
     await saveOverlays();
     clearDirty();
   }
-  const btn = document.getElementById('btn-rerecord');
-  btn.disabled = true;
-  btn.textContent = 'Recording...';
-  setStatus('Re-recording pipeline...', 'saving');
+  const overlay = document.getElementById('recording-overlay');
+  const title = document.getElementById('recording-title');
+  const subtitle = document.getElementById('recording-subtitle');
+  overlay.classList.remove('success', 'error');
+  overlay.classList.add('active');
+  title.textContent = 'Re-recording pipeline...';
+  subtitle.textContent = 'All editing is paused while the pipeline runs.';
+  video.pause();
+  stopAudio();
+  showPlayIcon();
   try {
     const resp = await fetch('/api/rerecord', { method: 'POST' });
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
-    setStatus('Re-record complete! Reloading...', 'saved');
+    overlay.classList.add('success');
+    title.textContent = 'Recording complete!';
+    subtitle.textContent = 'Reloading preview...';
     setTimeout(() => location.reload(), 1500);
   } catch (err) {
-    setStatus('Re-record failed: ' + err.message, 'error');
-    btn.disabled = false;
-    btn.textContent = 'Re-record';
+    overlay.classList.add('error');
+    title.textContent = 'Recording failed';
+    subtitle.textContent = err.message;
+    setTimeout(() => overlay.classList.remove('active', 'error'), 5000);
   }
 });
 
