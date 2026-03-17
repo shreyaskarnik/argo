@@ -220,11 +220,13 @@ function inferSceneName(actions: PendingAction[]): string {
 }
 
 function slugify(text: string): string {
-  return text
+  const slug = text
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 30) || 'step';
+    .replace(/^-+|-+$/g, '');
+  // Keep at most 3 words for ergonomic scene names
+  const words = slug.split('-').filter(Boolean).slice(0, 3);
+  return words.join('-') || 'step';
 }
 
 function slugifyUrl(url: string): string {

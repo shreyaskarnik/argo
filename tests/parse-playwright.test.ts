@@ -101,7 +101,7 @@ describe('parsePlaywrightTest', () => {
     const result = parsePlaywrightTest(TEST_WITH_COMMENTS);
     const names = result.scenes.map((s) => s.name);
     expect(names).toContain('navigate-to-signup');
-    expect(names).toContain('fill-in-the-registration-form');
+    expect(names).toContain('fill-in-the');
     expect(names).toContain('submit-and-verify');
   });
 
