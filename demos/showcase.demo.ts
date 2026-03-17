@@ -1,10 +1,12 @@
 import { test, demoType } from '@argo-video/cli';
 import { showOverlay, withOverlay, showConfetti } from '@argo-video/cli';
 import { spotlight, focusRing, dimAround, zoomTo, resetCamera } from '@argo-video/cli';
+import { cursorHighlight } from '@argo-video/cli';
 
 test('showcase', async ({ page, narration }) => {
   test.setTimeout(160000);
   await page.goto('/showcase.html');
+  cursorHighlight(page, { color: '#6366f1', radius: 18 });
   await page.waitForTimeout(800);
 
   // Scene 1: Hero — spotlight + voiceover together
