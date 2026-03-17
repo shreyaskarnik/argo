@@ -147,9 +147,21 @@ export async function runPipeline(
       );
     }
 
+    // Merge voiced placements with silent scenes (scenes that have timing marks but no TTS clips)
+    const voicedScenes = new Set(aligned.placements.map(p => p.scene));
+    const sortedMarks = Object.entries(timing).sort((a, b) => a[1] - b[1]);
+    const silentPlacements = sortedMarks
+      .filter(([scene]) => !voicedScenes.has(scene))
+      .map(([scene, startMs], _i, arr) => {
+        const idx = sortedMarks.findIndex(([s]) => s === scene);
+        const endMs = idx + 1 < sortedMarks.length ? sortedMarks[idx + 1][1] : totalDurationMs;
+        return { scene, startMs, endMs };
+      });
+    const allPlacements = [...aligned.placements, ...silentPlacements].sort((a, b) => a.startMs - b.startMs);
+
     shiftedPlacements = headTrimMs > 0
-      ? aligned.placements.map(p => ({ ...p, startMs: p.startMs - headTrimMs, endMs: p.endMs - headTrimMs }))
-      : aligned.placements;
+      ? allPlacements.map(p => ({ ...p, startMs: p.startMs - headTrimMs, endMs: p.endMs - headTrimMs }))
+      : allPlacements;
     shiftedDurationMs = Math.max(totalDurationMs, aligned.requiredDurationMs) - headTrimMs;
   } else {
     console.log('★ Silent mode — no voiceover clips');

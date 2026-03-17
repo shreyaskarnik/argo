@@ -10,7 +10,7 @@
 
 import { execFile } from 'node:child_process';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { readFileSync, existsSync, readdirSync, writeFileSync, statSync, createReadStream } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, writeFileSync, statSync, createReadStream, unlinkSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { renderTemplate } from './overlays/templates.js';
 import { alignClips, schedulePlacements, type ClipInfo, type Placement, type SceneTiming } from './tts/align.js';
@@ -338,14 +338,25 @@ function refreshPreviewAudioArtifacts(
 
   writeFileSync(join(demoDir, '.scene-durations.json'), JSON.stringify(sceneDurations, null, 2), 'utf-8');
 
-  const baseReport = buildPreviewSceneReport(timing, sceneDurations, persistedReport);
-  const totalDurationMs = baseReport?.totalDurationMs ?? 0;
-  const aligned = alignClips(timing, clips, totalDurationMs);
-  writeFileSync(join(demoDir, 'narration-aligned.wav'), createWavBuffer(aligned.samples, 24_000));
+  if (clips.length > 0) {
+    const baseReport = buildPreviewSceneReport(timing, sceneDurations, persistedReport);
+    const totalDurationMs = baseReport?.totalDurationMs ?? 0;
+    const aligned = alignClips(timing, clips, totalDurationMs);
+    writeFileSync(join(demoDir, 'narration-aligned.wav'), createWavBuffer(aligned.samples, 24_000));
+    return {
+      sceneDurations,
+      sceneReport: createSceneReportFromPlacements(aligned.placements, persistedReport),
+    };
+  }
 
+  // Silent mode: no clips, build report from timing marks
+  const alignedPath = join(demoDir, 'narration-aligned.wav');
+  if (existsSync(alignedPath)) {
+    try { unlinkSync(alignedPath); } catch {}
+  }
   return {
     sceneDurations,
-    sceneReport: createSceneReportFromPlacements(aligned.placements, persistedReport),
+    sceneReport: buildPreviewSceneReport(timing, sceneDurations, persistedReport),
   };
 }
 
