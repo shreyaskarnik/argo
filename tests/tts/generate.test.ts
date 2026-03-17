@@ -128,12 +128,11 @@ describe('generateClips', () => {
     ).rejects.toThrow('missing required field');
   });
 
-  it('throws on missing required field text', async () => {
+  it('returns empty results for scenes without text (silent mode)', async () => {
     writeManifest([{ scene: 'intro' }]);
     const engine = createMockTTSEngine();
-    await expect(
-      generateClips({ manifestPath, demoName, engine, projectRoot: tmpDir }),
-    ).rejects.toThrow('missing required field');
+    const results = await generateClips({ manifestPath, demoName, engine, projectRoot: tmpDir });
+    expect(results).toHaveLength(0);
   });
 
   it('applies defaults for voice and speed when entry does not specify them', async () => {

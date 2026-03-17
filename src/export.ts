@@ -76,9 +76,7 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
   if (!existsSync(videoPath)) {
     throw new Error(`Missing video.webm at ${videoPath}`);
   }
-  if (!existsSync(audioPath)) {
-    throw new Error(`Missing narration-aligned.wav at ${audioPath}`);
-  }
+  const hasAudio = existsSync(audioPath);
 
   if (!existsSync(outputDir)) {
     mkdirSync(outputDir, { recursive: true });
@@ -102,10 +100,12 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
   // Trim setup/teardown by seeking both inputs to the first scene mark
   if (headTrimSec) args.push('-ss', headTrimSec);
   args.push('-i', videoPath);   // input 0: video
-  if (headTrimSec) args.push('-ss', headTrimSec);
-  args.push('-i', audioPath);   // input 1: audio
+  if (hasAudio) {
+    if (headTrimSec) args.push('-ss', headTrimSec);
+    args.push('-i', audioPath); // input 1: audio (omitted for silent videos)
+  }
 
-  let nextInput = 2;
+  let nextInput = hasAudio ? 2 : 1;
   const hasChapters = chapterMetadataPath && existsSync(chapterMetadataPath);
   let chapterInputIdx = -1;
   if (hasChapters) {
@@ -135,9 +135,10 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     '-c:v', 'libx264',
     '-preset', preset,
     '-crf', String(crf),
-    '-c:a', 'aac',
-    '-b:a', '192k',
   );
+  if (hasAudio) {
+    args.push('-c:a', 'aac', '-b:a', '192k');
+  }
 
   if (fps !== undefined) {
     args.push('-r', String(fps));
@@ -148,12 +149,14 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
   }
 
   if (hasThumbnail) {
-    // Map video, audio, and thumbnail streams explicitly
-    args.push('-map', '0:v', '-map', '1:a', '-map', `${thumbInputIdx}:v`);
+    // Map video, audio (if present), and thumbnail streams explicitly
+    args.push('-map', '0:v');
+    if (hasAudio) args.push('-map', '1:a');
+    args.push('-map', `${thumbInputIdx}:v`);
     // Encode thumbnail stream as PNG attached picture
     args.push('-c:v:1', 'png', '-disposition:v:1', 'attached_pic');
     // Skip -shortest: the PNG has 0 duration and would truncate the whole output.
-  } else {
+  } else if (hasAudio) {
     args.push('-shortest');
   }
 

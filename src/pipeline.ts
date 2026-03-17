@@ -67,12 +67,7 @@ export async function runPipeline(
     defaults: { voice: config.tts.defaultVoice, speed: config.tts.defaultSpeed },
   });
 
-  if (clipResults.length === 0) {
-    throw new Error(
-      `No TTS clips were generated from ${config.demosDir}/${demoName}.scenes.json. ` +
-      `Ensure the manifest contains at least one entry.`
-    );
-  }
+  const isSilent = clipResults.length === 0;
 
   // Write scene durations so demo scripts can use narration.durationFor()
   const sceneDurations: Record<string, number> = {};
@@ -96,7 +91,6 @@ export async function runPipeline(
   });
 
   // Step 3: Align clips with timing
-  console.log('★ Mixing the soundtrack...');
   let timing: SceneTiming;
   try {
     timing = JSON.parse(readFileSync(timingPath, 'utf-8'));
@@ -107,39 +101,14 @@ export async function runPipeline(
     );
   }
 
-  // Load WAV clips into memory
-  const clips: ClipInfo[] = clipResults.map((cr) => {
-    const wavBuf = readFileSync(cr.clipPath);
-    const header = parseWavHeader(wavBuf);
-    // Extract Float32 samples from the data chunk
-    const sampleCount = header.dataSize / 4; // 32-bit float = 4 bytes
-    const samples = new Float32Array(sampleCount);
-    for (let i = 0; i < sampleCount && header.dataOffset + i * 4 + 3 < wavBuf.length; i++) {
-      samples[i] = wavBuf.readFloatLE(header.dataOffset + i * 4);
-    }
-    return {
-      scene: cr.scene,
-      durationMs: header.durationMs,
-      samples,
-    };
-  });
-
   // Use actual video duration for alignment
   const videoPath = join(argoDir, 'video.webm');
   const totalDurationMs = getVideoDurationMs(videoPath);
 
-  const aligned = alignClips(timing, clips, totalDurationMs);
-  const alignedWav = createWavBuffer(aligned.samples, 24_000);
-  const alignedPath = join(argoDir, 'narration-aligned.wav');
-  writeFileSync(alignedPath, alignedWav);
-  const tailPadMs = aligned.overflowMs > 0 ? aligned.overflowMs + 100 : undefined;
-
-  if (tailPadMs !== undefined) {
-    console.warn(
-      `Aligned narration runs ${aligned.overflowMs}ms past the recording. ` +
-      `Padding the final video frame to preserve the full audio.`
-    );
-  }
+  let tailPadMs: number | undefined;
+  let overflowMs = 0;
+  let shiftedPlacements: Array<{ scene: string; startMs: number; endMs: number }> = [];
+  let shiftedDurationMs = totalDurationMs;
 
   // Auto-trim: skip setup before first scene mark (with 200ms lead-in)
   const markTimes = Object.values(timing);
@@ -147,14 +116,45 @@ export async function runPipeline(
   if (markTimes.length > 0) {
     const firstMarkMs = Math.min(...markTimes);
     headTrimMs = Math.max(0, firstMarkMs - 200);
-    if (headTrimMs <= 500) headTrimMs = 0; // Don't trim tiny gaps
+    if (headTrimMs <= 500) headTrimMs = 0;
   }
 
-  // Shift placements for chapters/subtitles if head-trimming
-  const shiftedPlacements = headTrimMs > 0
-    ? aligned.placements.map(p => ({ ...p, startMs: p.startMs - headTrimMs, endMs: p.endMs - headTrimMs }))
-    : aligned.placements;
-  const shiftedDurationMs = Math.max(totalDurationMs, aligned.requiredDurationMs) - headTrimMs;
+  if (!isSilent) {
+    console.log('★ Mixing the soundtrack...');
+
+    // Load WAV clips into memory
+    const clips: ClipInfo[] = clipResults.map((cr) => {
+      const wavBuf = readFileSync(cr.clipPath);
+      const header = parseWavHeader(wavBuf);
+      const sampleCount = header.dataSize / 4;
+      const samples = new Float32Array(sampleCount);
+      for (let i = 0; i < sampleCount && header.dataOffset + i * 4 + 3 < wavBuf.length; i++) {
+        samples[i] = wavBuf.readFloatLE(header.dataOffset + i * 4);
+      }
+      return { scene: cr.scene, durationMs: header.durationMs, samples };
+    });
+
+    const aligned = alignClips(timing, clips, totalDurationMs);
+    const alignedWav = createWavBuffer(aligned.samples, 24_000);
+    writeFileSync(join(argoDir, 'narration-aligned.wav'), alignedWav);
+    overflowMs = aligned.overflowMs;
+    tailPadMs = overflowMs > 0 ? overflowMs + 100 : undefined;
+
+    if (tailPadMs !== undefined) {
+      console.warn(
+        `Aligned narration runs ${aligned.overflowMs}ms past the recording. ` +
+        `Padding the final video frame to preserve the full audio.`
+      );
+    }
+
+    shiftedPlacements = headTrimMs > 0
+      ? aligned.placements.map(p => ({ ...p, startMs: p.startMs - headTrimMs, endMs: p.endMs - headTrimMs }))
+      : aligned.placements;
+    shiftedDurationMs = Math.max(totalDurationMs, aligned.requiredDurationMs) - headTrimMs;
+  } else {
+    console.log('★ Silent mode — no voiceover clips');
+    shiftedDurationMs = totalDurationMs - headTrimMs;
+  }
 
   // Ensure output directory exists before writing subtitles
   mkdirSync(config.outputDir, { recursive: true });
@@ -204,7 +204,7 @@ export async function runPipeline(
   const outputPath = await exportVideo(exportOptions);
 
   // Scene report
-  const report = buildSceneReport(demoName, shiftedPlacements, aligned.overflowMs, shiftedDurationMs, outputPath);
+  const report = buildSceneReport(demoName, shiftedPlacements, overflowMs, shiftedDurationMs, outputPath);
   writeFileSync(join(argoDir, 'scene-report.json'), JSON.stringify(report, null, 2), 'utf-8');
   console.log(formatSceneReport(report));
 

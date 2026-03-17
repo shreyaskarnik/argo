@@ -117,7 +117,8 @@ export function isValidEffectType(value: string): value is EffectType {
 /** A single entry in the unified .scenes.json manifest. */
 export interface SceneEntry {
   scene: string;
-  text: string;
+  /** Spoken narration text. Omit for silent scenes (no TTS). */
+  text?: string;
   voice?: string;
   speed?: number;
   lang?: string;

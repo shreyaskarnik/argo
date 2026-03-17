@@ -61,7 +61,7 @@ export function validateDemo(options: ValidateOptions): ValidateResult {
         for (let i = 0; i < scenes.length; i++) {
           const entry = scenes[i];
           if (!entry.scene) errors.push(`Scene entry ${i}: missing "scene" field`);
-          if (!entry.text) errors.push(`Scene entry ${i}: missing "text" field`);
+          // text is optional — scenes without text are silent (no TTS)
           if (entry.scene && !scriptScenes.has(entry.scene)) {
             warnings.push(`Scene "${entry.scene}" has no matching narration.mark() in the demo script`);
           }

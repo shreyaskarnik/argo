@@ -45,28 +45,33 @@ export async function generateClips(options: GenerateClipsOptions): Promise<Clip
     throw new Error(`Manifest ${manifestPath} must contain a JSON array`);
   }
 
-  // 3. Validate entries
+  // 3. Validate entries — scene is required, text is optional (empty = silent scene)
   for (const entry of rawEntries) {
     const e = entry as Record<string, unknown>;
-    if (typeof e.scene !== 'string' || typeof e.text !== 'string') {
-      throw new Error('Manifest entry missing required field: scene and text are required');
+    if (typeof e.scene !== 'string') {
+      throw new Error('Manifest entry missing required field: scene is required');
     }
   }
 
   const cache = new ClipCache(projectRoot);
 
-  // Build manifest entries with defaults
-  const entries: { entry: ManifestEntry; clipPath: string }[] = rawEntries.map((raw) => {
-    const r = raw as Record<string, unknown>;
-    const entry: ManifestEntry = {
-      scene: r.scene as string,
-      text: r.text as string,
-      voice: (r.voice as string | undefined) ?? defaults?.voice,
-      speed: (r.speed as number | undefined) ?? defaults?.speed,
-      lang: r.lang as string | undefined,
-    };
-    return { entry, clipPath: cache.getClipPath(demoName, entry) };
-  });
+  // Build manifest entries with defaults (skip entries with empty text for silent scenes)
+  const entries: { entry: ManifestEntry; clipPath: string }[] = rawEntries
+    .filter((raw) => {
+      const r = raw as Record<string, unknown>;
+      return typeof r.text === 'string' && r.text.trim().length > 0;
+    })
+    .map((raw) => {
+      const r = raw as Record<string, unknown>;
+      const entry: ManifestEntry = {
+        scene: r.scene as string,
+        text: r.text as string,
+        voice: (r.voice as string | undefined) ?? defaults?.voice,
+        speed: (r.speed as number | undefined) ?? defaults?.speed,
+        lang: r.lang as string | undefined,
+      };
+      return { entry, clipPath: cache.getClipPath(demoName, entry) };
+    });
 
   // Log per-scene status and generate uncached clips sequentially —
   // Kokoro's ONNX runtime is not safe for concurrent generate() calls.

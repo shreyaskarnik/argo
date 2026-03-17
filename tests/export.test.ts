@@ -138,15 +138,19 @@ describe('exportVideo', () => {
       .rejects.toThrow(/video\.webm/);
   });
 
-  it('throws on missing narration-aligned.wav', async () => {
+  it('exports without audio when narration-aligned.wav is missing (silent mode)', async () => {
     mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
     mockedExistsSync.mockImplementation((p) => {
       if (String(p).endsWith('narration-aligned.wav')) return false;
       return true;
     });
+    mockedSpawnSync.mockReturnValue({ status: 0, stdout: '', stderr: '', output: [], pid: 0, signal: null });
 
-    await expect(exportVideo({ demoName: 'demo', argoDir: '.argo', outputDir: 'out' }))
-      .rejects.toThrow(/narration-aligned\.wav/);
+    await exportVideo({ demoName: 'demo', argoDir: '.argo', outputDir: 'out' });
+    // Should not include audio input or -c:a args
+    const args = mockedSpawnSync.mock.calls[0][1] as string[];
+    expect(args).not.toContain('narration-aligned.wav');
+    expect(args).not.toContain('-c:a');
   });
 
   it('creates output directory if it does not exist', async () => {
