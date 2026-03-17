@@ -196,15 +196,10 @@ function loadPreviewData(demoName: string, argoDir: string, demosDir: string, ou
   }
   const rawTiming = readJsonFile<Record<string, number>>(timingPath, {});
 
-  // If serving a trimmed MP4, shift timing to match the trimmed video
-  const mp4Exists = existsSync(join(outputDir, `${demoName}.mp4`));
-  const markTimes = Object.values(rawTiming);
-  let headTrimMs = 0;
-  if (mp4Exists && markTimes.length > 0) {
-    const firstMarkMs = Math.min(...markTimes);
-    headTrimMs = Math.max(0, firstMarkMs - 200);
-    if (headTrimMs <= 500) headTrimMs = 0;
-  }
+  // If the pipeline applied head-trimming, shift timing to match the trimmed MP4
+  const metaPath = join(outputDir, `${demoName}.meta.json`);
+  const meta = existsSync(metaPath) ? readJsonFile<Record<string, any>>(metaPath, {}) : {};
+  const headTrimMs: number = meta?.export?.headTrimMs ?? 0;
   const timing: Record<string, number> = {};
   for (const [scene, ms] of Object.entries(rawTiming)) {
     timing[scene] = ms - headTrimMs;
@@ -247,9 +242,8 @@ function loadPreviewData(demoName: string, argoDir: string, demosDir: string, ou
   const sceneReport = buildPreviewSceneReport(timing, sceneDurations, persistedReport);
   const renderedOverlays = buildRenderedOverlays(overlays);
 
-  // Pipeline metadata (from last recording)
-  const metaPath = join(outputDir, `${demoName}.meta.json`);
-  const pipelineMeta = existsSync(metaPath) ? readJsonFile<Record<string, unknown>>(metaPath, {}) : null;
+  // Pipeline metadata (reuse meta loaded above for headTrimMs)
+  const pipelineMeta = Object.keys(meta).length > 0 ? meta as Record<string, unknown> : null;
 
   return { demoName, timing, voiceover, overlays, effects, sceneDurations, sceneReport, renderedOverlays, pipelineMeta };
 }

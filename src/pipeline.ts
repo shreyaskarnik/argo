@@ -232,6 +232,7 @@ export async function runPipeline(
     export: {
       preset: config.export.preset,
       crf: config.export.crf,
+      headTrimMs: headTrimMs > 0 ? headTrimMs : undefined,
     },
     output: outputPath,
   };
