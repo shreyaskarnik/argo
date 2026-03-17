@@ -169,6 +169,7 @@ export function createProgram(): Command {
         demoName: demo,
         argoDir: '.argo',
         demosDir: config.demosDir,
+        outputDir: config.outputDir,
         port: cmdOpts.port,
         ttsDefaults: {
           voice: config.tts.defaultVoice,

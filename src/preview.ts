@@ -22,6 +22,7 @@ export interface PreviewOptions {
   demoName: string;
   argoDir?: string;
   demosDir?: string;
+  outputDir?: string;
   port?: number;
   open?: boolean;
   ttsDefaults?: { voice?: string; speed?: number };
@@ -183,7 +184,7 @@ function createSceneReportFromPlacements(
   };
 }
 
-function loadPreviewData(demoName: string, argoDir: string, demosDir: string): PreviewData {
+function loadPreviewData(demoName: string, argoDir: string, demosDir: string, outputDir: string = 'videos'): PreviewData {
   const demoDir = join(argoDir, demoName);
 
   // Required files
@@ -223,10 +224,8 @@ function loadPreviewData(demoName: string, argoDir: string, demosDir: string): P
   const renderedOverlays = buildRenderedOverlays(overlays);
 
   // Pipeline metadata (from last recording)
-  const projectRoot = dirname(resolve(argoDir));
-  const metaCandidates = ['videos', 'output'].map(d => join(projectRoot, d, `${demoName}.meta.json`));
-  const metaPath = metaCandidates.find(p => existsSync(p));
-  const pipelineMeta = metaPath ? readJsonFile<Record<string, unknown>>(metaPath, {}) : null;
+  const metaPath = join(outputDir, `${demoName}.meta.json`);
+  const pipelineMeta = existsSync(metaPath) ? readJsonFile<Record<string, unknown>>(metaPath, {}) : null;
 
   return { demoName, timing, voiceover, overlays, sceneDurations, sceneReport, renderedOverlays, pipelineMeta };
 }
@@ -344,15 +343,15 @@ async function runPreviewTtsGenerate(manifestPath: string): Promise<void> {
 export async function startPreviewServer(options: PreviewOptions): Promise<{ url: string; close: () => void }> {
   const argoDir = options.argoDir ?? '.argo';
   const demosDir = options.demosDir ?? 'demos';
+  const outputDir = options.outputDir ?? 'videos';
   const port = options.port ?? 0; // 0 = auto-assign
   const demoName = options.demoName;
   const demoDir = join(argoDir, demoName);
 
   // Prefer exported MP4 (has keyframes for seeking) over raw WebM (no cue points)
   const webmPath = join(demoDir, 'video.webm');
-  const projectRoot = dirname(resolve(argoDir));
-  const mp4Candidates = ['videos', 'output'].map(d => join(projectRoot, d, `${demoName}.mp4`));
-  const videoPath = mp4Candidates.find(p => existsSync(p)) ?? webmPath;
+  const mp4Path = join(outputDir, `${demoName}.mp4`);
+  const videoPath = existsSync(mp4Path) ? mp4Path : webmPath;
   if (!existsSync(videoPath)) {
     throw new Error(
       `No recording found for '${demoName}'. Run 'argo pipeline ${demoName}' first.`
@@ -367,7 +366,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
       // --- API routes ---
 
       if (url === '/api/data') {
-        const data = loadPreviewData(demoName, argoDir, demosDir);
+        const data = loadPreviewData(demoName, argoDir, demosDir, outputDir);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(data));
         return;
@@ -432,7 +431,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
           writeFileSync(scenesPath, JSON.stringify(scenes, null, 2) + '\n', 'utf-8');
         }
         // Reload and re-render overlays
-        const data = loadPreviewData(demoName, argoDir, demosDir);
+        const data = loadPreviewData(demoName, argoDir, demosDir, outputDir);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, changed, renderedOverlays: data.renderedOverlays }));
         return;
@@ -520,7 +519,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
 
       // Root — serve the preview HTML
       if (url === '/' || url === '/index.html') {
-        const data = loadPreviewData(demoName, argoDir, demosDir);
+        const data = loadPreviewData(demoName, argoDir, demosDir, outputDir);
         const html = getPreviewHtml(data);
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end(html);

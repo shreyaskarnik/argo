@@ -208,6 +208,7 @@ describePreview('preview server', () => {
       demoName: 'test-demo',
       argoDir,
       demosDir,
+      outputDir: join(dir, 'videos'),
     });
     close = server.close;
 

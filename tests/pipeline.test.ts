@@ -44,7 +44,7 @@ const mockEngine = { generate: vi.fn().mockResolvedValue(Buffer.from('fake')) };
 const defaultConfig: Pick<ArgoConfig, 'baseURL' | 'demosDir' | 'outputDir' | 'tts' | 'video' | 'export' | 'overlays'> = {
   baseURL: 'http://localhost:3000',
   demosDir: 'demos',
-  outputDir: 'videos',
+  outputDir: join('.argo', 'test-output'),
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0, engine: mockEngine },
   video: { width: 1920, height: 1080, fps: 30, browser: 'chromium' as const, deviceScaleFactor: 1 },
   export: { preset: 'slow', crf: 16, thumbnailPath: 'assets/thumb.png' },
@@ -75,7 +75,7 @@ beforeEach(() => {
     { scene: 'done', clipPath: join(ARGO_DIR, 'clips', 'done.wav'), durationMs: 1000 },
   ]);
   mockedRecord.mockResolvedValue({ videoPath: VIDEO_PATH, timingPath: TIMING_PATH });
-  mockedExportVideo.mockResolvedValue(`videos/${DEMO_NAME}.mp4`);
+  mockedExportVideo.mockResolvedValue(join('.argo', 'test-output', `${DEMO_NAME}.mp4`));
 });
 
 describe('runPipeline', () => {
@@ -115,7 +115,7 @@ describe('runPipeline', () => {
 
   it('returns the output path from exportVideo', async () => {
     const result = await runPipeline(DEMO_NAME, defaultConfig);
-    expect(result).toBe(`videos/${DEMO_NAME}.mp4`);
+    expect(result).toBe(join('.argo', 'test-output', `${DEMO_NAME}.mp4`));
   });
 
   it('passes correct options to generateClips', async () => {
@@ -146,7 +146,7 @@ describe('runPipeline', () => {
     expect(mockedExportVideo).toHaveBeenCalledWith({
       demoName: DEMO_NAME,
       argoDir: '.argo',
-      outputDir: 'videos',
+      outputDir: join('.argo', 'test-output'),
       preset: 'slow',
       crf: 16,
       fps: 30,
