@@ -83,6 +83,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 
 - Demo scripts: `demos/<name>.demo.ts`
 - Scenes manifest: `demos/<name>.scenes.json` (unified voiceover + overlay data per scene)
+- The `effects` array in scenes.json is preview-UI metadata only — it does NOT auto-inject during recording. Effects require explicit script-side calls (`showConfetti()`, `spotlight()`, etc.)
 - TTS engine: Kokoro (local, no API keys). Voices: `af_heart` (female default), `am_michael` (male)
 - OpenAI engine supports `instructions` option for system-prompt-capable models like `gpt-4o-mini-tts`: `engines.openai({ model: 'gpt-4o-mini-tts', instructions: '...' })`
 - Transformers.js engine works with any HuggingFace `text-to-speech` model: `engines.transformers({ model: 'onnx-community/Supertonic-TTS-ONNX' })`. Speaker embeddings map to the `voice` field per scene. Models outputting non-24kHz audio are automatically resampled.

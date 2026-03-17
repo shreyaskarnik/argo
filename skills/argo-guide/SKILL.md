@@ -120,6 +120,8 @@ File: `demos/<name>.scenes.json` — JSON array combining voiceover + overlay de
 
 Key fields: `scene` (required, matches `mark()`), `text` (spoken narration — omit for silent scenes), `voice` (default `af_heart`), `speed` (default `1.0`), `overlay` (optional cue object).
 
+**`effects` field**: The `effects` array in scenes.json is **preview-UI metadata only** — it does NOT auto-inject effects during recording. To produce camera effects in the final video, you must call `showConfetti()`, `spotlight()`, etc. explicitly in the demo script. The `effects` field is used by `argo preview` for editing and display purposes.
+
 **Silent demos:** Omit `text` from all scenes — exports video-only with no audio track.
 
 ### Overlay Templates

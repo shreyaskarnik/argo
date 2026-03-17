@@ -1,5 +1,6 @@
 import { Command, Option } from 'commander';
 import { basename } from 'node:path';
+import { createRequire } from 'node:module';
 import { loadConfig, type ArgoConfig, type BrowserEngine } from './config.js';
 import { record } from './record.js';
 import { generateClips } from './tts/generate.js';
@@ -28,11 +29,14 @@ async function ensureTTSEngine(config: ArgoConfig): Promise<ArgoConfig> {
 }
 
 export function createProgram(): Command {
+  const require = createRequire(import.meta.url);
+  const { version } = require('../package.json');
   const program = new Command();
 
   program
     .name('argo')
     .description('Turn Playwright demo scripts into polished product demo videos with AI voiceover')
+    .version(version, '-V, --version', 'output the version number')
     .option('-c, --config <path>', 'path to config file');
 
   program
