@@ -99,7 +99,23 @@ export class TransformersEngine implements TTSEngine {
       );
     }
     const sampleRate: number = audio.sampling_rate ?? 24000;
+    const TARGET_RATE = 24000;
     const { createWavBuffer } = await import('../engine.js');
+
+    // Resample to 24kHz if needed (pipeline alignment assumes 24kHz)
+    if (sampleRate !== TARGET_RATE) {
+      const ratio = sampleRate / TARGET_RATE;
+      const outLen = Math.round(samples.length / ratio);
+      const resampled = new Float32Array(outLen);
+      for (let i = 0; i < outLen; i++) {
+        const srcIdx = i * ratio;
+        const lo = Math.floor(srcIdx);
+        const hi = Math.min(lo + 1, samples.length - 1);
+        const frac = srcIdx - lo;
+        resampled[i] = samples[lo] * (1 - frac) + samples[hi] * frac;
+      }
+      return createWavBuffer(resampled, TARGET_RATE);
+    }
     return createWavBuffer(samples, sampleRate);
   }
 }
