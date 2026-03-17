@@ -7,8 +7,10 @@ export interface ConfettiOptions {
   pieces?: number;
   /** 'burst' fans from center-top (Raycast-style), 'rain' falls across full width. Default: 'burst' */
   spread?: 'burst' | 'rain';
-  /** Hex color strings for confetti pieces. Default: blue, cyan, green, amber, red, purple */
+  /** Hex color strings for confetti pieces. Default: blue, cyan, green, amber, red, purple. Ignored when emoji is set. */
   colors?: string[];
+  /** Emoji character(s) to use instead of colored rectangles. e.g. '🎃' for Halloween, '🎄' for Christmas. */
+  emoji?: string | string[];
   /** Fade-out duration in ms. Default: 800 */
   fadeOut?: number;
   /** Block until animation completes. Default: false (non-blocking, fire-and-forget safe). */
@@ -27,12 +29,14 @@ export async function showConfetti(
   const pieces = opts?.pieces ?? 150;
   const spread = opts?.spread ?? 'burst';
   const colors = opts?.colors ?? DEFAULT_COLORS;
+  const rawEmoji = opts?.emoji;
+  const emojis = rawEmoji ? (Array.isArray(rawEmoji) ? rawEmoji : [rawEmoji]) : null;
   const fadeOut = opts?.fadeOut ?? 800;
   const wait = opts?.wait ?? false;
 
   try {
   await page.evaluate(
-    ({ pieces, spread, colors, duration, fadeOut, id }) => {
+    ({ pieces, spread, colors, emojis, duration, fadeOut, id }) => {
       // Remove any existing confetti
       document.getElementById(id)?.remove();
 
@@ -51,6 +55,7 @@ export async function showConfetti(
         w: number;
         h: number;
         color: string;
+        emoji: string | null;
         vx: number;
         vy: number;
         rot: number;
@@ -59,6 +64,7 @@ export async function showConfetti(
 
       for (let i = 0; i < pieces; i++) {
         const color = colors[Math.floor(Math.random() * colors.length)];
+        const emoji = emojis ? emojis[Math.floor(Math.random() * emojis.length)] : null;
         const w = 6 + Math.random() * 8;
         const h = 4 + Math.random() * 6;
         const rot = Math.random() * Math.PI * 2;
@@ -75,6 +81,7 @@ export async function showConfetti(
             w,
             h,
             color,
+            emoji,
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
             rot,
@@ -88,6 +95,7 @@ export async function showConfetti(
             w,
             h,
             color,
+            emoji,
             vx: (Math.random() - 0.5) * 4,
             vy: 2 + Math.random() * 4,
             rot,
@@ -114,8 +122,15 @@ export async function showConfetti(
           ctx.save();
           ctx.translate(p.x, p.y);
           ctx.rotate(p.rot);
-          ctx.fillStyle = p.color;
-          ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+          if (p.emoji) {
+            ctx.font = `${Math.round(p.w + p.h)}px serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(p.emoji, 0, 0);
+          } else {
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+          }
           ctx.restore();
         }
 
@@ -138,7 +153,7 @@ export async function showConfetti(
 
       requestAnimationFrame(frame);
     },
-    { pieces, spread, colors, duration, fadeOut, id: CONFETTI_ID },
+    { pieces, spread, colors, emojis, duration, fadeOut, id: CONFETTI_ID },
   );
 
   if (wait) {

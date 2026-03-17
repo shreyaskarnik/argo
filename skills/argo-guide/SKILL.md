@@ -71,7 +71,7 @@ All camera effects are **non-blocking by default** (fire-and-forget safe). All a
 | `dimAround(page, target, opts?)` | Fade siblings to highlight target |
 | `zoomTo(page, target, opts?)` | Scale viewport centered on target. Note: active overlays scale with the page. |
 | `resetCamera(page)` | Clear all active camera effects |
-| `showConfetti(page, opts?)` | Confetti burst. `spread: 'burst'` (center-top fan) or `'rain'` (full-width fall). |
+| `showConfetti(page, opts?)` | Confetti burst. `spread: 'burst'` (center-top fan) or `'rain'` (full-width fall). `emoji: '🎃'` or `emoji: ['🎃', '👻']` renders emoji instead of colored rectangles. |
 | `cursorHighlight(page, opts?)` | Persistent ring following cursor. Remove with `resetCursor(page)`. |
 
 Derive camera durations from `narration.durationFor()` so effects track voiceover timing:
