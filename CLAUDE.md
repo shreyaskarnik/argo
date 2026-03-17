@@ -36,7 +36,7 @@ The system is a 4-step pipeline: **TTS → Record → Align → Export**
 - **TTS** (`src/tts/`): Generates voice clips from `.scenes.json` manifests. Pluggable engine system with 6 built-in adapters in `src/tts/engines/`: Kokoro (default), OpenAI, ElevenLabs, Gemini, Sarvam, mlx-audio. Selected via `engines.*` factory functions in config. Cloud engines lazy-load their SDKs. All audio normalized to mono Float32 24kHz WAV via `convertToWav()` (ffmpeg). Clips are content-addressed cached (SHA256 of scene+text+voice+speed+lang) in `.argo/<demo>/clips/`. Cloud engine API keys are validated lazily at `generate()` time, not constructor — so non-TTS commands like `argo validate` work without keys. Kokoro's ONNX runtime is not safe for concurrent `generate()` calls — clips generate sequentially despite shared init promise.
 - **Record** (`src/record.ts`): Runs Playwright demo script, captures video (WebM) and timing marks (`.timing.json`). Generates a dynamic Playwright config on-the-fly.
 - **Align** (`src/tts/align.ts`): Places audio clips at scene timestamps from timing data. Prevents overlap with 100ms gaps. Mixes into single WAV (Float32, 24kHz).
-- **Export** (`src/export.ts`): Merges video + aligned audio via ffmpeg into final MP4. Supports optional MP4 thumbnail embedding via `export.thumbnailPath` config (ffmpeg attached_pic stream). CRITICAL: `-shortest` must be skipped when thumbnail is present — PNG has 0 duration and truncates the entire output. Embeds chapter markers from scene placements via ffmpeg metadata. Input indices are dynamic based on presence of chapters/thumbnail.
+- **Export** (`src/export.ts`): Merges video + aligned audio via ffmpeg into final MP4. Supports optional MP4 thumbnail embedding via `export.thumbnailPath` config (ffmpeg attached_pic stream). CRITICAL: `-shortest` must be skipped when thumbnail is present — PNG has 0 duration and truncates the entire output. Embeds chapter markers from scene placements via ffmpeg metadata. Input indices are dynamic based on presence of chapters/thumbnail. Silent mode: when no `narration-aligned.wav` exists, exports video-only (no audio input, no `-c:a`, no `-shortest`).
 - **Subtitles** (`src/subtitles.ts`): Generates `.srt` and `.vtt` files from alignment placements + scenes manifest text. Best-effort — won't fail the pipeline.
 - **Chapters** (`src/chapters.ts`): Generates ffmpeg metadata format (`TIMEBASE=1/1000`) for MP4 chapter markers from scene placements.
 - **Report** (`src/report.ts`): Builds scene timing report (JSON + formatted console output) with per-scene durations, overflow, and output path.
@@ -55,7 +55,7 @@ Overlay cues use discriminated unions — each template type has its own TypeScr
 
 ### Camera (`src/camera.ts`)
 
-Four directed recording effects: `spotlight`, `focusRing`, `dimAround`, `zoomTo`, plus `resetCamera`. All non-blocking by default (fire-and-forget safe). `zoomTo` uses `transform-origin: 0 0` + `scale() translate()` on `documentElement` to zoom and reframe the viewport onto the target. Note: overlays active during zoom will scale with the page (they're children of `documentElement`). Error handling follows the same pattern as `showConfetti` (filter by disposal errors, warn on others).
+Four directed recording effects: `spotlight`, `focusRing`, `dimAround`, `zoomTo`, plus `resetCamera`. All accept CSS selector strings or Playwright Locators (resolved via `boundingBox()` before `page.evaluate()`). When a Locator is passed to `dimAround`, it falls back to a spotlight-style clip-path dim. All non-blocking by default (fire-and-forget safe). `zoomTo` uses `transform-origin: 0 0` + `scale() translate()` on `documentElement` to zoom and reframe the viewport onto the target. Note: overlays active during zoom will scale with the page (they're children of `documentElement`). Error handling follows the same pattern as `showConfetti` (filter by disposal errors, warn on others).
 
 ### Cursor Highlight (`src/cursor.ts`)
 
@@ -93,6 +93,8 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - Voice cloning: mlx-audio engine supports `refAudio` + `refText` options for cloning from a 15s reference clip. Qwen3-TTS produces best clone quality (CSM is lower). Scripts: `scripts/record-voice-ref.sh` (macOS mic recording), `scripts/voice-clone-preview.sh` (batch preview with manifest).
 - Camera effect durations should derive from `narration.durationFor()` (e.g., `Math.floor(durationFor('scene') / N)`) so effects track voiceover timing.
 - Avoid `test.beforeEach` in demo scripts — it gets recorded into the video. Put setup before the first `narration.mark()` instead.
+- Silent demos: omit `text` from scenes manifest entries — TTS is skipped, pipeline exports video-only with no audio track. Useful for quick prototype demos with just overlays and camera effects.
+- Auto-trim: pipeline trims video before the first `narration.mark()` (~200ms lead-in) and persists `headTrimMs` in `.meta.json`. Setup code (login, navigation, `beforeEach`) is automatically cut from the final MP4.
 
 ## Scene Durations & Dynamic Timing
 
@@ -123,6 +125,9 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - `<demo>.meta.json` displayed in the Metadata sidebar tab when available
 - IMPORTANT: `bin/argo.js` loads from `dist/`, not source — always run `npm run build` before restarting the preview server after code changes
 - The preview HTML/CSS/JS is a single inline template string in `src/preview.ts` (~1600 lines) — `wireOverlayListeners` must be called AFTER `sceneList.appendChild(card)` or DOM queries fail silently
+- Export button re-aligns audio + generates chapters/subtitles + exports MP4 without re-recording (for TTS-only changes)
+- Re-record and Export both update the served video path so the new MP4 is served immediately without restarting
+- Preview reads `headTrimMs` from `.meta.json` to shift timeline — only shifts when metadata confirms trimming was applied (standalone `argo export` produces untrimmed video)
 
 ## Thumbnail
 

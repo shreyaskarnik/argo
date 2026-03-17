@@ -315,6 +315,8 @@ function refreshPreviewAudioArtifacts(
   const sceneDurations: Record<string, number> = {};
 
   for (const entry of manifest) {
+    // Skip silent scenes (no text = no TTS clip)
+    if (!entry.text?.trim()) continue;
     const cacheEntry: ManifestEntry = {
       scene: entry.scene,
       text: entry.text,

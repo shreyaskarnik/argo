@@ -154,6 +154,12 @@ export async function runPipeline(
   } else {
     console.log('★ Silent mode — no voiceover clips');
     shiftedDurationMs = totalDurationMs - headTrimMs;
+    // Build placements from timing marks for chapters (each scene runs until the next mark)
+    const sortedMarks = Object.entries(timing).sort((a, b) => a[1] - b[1]);
+    shiftedPlacements = sortedMarks.map(([scene, startMs], i) => {
+      const endMs = i + 1 < sortedMarks.length ? sortedMarks[i + 1][1] : totalDurationMs;
+      return { scene, startMs: startMs - headTrimMs, endMs: endMs - headTrimMs };
+    });
   }
 
   // Ensure output directory exists before writing subtitles

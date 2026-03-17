@@ -221,7 +221,7 @@ File: `demos/<name>.scenes.json` — unified JSON array of entries combining voi
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `scene` | yes | — | Must exactly match a `narration.mark()` call |
-| `text` | yes | — | Spoken narration text |
+| `text` | no | — | Spoken narration text. Omit for silent scenes (no TTS generated). |
 | `voice` | no | `af_heart` | Kokoro voice: `af_heart` (female), `am_michael` (male) |
 | `speed` | no | `1.0` | Playback speed (0.9 = slightly slower, good for narration) |
 | `lang` | no | — | Language code for multilingual TTS engines |
@@ -230,6 +230,8 @@ File: `demos/<name>.scenes.json` — unified JSON array of entries combining voi
 | `effects` | no | — | Array of effects to apply during this scene: `confetti`, `spotlight`, `focus-ring`, `dim-around`, `zoom-to` |
 
 TTS runs locally via Kokoro by default — no API keys needed. Clips are content-addressed cached in `.argo/<demo>/clips/` by SHA256 of `{scene, text, voice, speed}`. Clear the cache (`rm -rf .argo/<demo>/clips`) if voiceover text changes and stale clips persist.
+
+**Silent demos:** Omit `text` from all scenes to create a video with no audio track — useful for quick prototype demos with just overlays and camera effects.
 
 ### TTS Engine Selection
 
