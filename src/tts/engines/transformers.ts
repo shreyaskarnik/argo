@@ -55,10 +55,19 @@ export class TransformersEngine implements TTSEngine {
           });
         } catch (err) {
           this.initPromise = null;
+          const msg = (err as Error).message;
+          // Detect missing quantized model files and suggest dtype: 'fp32'
+          if (msg.includes('quantized') || msg.includes('Could not locate file')) {
+            throw new Error(
+              `Failed to load model "${this.model}" with dtype "${this.dtype}": quantized model files not found. ` +
+              `This model may not ship quantized weights. ` +
+              `Try setting dtype: 'fp32' in your engine config: engines.transformers({ model: '${this.model}', dtype: 'fp32' })`,
+            );
+          }
           throw new Error(
             `Failed to initialize Transformers TTS pipeline (model: ${this.model}, dtype: ${this.dtype}). ` +
             `This may require an internet connection for first-time model download. ` +
-            `Original error: ${(err as Error).message}`,
+            `Original error: ${msg}`,
           );
         }
         return this.pipeline;
@@ -74,8 +83,22 @@ export class TransformersEngine implements TTSEngine {
     const { createWavBuffer } = await import('../engine.js');
     const TARGET_RATE = 24000;
 
-    // Build base generation options
-    const speaker = options.voice ?? this.speakerEmbeddings;
+    // Build base generation options.
+    // The voice field may contain engine-specific values (e.g., 'af_heart' for Kokoro).
+    // Only use it as speaker_embeddings if it looks like a URL or file path —
+    // otherwise fall back to the config-level speakerEmbeddings and warn.
+    let speaker = this.speakerEmbeddings;
+    if (options.voice) {
+      if (options.voice.includes('/') || options.voice.includes('\\') || options.voice.endsWith('.bin')) {
+        speaker = options.voice;
+      } else if (!this.speakerEmbeddings) {
+        console.warn(
+          `Warning: voice "${options.voice}" is not a valid speaker embedding path for Transformers engine ` +
+          `(model: ${this.model}). Ignoring — using default voice. ` +
+          `Tip: voice values like "af_heart" are Kokoro-specific. For Transformers, use a path to a .bin embedding file.`,
+        );
+      }
+    }
     const baseOpts: Record<string, unknown> = {
       speed: options.speed ?? 1.0,
       num_inference_steps: this.numInferenceSteps,

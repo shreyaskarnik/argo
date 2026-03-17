@@ -87,6 +87,8 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - TTS engine: Kokoro (local, no API keys). Voices: `af_heart` (female default), `am_michael` (male)
 - OpenAI engine supports `instructions` option for system-prompt-capable models like `gpt-4o-mini-tts`: `engines.openai({ model: 'gpt-4o-mini-tts', instructions: '...' })`
 - Transformers.js engine works with any HuggingFace `text-to-speech` model: `engines.transformers({ model: 'onnx-community/Supertonic-TTS-ONNX' })`. Speaker embeddings map to the `voice` field per scene. Models outputting non-24kHz audio are automatically resampled.
+- Transformers engine voice field: only URL/file-path values are used as speaker embeddings. Engine-specific names like `af_heart` (Kokoro) are gracefully ignored with a warning — no crash.
+- Transformers engine dtype: defaults to `q8` (quantized). Models that only ship fp32 weights (e.g., Supertonic) need `dtype: 'fp32'`. The error message now suggests this fix.
 - Long voiceover text is automatically chunked at sentence boundaries (80-500 chars) with 300ms silence gaps for Kokoro and Transformers engines. Shared utilities: `splitTextForTTS()` and `concatSamples()` in `src/tts/engine.ts`.
 - Long demos need `test.setTimeout()` — Playwright default is 30s
 - Showcase demo (`demos/showcase.demo.ts`) requires a local HTTP server serving `demos/`: `python3 -m http.server 8976 --directory demos` then `BASE_URL=http://127.0.0.1:8976 npx tsx bin/argo.js pipeline showcase --browser webkit`
