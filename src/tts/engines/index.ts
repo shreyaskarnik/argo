@@ -5,6 +5,7 @@ import { ElevenLabsEngine, type ElevenLabsEngineOptions } from './elevenlabs.js'
 import { GeminiEngine, type GeminiEngineOptions } from './gemini.js';
 import { SarvamEngine, type SarvamEngineOptions } from './sarvam.js';
 import { MlxAudioEngine, type MlxAudioEngineOptions } from './mlx-audio.js';
+import { TransformersEngine, type TransformersEngineOptions } from './transformers.js';
 
 export const engines = {
   kokoro: (opts?: KokoroEngineOptions): TTSEngine => new KokoroEngine(opts),
@@ -13,6 +14,7 @@ export const engines = {
   gemini: (opts?: GeminiEngineOptions): TTSEngine => new GeminiEngine(opts),
   sarvam: (opts?: SarvamEngineOptions): TTSEngine => new SarvamEngine(opts),
   mlxAudio: (opts?: MlxAudioEngineOptions): TTSEngine => new MlxAudioEngine(opts),
+  transformers: (opts?: TransformersEngineOptions): TTSEngine => new TransformersEngine(opts),
 };
 
 export type { KokoroEngineOptions } from './kokoro.js';
@@ -21,6 +23,7 @@ export type { ElevenLabsEngineOptions } from './elevenlabs.js';
 export type { GeminiEngineOptions } from './gemini.js';
 export type { SarvamEngineOptions } from './sarvam.js';
 export type { MlxAudioEngineOptions } from './mlx-audio.js';
+export type { TransformersEngineOptions } from './transformers.js';
 
 export { KokoroEngine } from './kokoro.js';
 export { OpenAIEngine } from './openai.js';
@@ -28,3 +31,4 @@ export { ElevenLabsEngine } from './elevenlabs.js';
 export { GeminiEngine } from './gemini.js';
 export { SarvamEngine } from './sarvam.js';
 export { MlxAudioEngine } from './mlx-audio.js';
+export { TransformersEngine } from './transformers.js';
