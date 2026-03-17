@@ -46,10 +46,23 @@ describe('showConfetti', () => {
       pieces: 200,
       spread: 'rain',
       colors: ['#ff0000'],
+      emojis: null,
       duration: 2000,
       fadeOut: 500,
       id: 'argo-confetti',
     });
+  });
+
+  it('passes emoji as array to page.evaluate', async () => {
+    await showConfetti(page, { emoji: '🎃' });
+    const [, args] = (page.evaluate as any).mock.calls[0];
+    expect(args.emojis).toEqual(['🎃']);
+  });
+
+  it('passes emoji array directly', async () => {
+    await showConfetti(page, { emoji: ['🎄', '⭐'] });
+    const [, args] = (page.evaluate as any).mock.calls[0];
+    expect(args.emojis).toEqual(['🎄', '⭐']);
   });
 
   it('uses burst spread by default', async () => {
@@ -64,6 +77,7 @@ describe('showConfetti', () => {
     expect(args.pieces).toBe(150);
     expect(args.duration).toBe(3000);
     expect(args.fadeOut).toBe(800);
+    expect(args.emojis).toBeNull();
   });
 
   it('swallows errors from page.evaluate (fire-and-forget safe)', async () => {
