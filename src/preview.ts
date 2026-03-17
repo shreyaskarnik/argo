@@ -16,7 +16,7 @@ import { renderTemplate } from './overlays/templates.js';
 import { alignClips, schedulePlacements, type ClipInfo, type Placement } from './tts/align.js';
 import { ClipCache, type ManifestEntry } from './tts/cache.js';
 import { createWavBuffer, parseWavHeader } from './tts/engine.js';
-import type { OverlayManifestEntry, Zone } from './overlays/types.js';
+import type { OverlayManifestEntry, SceneEffect, Zone } from './overlays/types.js';
 
 export interface PreviewOptions {
   demoName: string;
@@ -49,6 +49,8 @@ interface PreviewData {
   timing: Record<string, number>;
   voiceover: PreviewVoiceoverEntry[];
   overlays: OverlayManifestEntry[];
+  /** Per-scene effects (confetti, spotlight, etc.). Keyed by scene name. */
+  effects: Record<string, SceneEffect[]>;
   sceneDurations: Record<string, number>;
   sceneReport: PreviewSceneReport | null;
   /** Pre-rendered overlay HTML/CSS for each scene (keyed by scene name). */
@@ -212,6 +214,14 @@ function loadPreviewData(demoName: string, argoDir: string, demosDir: string, ou
     .filter((s: any) => s.overlay)
     .map((s: any) => ({ scene: s.scene, ...s.overlay }));
 
+  // Extract effects keyed by scene name
+  const effects: Record<string, SceneEffect[]> = {};
+  for (const s of scenes) {
+    if (Array.isArray(s.effects) && s.effects.length > 0) {
+      effects[s.scene] = s.effects;
+    }
+  }
+
   // Scene durations
   const sdPath = join(demoDir, '.scene-durations.json');
   const sceneDurations = readJsonFile<Record<string, number>>(sdPath, {});
@@ -227,7 +237,7 @@ function loadPreviewData(demoName: string, argoDir: string, demosDir: string, ou
   const metaPath = join(outputDir, `${demoName}.meta.json`);
   const pipelineMeta = existsSync(metaPath) ? readJsonFile<Record<string, unknown>>(metaPath, {}) : null;
 
-  return { demoName, timing, voiceover, overlays, sceneDurations, sceneReport, renderedOverlays, pipelineMeta };
+  return { demoName, timing, voiceover, overlays, effects, sceneDurations, sceneReport, renderedOverlays, pipelineMeta };
 }
 
 /** List WAV clip files available for a demo. */
@@ -434,6 +444,35 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
         const data = loadPreviewData(demoName, argoDir, demosDir, outputDir);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, changed, renderedOverlays: data.renderedOverlays }));
+        return;
+      }
+
+      // Save effects into unified .scenes.json
+      if (url === '/api/effects' && req.method === 'POST') {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(chunk as Buffer);
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf-8')) as Record<string, SceneEffect[]>;
+        const scenesPath = join(demosDir, `${demoName}.scenes.json`);
+        const scenes = readJsonFile<Array<any>>(scenesPath, []);
+        let changed = false;
+        for (const entry of scenes) {
+          const posted = body[entry.scene];
+          if (posted && posted.length > 0) {
+            const newEffects = JSON.stringify(posted);
+            if (JSON.stringify(entry.effects) !== newEffects) {
+              entry.effects = JSON.parse(newEffects);
+              changed = true;
+            }
+          } else if (entry.effects) {
+            delete entry.effects;
+            changed = true;
+          }
+        }
+        if (changed) {
+          writeFileSync(scenesPath, JSON.stringify(scenes, null, 2) + '\n', 'utf-8');
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, changed }));
         return;
       }
 
@@ -1144,6 +1183,23 @@ const PREVIEW_HTML = `<!DOCTYPE html>
     margin-bottom: 6px;
   }
 
+  .effects-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .effects-section .section-title {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .effect-entry { padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .effect-entry:last-child { border-bottom: none; }
+  .btn-sm { padding: 2px 6px; font-size: 11px; line-height: 1; min-width: auto; }
+  .btn-danger { color: var(--error); border-color: var(--error); }
+  .btn-danger:hover { background: var(--error); color: #fff; }
+
   /* Recording overlay */
   .recording-overlay {
     display: none;
@@ -1308,6 +1364,7 @@ const scenes = Object.entries(DATA.timing)
     startMs,
     vo: DATA.voiceover.find(v => v.scene === name),
     overlay: DATA.overlays.find(o => o.scene === name),
+    effects: DATA.effects[name] ?? [],
     rendered: DATA.renderedOverlays[name],
     report: DATA.sceneReport?.scenes?.find(s => s.scene === name),
   }));
@@ -1539,6 +1596,7 @@ function renderSceneList() {
         </div>
       </div>
       \${renderOverlayFields(s)}
+      \${renderEffectsFields(s)}
       <div class="btn-row">
         <button class="btn btn-undo" data-scene="\${esc(s.name)}" onclick="undoScene('\${esc(s.name)}')" style="display:none" title="Revert to last saved state">Undo</button>
         <span class="btn-group"><button class="btn" onclick="previewScene('\${esc(s.name)}')" title="Play this scene">&#9654;</button><button class="btn" onclick="pausePreview()" title="Pause">&#9646;&#9646;</button></span>
@@ -1592,8 +1650,9 @@ function renderSceneList() {
 
     sceneList.appendChild(card);
 
-    // Wire overlay listeners AFTER appendChild so document.querySelector can find the card
+    // Wire overlay + effect listeners AFTER appendChild so document.querySelector can find the card
     wireOverlayListeners(s.name);
+    wireEffectListeners(s.name);
   }
 }
 
@@ -1721,6 +1780,248 @@ function wireOverlayListeners(sceneName) {
   if (typeSelect) {
     typeSelect.addEventListener('change', () => updateOverlayFieldsForScene(sceneName));
   }
+}
+
+// ─── Effects section ────────────────────────────────────────────────────────
+const EFFECT_TYPES = ['confetti', 'spotlight', 'focus-ring', 'dim-around', 'zoom-to'];
+const CONFETTI_SPREADS = ['burst', 'rain'];
+
+function renderEffectsFields(s) {
+  const fx = (s.effects || []);
+  return \`
+    <div class="effects-section">
+      <div class="section-title">Effects <button class="btn btn-sm" onclick="addEffect('\${esc(s.name)}')" title="Add effect">+</button></div>
+      <div class="effects-list" data-scene="\${esc(s.name)}">
+        \${fx.map((e, i) => renderSingleEffect(s.name, e, i)).join('')}
+      </div>
+    </div>
+  \`;
+}
+
+function renderSingleEffect(sceneName, effect, index) {
+  const type = effect.type || '';
+  let fields = '';
+
+  if (type === 'confetti') {
+    fields = \`
+      <div class="field-group" style="display:flex;gap:8px">
+        <div style="flex:1">
+          <label>Spread</label>
+          <select data-field="effect-spread" data-scene="\${esc(sceneName)}" data-effect-idx="\${index}">
+            \${CONFETTI_SPREADS.map(s => '<option value="' + s + '"' + (effect.spread === s || (!effect.spread && s === 'burst') ? ' selected' : '') + '>' + s + '</option>').join('')}
+          </select>
+        </div>
+        <div style="flex:1">
+          <label>Pieces</label>
+          <input data-field="effect-pieces" data-scene="\${esc(sceneName)}" data-effect-idx="\${index}" type="number" min="10" max="500" step="10" value="\${effect.pieces ?? 150}" placeholder="150">
+        </div>
+        <div style="flex:1">
+          <label>Duration</label>
+          <input data-field="effect-duration" data-scene="\${esc(sceneName)}" data-effect-idx="\${index}" type="number" min="500" max="10000" step="500" value="\${effect.duration ?? 3000}" placeholder="3000">
+        </div>
+      </div>\`;
+  } else if (type === 'spotlight' || type === 'focus-ring' || type === 'dim-around' || type === 'zoom-to') {
+    fields = \`
+      <div class="field-group">
+        <label>Selector</label>
+        <input data-field="effect-selector" data-scene="\${esc(sceneName)}" data-effect-idx="\${index}" value="\${esc(effect.selector ?? '')}" placeholder="CSS selector">
+      </div>
+      <div class="field-group" style="display:flex;gap:8px">
+        <div style="flex:1">
+          <label>Duration</label>
+          <input data-field="effect-duration" data-scene="\${esc(sceneName)}" data-effect-idx="\${index}" type="number" min="500" max="10000" step="500" value="\${effect.duration ?? 3000}" placeholder="3000">
+        </div>
+        \${type === 'spotlight' ? '<div style="flex:1"><label>Padding</label><input data-field="effect-padding" data-scene="' + esc(sceneName) + '" data-effect-idx="' + index + '" type="number" min="0" max="50" value="' + (effect.padding ?? 12) + '"></div>' : ''}
+        \${type === 'focus-ring' ? '<div style="flex:1"><label>Color</label><input data-field="effect-color" data-scene="' + esc(sceneName) + '" data-effect-idx="' + index + '" type="text" value="' + esc(effect.color ?? '#3b82f6') + '" placeholder="#3b82f6"></div>' : ''}
+        \${type === 'zoom-to' ? '<div style="flex:1"><label>Scale</label><input data-field="effect-scale" data-scene="' + esc(sceneName) + '" data-effect-idx="' + index + '" type="number" step="0.5" min="1" max="5" value="' + (effect.scale ?? 2) + '"></div>' : ''}
+      </div>\`;
+  }
+
+  return \`
+    <div class="effect-entry" data-scene="\${esc(sceneName)}" data-effect-idx="\${index}">
+      <div class="field-group" style="display:flex;gap:8px;align-items:end">
+        <div style="flex:1">
+          <label>Effect</label>
+          <select data-field="effect-type" data-scene="\${esc(sceneName)}" data-effect-idx="\${index}">
+            \${EFFECT_TYPES.map(t => '<option value="' + t + '"' + (type === t ? ' selected' : '') + '>' + t + '</option>').join('')}
+          </select>
+        </div>
+        <button class="btn btn-sm btn-danger" onclick="removeEffect('\${esc(sceneName)}', \${index})" title="Remove effect">&times;</button>
+        <button class="btn btn-sm" onclick="previewEffect('\${esc(sceneName)}', \${index})" title="Preview effect">&#9654;</button>
+      </div>
+      \${fields}
+    </div>
+  \`;
+}
+
+function addEffect(sceneName) {
+  const s = scenes.find(sc => sc.name === sceneName);
+  if (!s) return;
+  s.effects = s.effects || [];
+  s.effects.push({ type: 'confetti' });
+  refreshEffectsUI(sceneName);
+  markDirty();
+}
+
+function removeEffect(sceneName, index) {
+  const s = scenes.find(sc => sc.name === sceneName);
+  if (!s || !s.effects) return;
+  s.effects.splice(index, 1);
+  refreshEffectsUI(sceneName);
+  markDirty();
+}
+
+function refreshEffectsUI(sceneName) {
+  const container = document.querySelector('.effects-list[data-scene="' + sceneName + '"]');
+  if (!container) return;
+  const s = scenes.find(sc => sc.name === sceneName);
+  if (!s) return;
+  container.innerHTML = (s.effects || []).map((e, i) => renderSingleEffect(sceneName, e, i)).join('');
+  wireEffectListeners(sceneName);
+}
+
+function wireEffectListeners(sceneName) {
+  const container = document.querySelector('.effects-list[data-scene="' + sceneName + '"]');
+  if (!container) return;
+  container.querySelectorAll('[data-field="effect-type"]').forEach(select => {
+    select.addEventListener('change', () => {
+      const idx = Number(select.dataset.effectIdx);
+      const s = scenes.find(sc => sc.name === sceneName);
+      if (s?.effects?.[idx]) {
+        const newType = select.value;
+        s.effects[idx] = { type: newType };
+        refreshEffectsUI(sceneName);
+      }
+      markDirty();
+    });
+  });
+  container.querySelectorAll('[data-field^="effect-"]').forEach(input => {
+    if (input.dataset.field === 'effect-type') return;
+    input.addEventListener('input', () => markDirty());
+    input.addEventListener('change', () => {
+      collectEffectValues(sceneName);
+      markDirty();
+    });
+  });
+}
+
+function collectEffectValues(sceneName) {
+  const s = scenes.find(sc => sc.name === sceneName);
+  if (!s?.effects) return;
+  for (let i = 0; i < s.effects.length; i++) {
+    const entry = {};
+    const container = document.querySelector('.effects-list[data-scene="' + sceneName + '"]');
+    if (!container) continue;
+    const typeEl = container.querySelector('[data-field="effect-type"][data-effect-idx="' + i + '"]');
+    entry.type = typeEl?.value ?? s.effects[i].type;
+    const fields = ['spread', 'pieces', 'duration', 'selector', 'padding', 'color', 'scale'];
+    for (const f of fields) {
+      const el = container.querySelector('[data-field="effect-' + f + '"][data-effect-idx="' + i + '"]');
+      if (el) {
+        const v = el.value;
+        if (f === 'pieces' || f === 'duration' || f === 'padding' || f === 'scale') {
+          const n = Number(v);
+          if (Number.isFinite(n)) entry[f] = n;
+        } else if (v) {
+          entry[f] = v;
+        }
+      }
+    }
+    s.effects[i] = entry;
+  }
+}
+
+function collectAllEffects() {
+  const result = {};
+  for (const s of scenes) {
+    collectEffectValues(s.name);
+    if (s.effects && s.effects.length > 0) {
+      result[s.name] = s.effects;
+    }
+  }
+  return result;
+}
+
+async function saveEffects() {
+  const fx = collectAllEffects();
+  await fetch('/api/effects', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fx),
+  });
+}
+
+function previewEffect(sceneName, index) {
+  const s = scenes.find(sc => sc.name === sceneName);
+  if (!s?.effects?.[index]) return;
+  collectEffectValues(sceneName);
+  const effect = s.effects[index];
+  if (effect.type === 'confetti') {
+    fireConfettiPreview(effect);
+  }
+  // Camera effects need a target in the recorded page — show status hint
+  if (['spotlight', 'focus-ring', 'dim-around', 'zoom-to'].includes(effect.type)) {
+    setStatus('Camera effects preview in the recorded page during playback', 'saving');
+    setTimeout(() => { statusEl.textContent = 'Ready'; statusEl.className = 'status'; }, 2500);
+  }
+}
+
+function fireConfettiPreview(effect) {
+  const spread = effect.spread ?? 'burst';
+  const pieces = effect.pieces ?? 150;
+  const duration = effect.duration ?? 3000;
+  const fadeOut = 800;
+  const colors = ['#3b82f6', '#06b6d4', '#4ade80', '#f59e0b', '#ef4444', '#a78bfa'];
+  const id = 'argo-confetti-preview';
+  document.getElementById(id)?.remove();
+
+  const videoContainer = document.querySelector('.video-container');
+  const canvas = document.createElement('canvas');
+  canvas.id = id;
+  canvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10';
+  videoContainer.appendChild(canvas);
+  canvas.width = videoContainer.offsetWidth;
+  canvas.height = videoContainer.offsetHeight;
+  const ctx = canvas.getContext('2d');
+
+  const particles = [];
+  for (let i = 0; i < pieces; i++) {
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const w = 6 + Math.random() * 8;
+    const h = 4 + Math.random() * 6;
+    const rot = Math.random() * Math.PI * 2;
+    const rv = (Math.random() - 0.5) * 0.2;
+    if (spread === 'burst') {
+      const cx = canvas.width / 2;
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.8;
+      const speed = 4 + Math.random() * 8;
+      particles.push({ x: cx + (Math.random() - 0.5) * 40, y: -10, w, h, color, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, rot, rv });
+    } else {
+      particles.push({ x: Math.random() * canvas.width, y: -Math.random() * canvas.height, w, h, color, vx: (Math.random() - 0.5) * 4, vy: 2 + Math.random() * 4, rot, rv });
+    }
+  }
+
+  const startTime = performance.now();
+  function frame() {
+    const elapsed = performance.now() - startTime;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const p of particles) {
+      p.x += p.vx; p.y += p.vy; p.rot += p.rv; p.vy += 0.15;
+      if (spread === 'burst') p.vx *= 0.99;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.fillStyle = p.color; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    }
+    if (elapsed >= duration) {
+      const fadeProgress = Math.min(1, (elapsed - duration) / fadeOut);
+      canvas.style.opacity = String(1 - fadeProgress);
+      if (fadeProgress >= 1) { canvas.remove(); return; }
+    }
+    if (particles.some(p => p.y < canvas.height + 50) || elapsed < duration + fadeOut) {
+      requestAnimationFrame(frame);
+    } else { canvas.remove(); }
+  }
+  requestAnimationFrame(frame);
 }
 
 const manuallyCollapsed = new Set();
@@ -2037,6 +2338,7 @@ function snapshotAllScenes() {
       voice: s.vo?.voice ?? '',
       speed: s.vo?.speed ?? '',
       overlay: s.overlay ? JSON.parse(JSON.stringify(s.overlay)) : null,
+      effects: s.effects?.length ? JSON.parse(JSON.stringify(s.effects)) : [],
     });
   }
 }
@@ -2074,6 +2376,11 @@ function isSceneModified(sceneName) {
     if (kicker !== (so.kicker ?? '')) return true;
     if (src !== (so.src ?? '')) return true;
   }
+  // Check effects
+  const s = scenes.find(sc => sc.name === sceneName);
+  const currentEffects = JSON.stringify(s?.effects ?? []);
+  const snapEffects = JSON.stringify(snap.effects ?? []);
+  if (currentEffects !== snapEffects) return true;
   return false;
 }
 
@@ -2101,6 +2408,12 @@ function undoScene(sceneName) {
   if (voiceEl) voiceEl.value = snap.voice;
   const speedEl = card.querySelector('[data-field="speed"]');
   if (speedEl) speedEl.value = snap.speed;
+  // Restore effects
+  const s = scenes.find(sc => sc.name === sceneName);
+  if (s) {
+    s.effects = snap.effects?.length ? JSON.parse(JSON.stringify(snap.effects)) : [];
+    refreshEffectsUI(sceneName);
+  }
   // Restore overlay type (triggers field re-render)
   const typeEl = card.querySelector('[data-field="overlay-type"]');
   if (typeEl) {
@@ -2160,6 +2473,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
   try {
     await saveVoiceover();
     await saveOverlays();
+    await saveEffects();
     clearDirty();
     setStatus('All changes saved', 'saved');
     saveBtn.textContent = '\\u2713 Saved';
