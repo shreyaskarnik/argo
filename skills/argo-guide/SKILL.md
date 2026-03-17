@@ -200,3 +200,7 @@ Read these when you need deeper guidance on specific topics:
 - **`references/init-from-conversion.md`** — Converting Playwright tests, post-conversion LLM workflow, scene detection heuristics
 - **`examples/basic.demo.ts`** — Complete working demo script template
 - **`examples/basic.scenes.json`** — Matching scenes manifest template
+
+## Related Skills
+
+For advanced Playwright automation patterns beyond what's covered here, invoke the `playwright-cli` skill if available.
