@@ -13,10 +13,13 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { readFileSync, existsSync, readdirSync, writeFileSync, statSync, createReadStream } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { renderTemplate } from './overlays/templates.js';
-import { alignClips, schedulePlacements, type ClipInfo, type Placement } from './tts/align.js';
+import { alignClips, schedulePlacements, type ClipInfo, type Placement, type SceneTiming } from './tts/align.js';
 import { ClipCache, type ManifestEntry } from './tts/cache.js';
 import { createWavBuffer, parseWavHeader } from './tts/engine.js';
 import type { OverlayManifestEntry, SceneEffect, Zone } from './overlays/types.js';
+import { generateSrt, generateVtt } from './subtitles.js';
+import { generateChapterMetadata } from './chapters.js';
+import { exportVideo, checkFfmpeg } from './export.js';
 
 export interface PreviewOptions {
   demoName: string;
@@ -369,13 +372,13 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
   // Prefer exported MP4 (has keyframes for seeking) over raw WebM (no cue points)
   const webmPath = join(demoDir, 'video.webm');
   const mp4Path = join(outputDir, `${demoName}.mp4`);
-  const videoPath = existsSync(mp4Path) ? mp4Path : webmPath;
+  let videoPath = existsSync(mp4Path) ? mp4Path : webmPath;
   if (!existsSync(videoPath)) {
     throw new Error(
       `No recording found for '${demoName}'. Run 'argo pipeline ${demoName}' first.`
     );
   }
-  const videoMime = videoPath.endsWith('.mp4') ? 'video/mp4' : 'video/webm';
+  let videoMime = videoPath.endsWith('.mp4') ? 'video/mp4' : 'video/webm';
 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const url = req.url ?? '/';
@@ -524,21 +527,76 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
         return;
       }
 
-      // Export-only: re-align audio + export MP4 without re-recording
+      // Export-only: re-align audio + chapters + subtitles + export MP4 (no re-recording)
       if (url === '/api/export' && req.method === 'POST') {
         res.writeHead(200, { 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked' });
         try {
+          checkFfmpeg();
+
           // Refresh aligned audio from current clips + timing
-          refreshPreviewAudioArtifacts(demoName, argoDir, demosDir, options.ttsDefaults);
-          // Run export via CLI
-          await new Promise<void>((resolve, reject) => {
-            execFile('npx', ['argo', 'export', demoName], {
-              env: process.env,
-            }, (err, stdout, stderr) => {
-              if (err) reject(new Error(stderr || stdout || err.message));
-              else resolve();
-            });
+          const refreshed = refreshPreviewAudioArtifacts(demoName, argoDir, demosDir, options.ttsDefaults);
+
+          // Read timing for head-trim + placement computation
+          const timing = readJsonFile<Record<string, number>>(join(demoDir, '.timing.json'), {});
+          const markTimes = Object.values(timing);
+          let headTrimMs = 0;
+          if (markTimes.length > 0) {
+            const firstMarkMs = Math.min(...markTimes);
+            headTrimMs = Math.max(0, firstMarkMs - 200);
+            if (headTrimMs <= 500) headTrimMs = 0;
+          }
+
+          // Compute shifted placements for chapters + subtitles
+          const placements = refreshed.sceneReport?.scenes?.map(s => ({
+            scene: s.scene, startMs: s.startMs - headTrimMs, endMs: s.endMs - headTrimMs,
+          })) ?? [];
+
+          // Get video duration
+          const { execFileSync } = await import('node:child_process');
+          const rawDur = execFileSync('ffprobe', [
+            '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', webmPath,
+          ], { encoding: 'utf-8' }).trim();
+          const totalDurationMs = Math.round(parseFloat(rawDur) * 1000);
+          const shiftedDurationMs = totalDurationMs - headTrimMs;
+
+          // Generate chapters
+          const chapterMetadataPath = join(demoDir, 'chapters.txt');
+          writeFileSync(chapterMetadataPath, generateChapterMetadata(placements, shiftedDurationMs), 'utf-8');
+
+          // Generate subtitles
+          const scenesPath = join(demosDir, `${demoName}.scenes.json`);
+          const scenes = readJsonFile<Array<any>>(scenesPath, []);
+          const sceneTexts: Record<string, string> = {};
+          for (const entry of scenes) {
+            if (entry.scene && entry.text) sceneTexts[entry.scene] = entry.text;
+          }
+          try {
+            const { mkdirSync } = await import('node:fs');
+            mkdirSync(outputDir, { recursive: true });
+            writeFileSync(join(outputDir, `${demoName}.srt`), generateSrt(placements, sceneTexts), 'utf-8');
+            writeFileSync(join(outputDir, `${demoName}.vtt`), generateVtt(placements, sceneTexts), 'utf-8');
+          } catch { /* subtitles are best-effort */ }
+
+          // Export
+          await exportVideo({
+            demoName,
+            argoDir,
+            outputDir,
+            chapterMetadataPath,
+            headTrimMs: headTrimMs > 0 ? headTrimMs : undefined,
           });
+
+          // Switch to serving the new MP4
+          if (existsSync(mp4Path)) {
+            videoPath = mp4Path;
+            videoMime = 'video/mp4';
+          }
+
+          // Switch to serving the new MP4
+          if (existsSync(mp4Path)) {
+            videoPath = mp4Path;
+            videoMime = 'video/mp4';
+          }
           res.end(JSON.stringify({ ok: true }));
         } catch (err) {
           res.end(JSON.stringify({ ok: false, error: (err as Error).message }));
