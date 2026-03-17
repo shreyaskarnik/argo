@@ -258,6 +258,19 @@ choco install ffmpeg       # Windows
    | `engines.elevenlabs()` | cloud | `npm i @elevenlabs/elevenlabs-js` | `ELEVENLABS_API_KEY` |
    | `engines.gemini()` | cloud | `npm i @google/genai` | `GEMINI_API_KEY` |
    | `engines.sarvam()` | cloud | `npm i sarvamai` | `SARVAM_API_KEY` |
+   | `engines.transformers()` | local | built-in | none |
+
+   **Transformers.js** — Use any HuggingFace `text-to-speech` model locally. Supertonic, or any future ONNX TTS model:
+
+   ```js
+   tts: {
+     engine: engines.transformers({
+       model: 'onnx-community/Supertonic-TTS-ONNX',
+       speakerEmbeddings: 'https://huggingface.co/.../voices/F1.bin',
+       numInferenceSteps: 10,
+     }),
+   }
+   ```
 
    **Voice cloning** — Clone your own voice locally with mlx-audio. Record a 15-second clip, and every demo sounds like you — privately, no data leaves your machine:
 

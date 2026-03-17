@@ -256,6 +256,7 @@ export default defineConfig({
 | `engines.gemini()` | cloud | `npm i @google/genai` | Gemini voice names |
 | `engines.sarvam()` | cloud | `npm i sarvamai` | `meera` + Indian language voices |
 | `engines.mlxAudio()` | local | `pip install mlx-audio` | model-dependent (Apple Silicon) |
+| `engines.transformers()` | local | built-in | any HuggingFace TTS model (speaker embeddings via `voice` field) |
 
 Cloud engines read API keys from environment variables (`OPENAI_API_KEY`, `ELEVENLABS_API_KEY`, `GEMINI_API_KEY`, `SARVAM_API_KEY`) or accept `apiKey` in the factory options.
 
