@@ -132,22 +132,15 @@ export class TransformersEngine implements TTSEngine {
     }
 
     // Concatenate chunks with silence gaps
-    let combined = concatSamples(audioChunks, sampleRate);
+    const combined = concatSamples(audioChunks, sampleRate);
 
-    // Resample to 24kHz if needed (pipeline alignment assumes 24kHz)
+    // Resample to 24kHz if needed (pipeline alignment assumes 24kHz).
+    // Use ffmpeg via convertToWav for proper anti-aliased resampling —
+    // naive linear interpolation causes garbled audio at large ratios (e.g., 44.1kHz → 24kHz).
     if (sampleRate !== TARGET_RATE) {
-      const ratio = sampleRate / TARGET_RATE;
-      const outLen = Math.round(combined.length / ratio);
-      const resampled = new Float32Array(outLen);
-      for (let i = 0; i < outLen; i++) {
-        const srcIdx = i * ratio;
-        const lo = Math.floor(srcIdx);
-        const hi = Math.min(lo + 1, combined.length - 1);
-        const frac = srcIdx - lo;
-        resampled[i] = combined[lo] * (1 - frac) + combined[hi] * frac;
-      }
-      combined = resampled;
-      sampleRate = TARGET_RATE;
+      const { convertToWav } = await import('../engine.js');
+      const nativeWav = createWavBuffer(combined, sampleRate);
+      return convertToWav(nativeWav);
     }
 
     return createWavBuffer(combined, sampleRate);

@@ -37,7 +37,21 @@ Works with any HuggingFace `text-to-speech` pipeline model:
 engines.transformers({ model: 'onnx-community/Supertonic-TTS-ONNX' })
 ```
 
-Speaker embeddings map to the `voice` field per scene. Models outputting non-24kHz audio are automatically resampled.
+Speaker embeddings map to the `voice` field per scene. Models outputting non-24kHz audio are automatically resampled via ffmpeg.
+
+**Gotchas:**
+- The `voice` field only accepts paths/URLs to `.bin` speaker embedding files. Engine-specific names like `af_heart` (Kokoro) are ignored with a warning.
+- Default dtype is `q8` (quantized). Models without quantized weights (like Supertonic) need `dtype: 'fp32'`.
+- Supertonic-TTS-2 outputs at 44.1kHz — resampling to 24kHz is handled automatically via ffmpeg.
+
+```javascript
+// Supertonic-TTS-2 example with speaker embedding
+engines.transformers({
+  model: 'onnx-community/Supertonic-TTS-2-ONNX',
+  dtype: 'fp32',
+  speakerEmbeddings: 'https://huggingface.co/onnx-community/Supertonic-TTS-2-ONNX/resolve/main/voices/F1.bin',
+})
+```
 
 ### OpenAI `instructions` Option
 
