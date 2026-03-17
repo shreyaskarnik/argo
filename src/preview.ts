@@ -194,7 +194,21 @@ function loadPreviewData(demoName: string, argoDir: string, demosDir: string, ou
   if (!existsSync(timingPath)) {
     throw new Error(`No timing data found at ${timingPath}. Run 'argo pipeline ${demoName}' first.`);
   }
-  const timing = readJsonFile<Record<string, number>>(timingPath, {});
+  const rawTiming = readJsonFile<Record<string, number>>(timingPath, {});
+
+  // If serving a trimmed MP4, shift timing to match the trimmed video
+  const mp4Exists = existsSync(join(outputDir, `${demoName}.mp4`));
+  const markTimes = Object.values(rawTiming);
+  let headTrimMs = 0;
+  if (mp4Exists && markTimes.length > 0) {
+    const firstMarkMs = Math.min(...markTimes);
+    headTrimMs = Math.max(0, firstMarkMs - 200);
+    if (headTrimMs <= 500) headTrimMs = 0;
+  }
+  const timing: Record<string, number> = {};
+  for (const [scene, ms] of Object.entries(rawTiming)) {
+    timing[scene] = ms - headTrimMs;
+  }
 
   // Unified scenes manifest
   const scenesPath = join(demosDir, `${demoName}.scenes.json`);
@@ -1961,7 +1975,7 @@ function previewEffect(sceneName, index) {
   }
   // Camera effects need a target in the recorded page — show status hint
   if (['spotlight', 'focus-ring', 'dim-around', 'zoom-to'].includes(effect.type)) {
-    setStatus('Camera effects preview in the recorded page during playback', 'saving');
+    setStatus('Camera effects are applied during recording — re-record to see changes', 'saving');
     setTimeout(() => { statusEl.textContent = 'Ready'; statusEl.className = 'status'; }, 2500);
   }
 }
@@ -2495,6 +2509,7 @@ document.getElementById('btn-rerecord').addEventListener('click', async () => {
   if (isDirty) {
     await saveVoiceover();
     await saveOverlays();
+    await saveEffects();
     clearDirty();
   }
   const overlay = document.getElementById('recording-overlay');
