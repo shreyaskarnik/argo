@@ -1,0 +1,48 @@
+[
+  {
+    "scene": "intro",
+    "text": "Welcome to our application. Let me walk you through the key features.",
+    "overlay": {
+      "type": "headline-card",
+      "title": "Product Demo",
+      "kicker": "Welcome",
+      "body": "A quick tour of our key features",
+      "placement": "center",
+      "motion": "fade-in"
+    }
+  },
+  {
+    "scene": "feature",
+    "text": "This is the main feature that sets us apart.",
+    "overlay": {
+      "type": "lower-third",
+      "text": "Core Feature",
+      "placement": "bottom-center",
+      "motion": "slide-in",
+      "autoBackground": true
+    }
+  },
+  {
+    "scene": "interaction",
+    "text": "Let me show you how easy it is to use.",
+    "overlay": {
+      "type": "callout",
+      "text": "Try it yourself",
+      "placement": "top-right",
+      "motion": "fade-in"
+    }
+  },
+  {
+    "scene": "closing",
+    "text": "Thanks for watching. Get started today.",
+    "voice": "am_michael",
+    "speed": 0.9,
+    "overlay": {
+      "type": "headline-card",
+      "title": "Get Started",
+      "body": "Sign up at example.com",
+      "placement": "center",
+      "motion": "fade-in"
+    }
+  }
+]

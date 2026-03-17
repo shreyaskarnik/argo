@@ -18,6 +18,36 @@
       "prompt": "I have an existing demo script for my app. I want to add a headline-card overlay to the 'features' scene that auto-detects whether the page background is dark or light and adjusts the overlay colors accordingly. The overlay should slide in from the left and show in the top-right corner. Also, my demo is about 2 minutes long and keeps timing out.",
       "expected_output": "Should provide the correct showOverlay or withOverlay call with type: 'headline-card', placement: 'top-right', motion: 'slide-in', autoBackground: true. Should also mention test.setTimeout() to fix the timeout issue. Should use narration.durationFor() for the overlay duration.",
       "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I want to use my own voice for the demo narration. I'm on a MacBook Pro M3. How do I set up voice cloning with Argo? I have about a 20-second audio clip of me reading a paragraph saved as voice-sample.wav.",
+      "expected_output": "Should recommend mlx-audio engine with Qwen3-TTS model for best clone quality. Should show the config with engines.mlxAudio() including refAudio and refText options. Should mention that only 15s of reference is needed. Should mention the voice-clone-preview.sh helper script for testing.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "I have a Playwright e2e test at tests/checkout.spec.ts that tests our checkout flow. I want to turn it into an Argo demo video. The test has test.step() calls for 'Add to cart', 'Enter shipping', 'Enter payment', and 'Confirm order'. Can you convert it?",
+      "expected_output": "Should use `npx argo init --from tests/checkout.spec.ts` to auto-convert. Should explain the post-conversion workflow: fill in voiceover text using _hint fields, add camera effects with durationFor(), refine overlay placeholders, add test.setTimeout(), apply phonetic fixes if using Kokoro, validate, then run pipeline.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "I want to create a quick silent demo of my app — just screen recording with overlays pointing out features, no voiceover at all. Is that possible with Argo?",
+      "expected_output": "Should explain that omitting the `text` field from all scene entries creates a silent demo with no audio track. Should still include narration.mark() calls and overlay definitions. Should mention this is useful for quick prototype demos. durationFor() will use fallbackMs (3000ms) since there are no clips.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "I already ran `argo pipeline my-demo` and got a video, but I want to tweak some of the voiceover wording and change an overlay from lower-third to headline-card. Do I need to re-record the whole thing?",
+      "expected_output": "Should recommend `argo preview my-demo` for iterating without re-recording. Explain that preview provides editable voiceover text/voice/speed, editable overlay type and content, per-scene TTS regeneration, and a Save button. Only re-run pipeline when the demo script itself changes.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "I need to switch from Kokoro to OpenAI TTS for my demo because I want better pronunciation of technical terms like 'Kubernetes', 'OAuth', and 'CI/CD'. What do I need to change?",
+      "expected_output": "Should show how to update argo.config.mjs to use engines.openai() with model and optional instructions. Should mention OPENAI_API_KEY env var. Should note that OpenAI handles acronyms natively so phonetic spellings like 'koo-ber-net-eez' can be reverted to normal spelling. Should mention clearing TTS cache with rm -rf .argo/<demo>/clips.",
+      "files": []
     }
   ]
 }
