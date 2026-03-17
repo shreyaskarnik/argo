@@ -12,6 +12,8 @@ export interface TransformersEngineOptions {
   speakerEmbeddings?: string;
   /** Number of inference steps (higher = better quality). Default: 10 */
   numInferenceSteps?: number;
+  /** Default language code for models that require language tags (e.g., Supertonic-TTS-2 needs 'en'). Wraps text as `<lang>text</lang>`. */
+  lang?: string;
 }
 
 export class TransformersEngine implements TTSEngine {
@@ -22,6 +24,7 @@ export class TransformersEngine implements TTSEngine {
   private device: string | null;
   private speakerEmbeddings?: string;
   private numInferenceSteps: number;
+  private lang?: string;
 
   constructor(options?: TransformersEngineOptions) {
     this.model = options?.model ?? 'onnx-community/Supertonic-TTS-ONNX';
@@ -29,6 +32,7 @@ export class TransformersEngine implements TTSEngine {
     this.device = options?.device ?? null;
     this.speakerEmbeddings = options?.speakerEmbeddings;
     this.numInferenceSteps = options?.numInferenceSteps ?? 10;
+    this.lang = options?.lang;
   }
 
   describe(): TTSEngineMetadata {
@@ -105,14 +109,20 @@ export class TransformersEngine implements TTSEngine {
     };
     if (speaker) baseOpts.speaker_embeddings = speaker;
 
+    // Wrap text in language tags if lang is set (per-scene or engine default).
+    // Models like Supertonic-TTS-2 require <en>text</en> format — without
+    // these tags the model produces garbled audio.
+    const lang = options.lang ?? this.lang;
+
     const chunks = splitTextForTTS(text);
     const audioChunks: Float32Array[] = [];
     let sampleRate = TARGET_RATE;
 
     for (const chunk of chunks) {
+      const input = lang ? `<${lang}>${chunk}</${lang}>` : chunk;
       let audio: any;
       try {
-        audio = await tts(chunk, baseOpts);
+        audio = await tts(input, baseOpts);
       } catch (err) {
         throw new Error(
           `Transformers TTS failed to generate audio for text "${chunk.substring(0, 80)}..." ` +

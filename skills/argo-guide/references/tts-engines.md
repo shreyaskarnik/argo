@@ -49,9 +49,12 @@ Speaker embeddings map to the `voice` field per scene. Models outputting non-24k
 engines.transformers({
   model: 'onnx-community/Supertonic-TTS-2-ONNX',
   dtype: 'fp32',
+  lang: 'en',  // Required — wraps text as <en>text</en>. Without this, audio is garbled.
   speakerEmbeddings: 'https://huggingface.co/onnx-community/Supertonic-TTS-2-ONNX/resolve/main/voices/F1.bin',
 })
 ```
+
+Supertonic-TTS-2 supports: `en`, `ko`, `es`, `pt`, `fr`. You can also set `lang` per-scene in the manifest.
 
 ### OpenAI `instructions` Option
 
