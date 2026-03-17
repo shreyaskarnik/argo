@@ -50,6 +50,13 @@ export {
   type ZoomToOptions,
 } from './camera.js';
 
+// Cursor
+export {
+  cursorHighlight,
+  resetCursor,
+  type CursorHighlightOptions,
+} from './cursor.js';
+
 // TTS
 export { type TTSEngineOptions } from './tts/engine.js';
 export { engines } from './tts/engines/index.js';

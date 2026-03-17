@@ -57,6 +57,10 @@ Overlay cues use discriminated unions — each template type has its own TypeScr
 
 Four directed recording effects: `spotlight`, `focusRing`, `dimAround`, `zoomTo`, plus `resetCamera`. All non-blocking by default (fire-and-forget safe). `zoomTo` uses `transform-origin: 0 0` + `scale() translate()` on `documentElement` to zoom and reframe the viewport onto the target. Note: overlays active during zoom will scale with the page (they're children of `documentElement`). Error handling follows the same pattern as `showConfetti` (filter by disposal errors, warn on others).
 
+### Cursor Highlight (`src/cursor.ts`)
+
+`cursorHighlight(page, opts?)` — persistent cursor highlight that follows the mouse pointer during recording. Injects a styled ring via `page.evaluate()` with optional pulse animation and click ripple effects. Stays active until `resetCursor(page)` is called. Error handling follows the same pattern as `showConfetti` (filter by disposal errors, warn on others). Options: `color` (default `#3b82f6`), `radius` (default 20px), `pulse` (default true), `clickRipple` (default true), `opacity` (default 0.5).
+
 ### Playwright Integration (`src/fixtures.ts`)
 
 Custom `test` fixture extends Playwright's `test` with a `narration` fixture that records `Date.now()` timestamps for each `mark()` call, flushed to `.timing.json` after test completion.
