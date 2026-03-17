@@ -1,4 +1,5 @@
 import type { TTSEngine, TTSEngineOptions, TTSEngineMetadata } from '../engine.js';
+import { splitTextForTTS, concatSamples } from '../engine.js';
 
 export interface TransformersEngineOptions {
   /** Model ID from Hugging Face Hub. Default: 'onnx-community/Supertonic-TTS-ONNX' */
@@ -70,52 +71,62 @@ export class TransformersEngine implements TTSEngine {
     if (!text?.trim()) throw new Error('TTS text must not be empty');
     const tts = await this.getPipeline();
 
-    // Build generation options
-    const genOpts: Record<string, unknown> = {
+    const { createWavBuffer } = await import('../engine.js');
+    const TARGET_RATE = 24000;
+
+    // Build base generation options
+    const speaker = options.voice ?? this.speakerEmbeddings;
+    const baseOpts: Record<string, unknown> = {
       speed: options.speed ?? 1.0,
       num_inference_steps: this.numInferenceSteps,
     };
+    if (speaker) baseOpts.speaker_embeddings = speaker;
 
-    // Speaker embeddings: per-call voice override, instance default, or omit
-    const speaker = options.voice ?? this.speakerEmbeddings;
-    if (speaker) genOpts.speaker_embeddings = speaker;
+    const chunks = splitTextForTTS(text);
+    const audioChunks: Float32Array[] = [];
+    let sampleRate = TARGET_RATE;
 
-    let audio: any;
-    try {
-      audio = await tts(text, genOpts);
-    } catch (err) {
-      throw new Error(
-        `Transformers TTS failed to generate audio for text "${text.substring(0, 80)}..." ` +
-        `(model: ${this.model}). Original error: ${(err as Error).message}`,
-      );
+    for (const chunk of chunks) {
+      let audio: any;
+      try {
+        audio = await tts(chunk, baseOpts);
+      } catch (err) {
+        throw new Error(
+          `Transformers TTS failed to generate audio for text "${chunk.substring(0, 80)}..." ` +
+          `(model: ${this.model}). Original error: ${(err as Error).message}`,
+        );
+      }
+
+      const samples: Float32Array = audio.audio ?? audio.data;
+      if (!samples || !(samples instanceof Float32Array)) {
+        throw new Error(
+          `Transformers TTS returned unexpected audio format from model ${this.model}. ` +
+          'Expected Float32Array in audio.audio or audio.data.',
+        );
+      }
+      sampleRate = audio.sampling_rate ?? TARGET_RATE;
+      audioChunks.push(samples);
     }
 
-    // Transformers.js pipeline returns { audio: Float32Array, sampling_rate: number }
-    const samples: Float32Array = audio.audio ?? audio.data;
-    if (!samples || !(samples instanceof Float32Array)) {
-      throw new Error(
-        `Transformers TTS returned unexpected audio format from model ${this.model}. ` +
-        'Expected Float32Array in audio.audio or audio.data.',
-      );
-    }
-    const sampleRate: number = audio.sampling_rate ?? 24000;
-    const TARGET_RATE = 24000;
-    const { createWavBuffer } = await import('../engine.js');
+    // Concatenate chunks with silence gaps
+    let combined = concatSamples(audioChunks, sampleRate);
 
     // Resample to 24kHz if needed (pipeline alignment assumes 24kHz)
     if (sampleRate !== TARGET_RATE) {
       const ratio = sampleRate / TARGET_RATE;
-      const outLen = Math.round(samples.length / ratio);
+      const outLen = Math.round(combined.length / ratio);
       const resampled = new Float32Array(outLen);
       for (let i = 0; i < outLen; i++) {
         const srcIdx = i * ratio;
         const lo = Math.floor(srcIdx);
-        const hi = Math.min(lo + 1, samples.length - 1);
+        const hi = Math.min(lo + 1, combined.length - 1);
         const frac = srcIdx - lo;
-        resampled[i] = samples[lo] * (1 - frac) + samples[hi] * frac;
+        resampled[i] = combined[lo] * (1 - frac) + combined[hi] * frac;
       }
-      return createWavBuffer(resampled, TARGET_RATE);
+      combined = resampled;
+      sampleRate = TARGET_RATE;
     }
-    return createWavBuffer(samples, sampleRate);
+
+    return createWavBuffer(combined, sampleRate);
   }
 }

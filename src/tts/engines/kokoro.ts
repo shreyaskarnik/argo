@@ -1,4 +1,5 @@
 import type { TTSEngine, TTSEngineOptions, TTSEngineMetadata } from '../engine.js';
+import { splitTextForTTS, concatSamples } from '../engine.js';
 
 export interface KokoroEngineOptions {
   modelId?: string;
@@ -54,25 +55,34 @@ export class KokoroEngine implements TTSEngine {
   async generate(text: string, options: TTSEngineOptions): Promise<Buffer> {
     if (!text?.trim()) throw new Error('TTS text must not be empty');
     const tts = await this.getTTS();
-    let audio;
-    try {
-      audio = await tts.generate(text, {
-        voice: options.voice ?? 'af_heart',
-        speed: options.speed ?? 1.0,
-      });
-    } catch (err) {
-      throw new Error(
-        `Kokoro TTS failed to generate audio for text "${text.substring(0, 80)}..." ` +
-        `(voice: ${options.voice ?? 'af_heart'}). Original error: ${(err as Error).message}`
-      );
-    }
-    const samples: Float32Array = audio.data ?? audio.audio;
-    if (!samples || !(samples instanceof Float32Array)) {
-      throw new Error('kokoro-js returned unexpected audio format. Check kokoro-js version.');
-    }
-    const sampleRate: number = audio.sampling_rate;
     const { createWavBuffer } = await import('../engine.js');
-    return createWavBuffer(samples, sampleRate);
+
+    const chunks = splitTextForTTS(text);
+    const audioChunks: Float32Array[] = [];
+    let sampleRate = 24000;
+
+    for (const chunk of chunks) {
+      let audio;
+      try {
+        audio = await tts.generate(chunk, {
+          voice: options.voice ?? 'af_heart',
+          speed: options.speed ?? 1.0,
+        });
+      } catch (err) {
+        throw new Error(
+          `Kokoro TTS failed to generate audio for text "${chunk.substring(0, 80)}..." ` +
+          `(voice: ${options.voice ?? 'af_heart'}). Original error: ${(err as Error).message}`
+        );
+      }
+      const samples: Float32Array = audio.data ?? audio.audio;
+      if (!samples || !(samples instanceof Float32Array)) {
+        throw new Error('kokoro-js returned unexpected audio format. Check kokoro-js version.');
+      }
+      sampleRate = audio.sampling_rate;
+      audioChunks.push(samples);
+    }
+
+    return createWavBuffer(concatSamples(audioChunks, sampleRate), sampleRate);
   }
 
   async *stream(text: string, options: TTSEngineOptions): AsyncGenerator<{ text: string; audio: Buffer }> {

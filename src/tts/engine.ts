@@ -24,6 +24,63 @@ export interface TTSEngine {
 }
 
 /**
+ * Split long text into chunks at sentence boundaries for better TTS quality.
+ * Each chunk is between minChars and maxChars, split at sentence-ending punctuation.
+ */
+export function splitTextForTTS(
+  text: string,
+  { minChars = 80, maxChars = 500 }: { minChars?: number; maxChars?: number } = {},
+): string[] {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+  if (trimmed.length <= maxChars) return [trimmed];
+
+  // Split on sentence-ending punctuation followed by space
+  const sentences = trimmed.match(/[^.!?]+[.!?]+[\s]*/g) ?? [trimmed];
+  const chunks: string[] = [];
+  let current = '';
+
+  for (const sentence of sentences) {
+    const s = sentence.trim();
+    if (!s) continue;
+
+    if (current && (current.length + s.length + 1) > maxChars) {
+      chunks.push(current.trim());
+      current = s;
+    } else {
+      current = current ? current + ' ' + s : s;
+    }
+
+    // Flush if we've reached a good size
+    if (current.length >= minChars && current.match(/[.!?]\s*$/)) {
+      chunks.push(current.trim());
+      current = '';
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
+  return chunks.length > 0 ? chunks : [trimmed];
+}
+
+/**
+ * Concatenate Float32Array audio chunks with optional silence gap between them.
+ */
+export function concatSamples(chunks: Float32Array[], sampleRate: number, gapMs = 300): Float32Array {
+  if (chunks.length === 0) return new Float32Array(0);
+  if (chunks.length === 1) return chunks[0];
+
+  const gapSamples = Math.round((gapMs / 1000) * sampleRate);
+  const totalLen = chunks.reduce((sum, c) => sum + c.length, 0) + gapSamples * (chunks.length - 1);
+  const result = new Float32Array(totalLen);
+  let offset = 0;
+  for (let i = 0; i < chunks.length; i++) {
+    result.set(chunks[i], offset);
+    offset += chunks[i].length;
+    if (i < chunks.length - 1) offset += gapSamples; // silence gap
+  }
+  return result;
+}
+
+/**
  * Creates a valid WAV file buffer from Float32Array samples.
  * Format: mono, 32-bit IEEE float, given sample rate.
  */
