@@ -212,7 +212,7 @@ import { defineConfig, demosProject, engines } from '@argo-video/cli';
 | `withOverlay(page, scene, action)` | Show overlay from manifest during an async action |
 | `withOverlay(page, scene, cue, action)` | Show overlay with inline cue during action (backward compat) |
 | `hideOverlay(page, zone?)` | Remove overlay from a zone |
-| `showConfetti(page, opts?)` | Non-blocking confetti animation (`spread: 'burst' \| 'rain'`, `wait: true` to block) |
+| `showConfetti(page, opts?)` | Non-blocking confetti animation (`spread: 'burst' \| 'rain'`, `emoji: '🎃'` or `emoji: ['🎄', '⭐']` for emoji mode, `wait: true` to block) |
 | `spotlight(page, selector, opts?)` | Dark overlay with hole around target element |
 | `focusRing(page, selector, opts?)` | Pulsing glow border on target |
 | `dimAround(page, selector, opts?)` | Fade sibling elements to highlight target |
