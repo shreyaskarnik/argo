@@ -524,6 +524,28 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
         return;
       }
 
+      // Export-only: re-align audio + export MP4 without re-recording
+      if (url === '/api/export' && req.method === 'POST') {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked' });
+        try {
+          // Refresh aligned audio from current clips + timing
+          refreshPreviewAudioArtifacts(demoName, argoDir, demosDir, options.ttsDefaults);
+          // Run export via CLI
+          await new Promise<void>((resolve, reject) => {
+            execFile('npx', ['argo', 'export', demoName], {
+              env: process.env,
+            }, (err, stdout, stderr) => {
+              if (err) reject(new Error(stderr || stdout || err.message));
+              else resolve();
+            });
+          });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (err) {
+          res.end(JSON.stringify({ ok: false, error: (err as Error).message }));
+        }
+        return;
+      }
+
       // --- Static file serving ---
 
       // Serve video with Range request support (required for seeking)
@@ -1268,6 +1290,7 @@ const PREVIEW_HTML = `<!DOCTYPE html>
   <div class="actions">
     <a class="trace-link" id="trace-link" href="https://trace.playwright.dev" target="_blank">Open Trace Viewer</a>
     <button class="btn btn-save" id="btn-save" title="Save all changes">Save</button>
+    <button class="btn btn-rerecord" id="btn-export" title="Re-export video with current audio (no re-recording)">Export</button>
     <button class="btn btn-rerecord" id="btn-rerecord" title="Re-record with current manifest">Re-record</button>
   </div>
 </header>
@@ -2494,6 +2517,41 @@ document.getElementById('btn-save').addEventListener('click', async () => {
     }, 2000);
   } catch (err) {
     setStatus('Save failed: ' + err.message, 'error');
+  }
+});
+
+// Export button (re-align audio + export MP4, no re-recording)
+document.getElementById('btn-export').addEventListener('click', async () => {
+  if (isDirty && !confirm('You have unsaved changes. Save before exporting?')) return;
+  if (isDirty) {
+    await saveVoiceover();
+    await saveOverlays();
+    await saveEffects();
+    clearDirty();
+  }
+  const overlay = document.getElementById('recording-overlay');
+  const title = document.getElementById('recording-title');
+  const subtitle = document.getElementById('recording-subtitle');
+  overlay.classList.remove('success', 'error');
+  overlay.classList.add('active');
+  title.textContent = 'Exporting video...';
+  subtitle.textContent = 'Re-aligning audio and exporting MP4.';
+  video.pause();
+  stopAudio();
+  showPlayIcon();
+  try {
+    const resp = await fetch('/api/export', { method: 'POST' });
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error);
+    overlay.classList.add('success');
+    title.textContent = 'Export complete!';
+    subtitle.textContent = 'Reloading preview...';
+    setTimeout(() => location.reload(), 1500);
+  } catch (err) {
+    overlay.classList.add('error');
+    title.textContent = 'Export failed';
+    subtitle.textContent = err.message;
+    setTimeout(() => overlay.classList.remove('active', 'error'), 5000);
   }
 });
 
