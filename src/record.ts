@@ -11,6 +11,9 @@ export interface RecordOptions {
   video: { width: number; height: number };
   browser?: BrowserEngine;
   deviceScaleFactor?: number;
+  isMobile?: boolean;
+  hasTouch?: boolean;
+  contextOptions?: Record<string, unknown>;
   autoBackground?: boolean;
   defaultPlacement?: string;
   headed?: boolean;
@@ -44,6 +47,17 @@ function createPlaywrightConfig(options: RecordOptions, outputDir: string): stri
   const captureWidth = width * deviceScaleFactor;
   const captureHeight = height * deviceScaleFactor;
 
+  // Build optional context options (isMobile, hasTouch, colorScheme, etc.)
+  const extraUseFields: string[] = [];
+  if (options.isMobile) extraUseFields.push(`        isMobile: true,`);
+  if (options.hasTouch) extraUseFields.push(`        hasTouch: true,`);
+  if (options.contextOptions) {
+    for (const [key, value] of Object.entries(options.contextOptions)) {
+      extraUseFields.push(`        ${key}: ${JSON.stringify(value)},`);
+    }
+  }
+  const extraUse = extraUseFields.length > 0 ? '\n' + extraUseFields.join('\n') : '';
+
   return `import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
@@ -59,7 +73,7 @@ export default defineConfig({
         browserName: ${JSON.stringify(browser)},
         baseURL: ${JSON.stringify(options.baseURL)},
         viewport: { width: ${width}, height: ${height} },
-        deviceScaleFactor: ${deviceScaleFactor},
+        deviceScaleFactor: ${deviceScaleFactor},${extraUse}
         video: {
           mode: 'on',
           size: { width: ${captureWidth}, height: ${captureHeight} },

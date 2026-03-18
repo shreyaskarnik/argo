@@ -20,6 +20,12 @@ export interface VideoConfig {
   fps: number;
   browser: BrowserEngine;
   deviceScaleFactor: number;
+  /** Enable mobile viewport emulation (sets Playwright isMobile). */
+  isMobile?: boolean;
+  /** Enable touch event emulation (sets Playwright hasTouch). */
+  hasTouch?: boolean;
+  /** Additional Playwright browser context options (colorScheme, locale, geolocation, permissions, etc.). */
+  contextOptions?: Record<string, unknown>;
 }
 
 export interface ExportConfig {

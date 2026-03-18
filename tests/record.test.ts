@@ -114,4 +114,37 @@ describe('record', () => {
     expect(config).toContain('deviceScaleFactor: 2');
     expect(config).toContain('size: { width: 2560, height: 1440 }');
   });
+
+  it('includes isMobile, hasTouch, and contextOptions in generated config', async () => {
+    execFileMock.mockImplementation((_cmd, _args, options, callback) => {
+      const testResultsDir = resolve(tempDir, 'test-results');
+      const argoOutputDir = options.env.ARGO_OUTPUT_DIR as string;
+
+      mkdirSync(join(testResultsDir, 'demo-run'), { recursive: true });
+      writeFileSync(join(testResultsDir, 'demo-run', 'video.webm'), 'video');
+      mkdirSync(resolve(tempDir, argoOutputDir), { recursive: true });
+      writeFileSync(resolve(tempDir, argoOutputDir, '.timing.json'), '{}');
+
+      callback(null, '', '');
+      return {} as never;
+    });
+
+    await record('demo', {
+      demosDir: 'custom-demos',
+      baseURL: 'http://localhost:3000',
+      video: { width: 390, height: 664 },
+      browser: 'webkit',
+      isMobile: true,
+      hasTouch: true,
+      contextOptions: { colorScheme: 'dark' },
+    });
+
+    const configPath = join(tempDir, '.argo', 'demo', 'playwright.record.config.mjs');
+    const config = readFileSync(configPath, 'utf-8');
+
+    expect(config).toContain('viewport: { width: 390, height: 664 }');
+    expect(config).toContain('isMobile: true');
+    expect(config).toContain('hasTouch: true');
+    expect(config).toContain('colorScheme: "dark"');
+  });
 });
