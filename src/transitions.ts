@@ -66,17 +66,26 @@ function buildFadeFilterComplex(
   const segLabels: string[] = [];
   const aSegLabels: string[] = [];
 
+  // Small overlap (2 frames at 30fps ≈ 0.067s) ensures the fade-out reaches
+  // full black before the next segment starts, eliminating the brief flash
+  // of the un-faded source at segment boundaries.
+  const overlapSec = 0.067;
+
   for (let i = 0; i < numSegments; i++) {
     const start = i === 0 ? 0 : boundaries[i - 1];
     const end = i < boundaries.length ? boundaries[i] : '';
-    const trimEnd = end !== '' ? `:${end.toFixed(4)}` : '';
+    // Extend each segment's end slightly past the boundary so fade-out
+    // reaches full black. Start the next segment at the boundary (the
+    // fade-in covers the overlap).
+    const trimEndVal = end !== '' ? (end as number) + overlapSec : '';
+    const trimEnd = trimEndVal !== '' ? `:${(trimEndVal as number).toFixed(4)}` : '';
     const label = `v${i}`;
 
     let chain = `[vs${i}]trim=${start.toFixed(4)}${trimEnd},setpts=PTS-STARTPTS`;
 
     // Fade out at end of segment (except last)
     if (i < boundaries.length) {
-      const segDuration = (end as number) - start;
+      const segDuration = (end as number) - start + overlapSec;
       const fadeStart = Math.max(0, segDuration - fadeDur);
       chain += `,fade=t=out:st=${fadeStart.toFixed(4)}:d=${fadeDur.toFixed(4)}`;
     }
@@ -90,7 +99,7 @@ function buildFadeFilterComplex(
     parts.push(chain);
     segLabels.push(`[${label}]`);
 
-    // Audio: just trim, no fading (voiceover should play through)
+    // Audio: trim to match video segment (including overlap), no fading
     if (audioInputLabel) {
       const aLabel = `a${i}`;
       parts.push(`[as${i}]atrim=${start.toFixed(4)}${trimEnd},asetpts=PTS-STARTPTS[${aLabel}]`);
