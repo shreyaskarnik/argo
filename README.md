@@ -216,6 +216,8 @@ argo pipeline --all                Run pipeline for every demo in demosDir
 argo validate <demo>               Check scene name consistency (no TTS/recording)
 argo preview <demo>                Browser-based editor for voiceover, overlays, timing
 argo preview                       Multi-demo dashboard (lists all demos with status)
+argo clip <demo> <scene>            Extract a scene clip from exported video
+argo clip <demo> <scene> --format gif  Extract as palette-optimized GIF
 argo doctor                        Check environment (ffmpeg, Playwright, config)
 argo --config <path> <command>     Use a custom config file
 

@@ -178,6 +178,8 @@ npx argo pipeline <name> --base-url <url>   # Override baseURL
 npx argo validate <name>                    # Dry run — checks scene name consistency
 npx argo preview <name>                     # Interactive replay viewer (iterate without re-recording)
 npx argo preview                            # Multi-demo dashboard (lists all demos with status)
+npx argo clip <name> <scene>                # Extract a scene as MP4 clip
+npx argo clip <name> <scene> --format gif   # Extract as GIF (for release notes, docs)
 npx argo init                               # Scaffold example demo + config
 npx argo init --from tests/spec.ts          # Convert existing Playwright test
 ```

@@ -94,5 +94,8 @@ export { runFfmpegWithProgress } from './progress.js';
 // Dashboard
 export { startDashboardServer } from './dashboard.js';
 
+// Clip
+export { extractClip, type ClipOptions } from './clip.js';
+
 // Init
 export { init } from './init.js';

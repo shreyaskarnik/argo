@@ -251,6 +251,28 @@ export function createProgram(): Command {
     });
 
   program
+    .command('clip <demo> <scene>')
+    .description('Extract a scene clip from an exported video using chapter markers')
+    .option('--format <type>', 'output format: mp4 (default) or gif', 'mp4')
+    .option('--gif-width <pixels>', 'GIF width in pixels (default: 640)', parseInt)
+    .option('--gif-fps <fps>', 'GIF framerate (default: 10)', parseInt)
+    .action(async (demo: string, scene: string, cmdOpts: { format?: string; gifWidth?: number; gifFps?: number }) => {
+      validateDemoName(demo);
+      const configPath = program.opts().config;
+      const config = await loadConfig(process.cwd(), configPath);
+      const { extractClip } = await import('./clip.js');
+      const outputPath = await extractClip({
+        demoName: demo,
+        scene,
+        outputDir: config.outputDir,
+        format: (cmdOpts.format === 'gif' ? 'gif' : 'mp4') as 'mp4' | 'gif',
+        gifWidth: cmdOpts.gifWidth,
+        gifFps: cmdOpts.gifFps,
+      });
+      console.log(`\n✓ Clip saved to: ${outputPath}`);
+    });
+
+  program
     .command('preview [demo]')
     .description('Start a browser-based preview server (omit demo name for dashboard)')
     .option('--port <number>', 'server port (default: auto)', parseInt)

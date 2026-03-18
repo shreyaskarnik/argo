@@ -76,6 +76,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - `argo pipeline --all` runs the full pipeline for every demo discovered in `demosDir` (finds all `.scenes.json` files)
 - `argo pipeline [demo]` — demo argument is optional when `--all` is used
 - `argo validate <demo>` checks scene name consistency between script and scenes manifest, validates overlay fields (no TTS/recording)
+- `argo clip <demo> <scene>` extracts a scene clip from an exported MP4 using chapter markers. `--format gif` produces a palette-optimized GIF. Clips go to `videos/clips/`. Useful for release notes and docs.
 - `--base-url <url>` flag on `record` and `pipeline` overrides `config.baseURL`
 - `--headed` flag on `record` and `pipeline` runs the browser in visible mode
 - `--all` flag on `pipeline` runs all demos in batch (sequential execution, continues on failure)
