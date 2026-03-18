@@ -9,12 +9,14 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { existsSync, readFileSync, statSync, readdirSync, createReadStream } from 'node:fs';
 import { join } from 'node:path';
 import { discoverDemos } from './pipeline.js';
+import { startPreviewServer } from './preview.js';
 
 export interface DashboardOptions {
   demosDir: string;
   outputDir: string;
   argoDir?: string;
   port?: number;
+  ttsDefaults?: { voice: string; speed: number };
 }
 
 interface DemoStatus {
@@ -70,7 +72,7 @@ function renderDashboardHTML(statuses: DemoStatus[], port: number): string {
       ? `<span class="meta">${(s.meta as any).video?.width}×${(s.meta as any).video?.height} &middot; ${(s.meta as any).video?.browser}</span>`
       : '';
     const previewLink = s.hasVideo
-      ? `<a href="/video/${s.name}" target="_blank" class="btn">Preview</a>`
+      ? `<a href="/preview/${s.name}" class="btn">Preview</a>`
       : '';
 
     return `
@@ -144,42 +146,41 @@ function renderDashboardHTML(statuses: DemoStatus[], port: number): string {
 }
 
 export async function startDashboardServer(options: DashboardOptions): Promise<{ url: string }> {
-  const { demosDir, outputDir, port: preferredPort } = options;
+  const { demosDir, outputDir, port: preferredPort, ttsDefaults } = options;
+
+  // Track spawned preview servers to avoid duplicates
+  const previewServers = new Map<string, string>(); // demo name → preview URL
 
   return new Promise((resolve) => {
-    const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+    const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
       const url = req.url ?? '/';
 
-      // Serve video files at /video/<name>
-      const videoMatch = url.match(/^\/video\/([a-zA-Z0-9][a-zA-Z0-9_-]*)$/);
-      if (videoMatch) {
-        const name = videoMatch[1];
-        const videoPath = join(outputDir, `${name}.mp4`);
-        if (!existsSync(videoPath)) {
-          res.writeHead(404);
-          res.end('Video not found');
+      // Spawn preview editor at /preview/<name> and redirect
+      const previewMatch = url.match(/^\/preview\/([a-zA-Z0-9][a-zA-Z0-9_-]*)$/);
+      if (previewMatch) {
+        const name = previewMatch[1];
+
+        // Check if a preview server is already running for this demo
+        if (previewServers.has(name)) {
+          res.writeHead(302, { Location: previewServers.get(name)! });
+          res.end();
           return;
         }
-        const stat = statSync(videoPath);
-        const range = req.headers.range;
-        if (range) {
-          const parts = range.replace(/bytes=/, '').split('-');
-          const start = parseInt(parts[0], 10);
-          const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
-          res.writeHead(206, {
-            'Content-Range': `bytes ${start}-${end}/${stat.size}`,
-            'Accept-Ranges': 'bytes',
-            'Content-Length': end - start + 1,
-            'Content-Type': 'video/mp4',
+
+        try {
+          const preview = await startPreviewServer({
+            demoName: name,
+            argoDir: '.argo',
+            demosDir,
+            outputDir,
+            ttsDefaults: ttsDefaults ?? { voice: 'af_heart', speed: 1.0 },
           });
-          createReadStream(videoPath, { start, end }).pipe(res);
-        } else {
-          res.writeHead(200, {
-            'Content-Length': stat.size,
-            'Content-Type': 'video/mp4',
-            'Accept-Ranges': 'bytes',
-          });
-          createReadStream(videoPath).pipe(res);
+          previewServers.set(name, preview.url);
+          res.writeHead(302, { Location: preview.url });
+          res.end();
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'text/plain' });
+          res.end(`Failed to start preview for ${name}: ${(err as Error).message}`);
         }
         return;
       }

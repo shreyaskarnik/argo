@@ -264,6 +264,7 @@ export function createProgram(): Command {
           demosDir: config.demosDir,
           outputDir: config.outputDir,
           port: cmdOpts.port,
+          ttsDefaults: { voice: config.tts.defaultVoice, speed: config.tts.defaultSpeed },
         });
         console.log(`\nArgo Dashboard running at: ${url}`);
         console.log('Press Ctrl+C to stop.\n');
