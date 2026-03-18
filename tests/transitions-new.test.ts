@@ -55,7 +55,8 @@ describe('buildTransitionFilters', () => {
     const fc = (result as any).filterComplex;
     expect(fc).not.toContain('asplit=');
     expect(fc).not.toContain('atrim=');
-    expect(fc).toContain('concat=n=2:v=1:a=0');
+    // 2 segments + 1 black gap = 3 concat inputs
+    expect(fc).toContain('concat=n=3:v=1:a=0');
     expect((result as any).audioOutput).toBeNull();
   });
 });

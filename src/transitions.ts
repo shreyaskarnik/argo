@@ -43,6 +43,8 @@ function buildFadeFilterComplex(
   isDissolveDip: boolean,
   videoInputLabel: string,
   audioInputLabel: string | null,
+  videoWidth?: number,
+  videoHeight?: number,
 ): { filterComplex: string; videoOutput: string; audioOutput: string | null } {
   // Build boundary times from placements (scene starts after the first)
   const boundaries: number[] = [];
@@ -68,6 +70,11 @@ function buildFadeFilterComplex(
   const segLabels: string[] = [];
   const aSegLabels: string[] = [];
 
+  // Duration of black gap between segments (2 frames). This masks the
+  // 1-frame flash where the decoder outputs the new segment's keyframe
+  // before the fade-in filter processes it.
+  const blackGapSec = 0.067;
+
   for (let i = 0; i < numSegments; i++) {
     const start = i === 0 ? 0 : boundaries[i - 1];
     const end = i < boundaries.length ? boundaries[i] : '';
@@ -76,19 +83,14 @@ function buildFadeFilterComplex(
 
     let chain = `[vs${i}]trim=${start.toFixed(4)}${trimEnd},setpts=PTS-STARTPTS`;
 
-    // Fade out at end of segment (except last).
-    // The fade completes exactly at the trim boundary — the last frame
-    // of this segment is full black, so the cut to the next segment
-    // (which starts with fade-in from black) is seamless.
+    // Fade out at end of segment (except last)
     if (i < boundaries.length) {
       const segDuration = (end as number) - start;
       const fadeStart = Math.max(0, segDuration - fadeDur);
       chain += `,fade=t=out:st=${fadeStart.toFixed(4)}:d=${fadeDur.toFixed(4)}`;
     }
 
-    // Fade in at start of segment (except first).
-    // First frame is black (opacity 0), matching the last frame of the
-    // previous segment's fade-out.
+    // Fade in at start of segment (except first)
     if (i > 0) {
       chain += `,fade=t=in:st=0:d=${fadeDur.toFixed(4)}`;
     }
@@ -97,23 +99,41 @@ function buildFadeFilterComplex(
     parts.push(chain);
     segLabels.push(`[${label}]`);
 
-    // Audio: trim to match video segment (including overlap), no fading
+    // Insert a short black gap after each segment (except last) to mask
+    // the keyframe flash at the cut point
+    if (i < boundaries.length) {
+      const gapLabel = `gap${i}`;
+      const gapW = videoWidth ?? 1920;
+      const gapH = videoHeight ?? 1080;
+      parts.push(`color=black:s=${gapW}x${gapH}:d=${blackGapSec.toFixed(4)}:r=30[${gapLabel}]`);
+      segLabels.push(`[${gapLabel}]`);
+    }
+
+    // Audio: trim to match video segment, no fading
     if (audioInputLabel) {
       const aLabel = `a${i}`;
       parts.push(`[as${i}]atrim=${start.toFixed(4)}${trimEnd},asetpts=PTS-STARTPTS[${aLabel}]`);
       aSegLabels.push(`[${aLabel}]`);
+
+      // Silent audio gap to match video black gap
+      if (i < boundaries.length) {
+        const aGapLabel = `agap${i}`;
+        parts.push(`aevalsrc=0:d=${blackGapSec.toFixed(4)}:s=24000:c=mono[${aGapLabel}]`);
+        aSegLabels.push(`[${aGapLabel}]`);
+      }
     }
   }
 
-  // Concat all segments — interleave video+audio pairs: [v0][a0][v1][a1]...
+  // Concat all segments + black gaps
+  const totalConcatSegments = segLabels.length; // includes gaps
   const videoOutput = 'vfaded';
   if (audioInputLabel) {
     const audioOutput = 'afaded';
     const interleaved = segLabels.map((v, i) => `${v}${aSegLabels[i]}`).join('');
-    parts.push(`${interleaved}concat=n=${numSegments}:v=1:a=1[${videoOutput}][${audioOutput}]`);
+    parts.push(`${interleaved}concat=n=${totalConcatSegments}:v=1:a=1[${videoOutput}][${audioOutput}]`);
     return { filterComplex: parts.join(';\n'), videoOutput: `[${videoOutput}]`, audioOutput: `[${audioOutput}]` };
   } else {
-    parts.push(`${segLabels.join('')}concat=n=${numSegments}:v=1:a=0[${videoOutput}]`);
+    parts.push(`${segLabels.join('')}concat=n=${totalConcatSegments}:v=1:a=0[${videoOutput}]`);
     return { filterComplex: parts.join(';\n'), videoOutput: `[${videoOutput}]`, audioOutput: null };
   }
 }
@@ -129,6 +149,8 @@ export function buildTransitionFilters(
   placements: Placement[],
   transition: TransitionConfig,
   hasAudio?: boolean,
+  videoWidth?: number,
+  videoHeight?: number,
 ): string[] | { filterComplex: string; videoOutput: string; audioOutput: string | null } {
   if (placements.length < 2) return [];
 
@@ -161,5 +183,7 @@ export function buildTransitionFilters(
     isDissolveDip,
     '[0:v]',
     hasAudio ? '[1:a]' : null,
+    videoWidth,
+    videoHeight,
   );
 }
