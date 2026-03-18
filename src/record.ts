@@ -117,6 +117,11 @@ export async function record(demoName: string, options: RecordOptions): Promise<
           ARGO_OVERLAYS_PATH: path.resolve(path.join(options.demosDir, `${demoName}.scenes.json`)),
         },
       }, (error, stdout, stderr) => {
+        // When DEBUG env vars are set (e.g., DEBUG=pw:api), forward Playwright's
+        // debug output to stderr so users can see it even on success.
+        if (process.env.DEBUG && stderr) {
+          process.stderr.write(stderr);
+        }
         if (error) {
           const output = [stdout, stderr].filter(Boolean).join('\n');
           reject(new Error(`Playwright recording failed:\n${output}`));
