@@ -67,8 +67,45 @@
     }
   },
   {
+    "scene": "transitions",
+    "text": "Scene transitions add smooth fades between scenes. Fade through black, dissolve, or directional wipes. One line of config.",
+    "speed": 0.9,
+    "overlay": {
+      "type": "lower-third",
+      "text": "transition: { type: 'fade-through-black', durationMs: 2000 }",
+      "placement": "bottom-center",
+      "motion": "fade-in",
+      "autoBackground": true
+    }
+  },
+  {
+    "scene": "formats",
+    "text": "Export multiple formats from one pipeline run. Square for Instagram. Vertical for TikTok. Animated GIF for docs and pull requests. And clip extraction for release notes.",
+    "speed": 0.9,
+    "overlay": {
+      "type": "callout",
+      "text": "MP4, GIF, 1:1, 9:16 — one pipeline run",
+      "placement": "top-right",
+      "motion": "fade-in",
+      "autoBackground": true
+    }
+  },
+  {
+    "scene": "batch",
+    "text": "Batch pipeline and dashboard. Build all demos at once with dash-dash all. And the dashboard gives you a bird's-eye view of every demo with status, resolution, and quick preview links.",
+    "speed": 0.9,
+    "overlay": {
+      "type": "headline-card",
+      "title": "argo pipeline --all",
+      "body": "Build everything. Preview from a dashboard.",
+      "placement": "top-left",
+      "motion": "slide-in",
+      "autoBackground": true
+    }
+  },
+  {
     "scene": "closing",
-    "text": "Overlays auto-detect your page theme and adapt. The pipeline also generates subtitles, chapter markers, and a scene timing report alongside every video.",
+    "text": "Overlays auto-detect your page theme. The pipeline generates subtitles, chapters, and a timing report. And scene transitions make everything flow.",
     "speed": 0.9,
     "overlay": {
       "type": "headline-card",

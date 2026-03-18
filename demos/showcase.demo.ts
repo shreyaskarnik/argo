@@ -4,7 +4,7 @@ import { spotlight, focusRing, dimAround, zoomTo, resetCamera } from '@argo-vide
 import { cursorHighlight } from '@argo-video/cli';
 
 test('showcase', async ({ page, narration }) => {
-  test.setTimeout(160000);
+  test.setTimeout(240000);
   await page.goto('/showcase.html');
   cursorHighlight(page, { color: '#6366f1', radius: 18 });
   await page.waitForTimeout(800);
@@ -76,9 +76,24 @@ test('showcase', async ({ page, narration }) => {
   focusRing(page, '#demo-script-code', { color: '#06b6d4', duration: narration.durationFor('code') });
   await showOverlay(page, 'code', narration.durationFor('code'));
 
-  // Scene 7: Theme toggle — autoBackground adapts
-  narration.mark('closing');
+  // Scene 7: Transitions — overlay-only scene (feature highlight)
+  narration.mark('transitions');
   await page.locator('#hero').scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  await showOverlay(page, 'transitions', narration.durationFor('transitions'));
+
+  // Scene 8: Multi-format export
+  narration.mark('formats');
+  await page.waitForTimeout(200);
+  await showOverlay(page, 'formats', narration.durationFor('formats'));
+
+  // Scene 9: Batch + dashboard
+  narration.mark('batch');
+  await page.waitForTimeout(200);
+  await showOverlay(page, 'batch', narration.durationFor('batch'));
+
+  // Scene 10: Theme toggle — autoBackground adapts
+  narration.mark('closing');
   await page.waitForTimeout(300);
   focusRing(page, '#theme-toggle', { color: '#f59e0b', duration: 1200 });
   await page.waitForTimeout(600);
@@ -86,8 +101,8 @@ test('showcase', async ({ page, narration }) => {
   await page.waitForTimeout(600);
   await showOverlay(page, 'closing', narration.durationFor('closing', { maxMs: 10000, leadOutMs: 600 }));
 
-  // Scene 8: Mic drop
+  // Scene 11: Mic drop
   narration.mark('mic-drop');
-  showConfetti(page, { spread: 'burst', duration: 3000, pieces: 180 });
+  showConfetti(page, { emoji: ['🎬', '🚀', '✨'], spread: 'burst', duration: 3000, pieces: 180 });
   await showOverlay(page, 'mic-drop', narration.durationFor('mic-drop', { minMs: 2800, leadOutMs: 400 }));
 });

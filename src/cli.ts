@@ -251,6 +251,29 @@ export function createProgram(): Command {
     });
 
   program
+    .command('release-prep <demo>')
+    .description('Extract all scene clips and generate release notes draft')
+    .option('--gif', 'also generate GIF for each scene clip')
+    .option('--gif-width <pixels>', 'GIF width in pixels (default: 640)', parseInt)
+    .option('--gif-fps <fps>', 'GIF framerate (default: 10)', parseInt)
+    .option('--version <version>', 'version string for the release notes header')
+    .action(async (demo: string, cmdOpts: { gif?: boolean; gifWidth?: number; gifFps?: number; version?: string }) => {
+      validateDemoName(demo);
+      const configPath = program.opts().config;
+      const config = await loadConfig(process.cwd(), configPath);
+      const { releasePrep } = await import('./release-prep.js');
+      await releasePrep({
+        demoName: demo,
+        outputDir: config.outputDir,
+        demosDir: config.demosDir,
+        includeGif: cmdOpts.gif,
+        gifWidth: cmdOpts.gifWidth,
+        gifFps: cmdOpts.gifFps,
+        version: cmdOpts.version,
+      });
+    });
+
+  program
     .command('clip <demo> <scene>')
     .description('Extract a scene clip from an exported video using chapter markers')
     .option('--format <type>', 'output format: mp4 (default) or gif', 'mp4')

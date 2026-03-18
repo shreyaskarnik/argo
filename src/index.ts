@@ -97,5 +97,8 @@ export { startDashboardServer } from './dashboard.js';
 // Clip
 export { extractClip, type ClipOptions } from './clip.js';
 
+// Release Prep
+export { releasePrep, type ReleasePrepOptions } from './release-prep.js';
+
 // Init
 export { init } from './init.js';
