@@ -1,6 +1,10 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import type { Placement } from './tts/align.js';
+import type { TransitionConfig, SpeedRampConfig } from './config.js';
+import { buildTransitionFilters } from './transitions.js';
+import { runFfmpegWithProgress } from './progress.js';
 
 export interface ExportOptions {
   demoName: string;
@@ -22,8 +26,14 @@ export interface ExportOptions {
   thumbnailPath?: string;
   /** Optional path to ffmpeg chapter metadata file for MP4 chapter markers. */
   chapterMetadataPath?: string;
-  /** Additional aspect ratios to export alongside the main 16:9. */
-  formats?: Array<'1:1' | '9:16'>;
+  /** Additional formats to export alongside the main 16:9. */
+  formats?: Array<'1:1' | '9:16' | 'gif'>;
+  /** Scene transition config for inter-scene transitions. */
+  transition?: TransitionConfig;
+  /** Scene placements — needed for transitions. */
+  placements?: Placement[];
+  /** Estimated total duration in ms — used for progress bar. */
+  totalDurationMs?: number;
 }
 
 function formatSeconds(ms: number): string {
@@ -49,6 +59,59 @@ export function checkFfmpeg(): boolean {
 }
 
 /**
+ * Export an MP4 to animated GIF with palette optimization.
+ */
+async function exportGif(
+  mp4Path: string,
+  gifPath: string,
+  fps = 10,
+  width = 640,
+): Promise<void> {
+  // Two-pass approach: generate palette first, then use it for high-quality GIF
+  const palettePath = mp4Path.replace(/\.mp4$/, '.palette.png');
+
+  const paletteArgs = [
+    '-i', mp4Path,
+    '-vf', `fps=${fps},scale=${width}:-1:flags=lanczos,palettegen=stats_mode=diff`,
+    '-y', palettePath,
+  ];
+
+  const paletteResult = spawnSync('ffmpeg', paletteArgs, { stdio: 'pipe' });
+  if (paletteResult.status !== 0) {
+    console.warn('Warning: GIF palette generation failed, using single-pass fallback');
+    // Single-pass fallback
+    const fallbackArgs = [
+      '-i', mp4Path,
+      '-vf', `fps=${fps},scale=${width}:-1:flags=lanczos`,
+      '-y', gifPath,
+    ];
+    const fbResult = spawnSync('ffmpeg', fallbackArgs, { stdio: 'inherit' });
+    if (fbResult.status !== 0) {
+      console.warn(`Warning: GIF export failed`);
+    }
+    return;
+  }
+
+  const gifArgs = [
+    '-i', mp4Path,
+    '-i', palettePath,
+    '-lavfi', `fps=${fps},scale=${width}:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=5`,
+    '-y', gifPath,
+  ];
+
+  const gifResult = spawnSync('ffmpeg', gifArgs, { stdio: 'pipe' });
+  if (gifResult.status !== 0) {
+    console.warn(`Warning: GIF export failed`);
+  }
+
+  // Clean up palette
+  try {
+    const { unlinkSync } = await import('node:fs');
+    unlinkSync(palettePath);
+  } catch { /* ignore */ }
+}
+
+/**
  * Export a demo to MP4 by combining the screen recording with aligned narration audio.
  */
 export async function exportVideo(options: ExportOptions): Promise<string> {
@@ -65,6 +128,9 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     deviceScaleFactor = 1,
     thumbnailPath,
     chapterMetadataPath,
+    transition,
+    placements,
+    totalDurationMs,
   } = options;
 
   checkFfmpeg();
@@ -127,6 +193,13 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
   if (deviceScaleFactor > 1 && outputWidth && outputHeight) {
     vFilters.push(`scale=${outputWidth}:${outputHeight}:flags=lanczos`);
   }
+
+  // Scene transitions
+  if (transition && placements && placements.length > 1) {
+    const transitionFilters = buildTransitionFilters(placements, transition);
+    vFilters.push(...transitionFilters);
+  }
+
   if (vFilters.length > 0) {
     args.push('-vf', vFilters.join(','));
   }
@@ -162,21 +235,33 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
 
   args.push('-y', outputPath);
 
-  const result = spawnSync('ffmpeg', args, { stdio: 'inherit' });
+  // Use progress bar when we know the total duration
+  if (totalDurationMs && totalDurationMs > 0) {
+    await runFfmpegWithProgress(args, totalDurationMs);
+  } else {
+    const result = spawnSync('ffmpeg', args, { stdio: 'inherit' });
 
-  if (result.error) {
-    throw new Error(`Failed to launch ffmpeg: ${result.error.message}`);
-  }
-  if (result.signal) {
-    throw new Error(`ffmpeg was killed by signal ${result.signal}`);
-  }
-  if (result.status !== 0) {
-    throw new Error(`ffmpeg failed with exit code ${result.status}`);
+    if (result.error) {
+      throw new Error(`Failed to launch ffmpeg: ${result.error.message}`);
+    }
+    if (result.signal) {
+      throw new Error(`ffmpeg was killed by signal ${result.signal}`);
+    }
+    if (result.status !== 0) {
+      throw new Error(`ffmpeg failed with exit code ${result.status}`);
+    }
   }
 
-  // Export additional aspect ratios by cropping from the main 16:9 output
+  // Export additional formats
   const formats = options.formats ?? [];
   for (const format of formats) {
+    if (format === 'gif') {
+      const gifPath = outputPath.replace(/\.mp4$/, '.gif');
+      console.log(`  Exporting GIF → ${gifPath}`);
+      await exportGif(outputPath, gifPath, 10, outputWidth ?? 640);
+      continue;
+    }
+
     const suffix = format.replace(':', 'x');
     const formatPath = outputPath.replace(/\.mp4$/, `.${suffix}.mp4`);
 

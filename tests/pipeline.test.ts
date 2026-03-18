@@ -143,7 +143,7 @@ describe('runPipeline', () => {
 
   it('passes correct options to exportVideo', async () => {
     await runPipeline(DEMO_NAME, defaultConfig);
-    expect(mockedExportVideo).toHaveBeenCalledWith({
+    expect(mockedExportVideo).toHaveBeenCalledWith(expect.objectContaining({
       demoName: DEMO_NAME,
       argoDir: '.argo',
       outputDir: join('.argo', 'test-output'),
@@ -157,7 +157,7 @@ describe('runPipeline', () => {
       chapterMetadataPath: '.argo/test-demo/chapters.txt',
       formats: undefined,
       headTrimMs: 800,
-    });
+    }));
   });
 
   it('writes scene durations metadata for recording-time pacing', async () => {

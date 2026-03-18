@@ -1,6 +1,6 @@
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import { generateClips } from './tts/generate.js';
 import { record } from './record.js';
 import { alignClips, type ClipInfo, type SceneTiming } from './tts/align.js';
@@ -9,6 +9,7 @@ import { exportVideo, checkFfmpeg } from './export.js';
 import { generateSrt, generateVtt } from './subtitles.js';
 import { generateChapterMetadata } from './chapters.js';
 import { buildSceneReport, formatSceneReport } from './report.js';
+import { computeSegments, applySpeedRamp } from './speed-ramp.js';
 import type { ArgoConfig } from './config.js';
 
 function getVideoDurationMs(videoPath: string): number {
@@ -37,6 +38,53 @@ function getVideoDurationMs(videoPath: string): number {
 
 export interface PipelineOptions {
   headed?: boolean;
+}
+
+/**
+ * Discover all demo names in the demos directory by looking for `.scenes.json` files.
+ */
+export function discoverDemos(demosDir: string): string[] {
+  try {
+    return readdirSync(demosDir)
+      .filter((f) => f.endsWith('.scenes.json'))
+      .map((f) => basename(f).replace(/\.scenes\.json$/, ''))
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Run the pipeline for all demos in the demosDir.
+ */
+export async function runBatchPipeline(
+  config: Pick<ArgoConfig, 'baseURL' | 'demosDir' | 'outputDir' | 'tts' | 'video' | 'export' | 'overlays'>,
+  pipelineOpts?: PipelineOptions,
+): Promise<string[]> {
+  const demos = discoverDemos(config.demosDir);
+  if (demos.length === 0) {
+    throw new Error(`No demos found in ${config.demosDir}/ (no .scenes.json files)`);
+  }
+
+  console.log(`Found ${demos.length} demo(s): ${demos.join(', ')}\n`);
+  const results: string[] = [];
+
+  for (const demo of demos) {
+    console.log(`\n${'═'.repeat(60)}`);
+    console.log(`  Pipeline: ${demo}`);
+    console.log(`${'═'.repeat(60)}\n`);
+    try {
+      const output = await runPipeline(demo, config, pipelineOpts);
+      results.push(output);
+    } catch (err) {
+      console.error(`\n✗ Pipeline failed for ${demo}: ${(err as Error).message}`);
+    }
+  }
+
+  console.log(`\n${'═'.repeat(60)}`);
+  console.log(`  Batch complete: ${results.length}/${demos.length} succeeded`);
+  console.log(`${'═'.repeat(60)}\n`);
+  return results;
 }
 
 export async function runPipeline(
@@ -218,11 +266,24 @@ export async function runPipeline(
     thumbnailPath: config.export.thumbnailPath,
     chapterMetadataPath,
     formats: config.export.formats,
+    transition: config.export.transition,
+    placements: shiftedPlacements,
+    totalDurationMs: shiftedDurationMs,
   };
   if (tailPadMs !== undefined) exportOptions.tailPadMs = tailPadMs;
   if (headTrimMs > 0) exportOptions.headTrimMs = headTrimMs;
 
   const outputPath = await exportVideo(exportOptions);
+
+  // Step 4b: Speed ramp — compress gaps between scenes
+  if (config.export.speedRamp && config.export.speedRamp.gapSpeed > 1.0 && shiftedPlacements.length > 0) {
+    console.log(`★ Applying speed ramp (${config.export.speedRamp.gapSpeed}× gaps)...`);
+    const hasAudioFile = !isSilent;
+    const segments = computeSegments(shiftedPlacements, shiftedDurationMs, config.export.speedRamp);
+    if (segments.length > 0) {
+      await applySpeedRamp(outputPath, segments, hasAudioFile, config.export.preset, config.export.crf);
+    }
+  }
 
   // Scene report
   const report = buildSceneReport(demoName, shiftedPlacements, overflowMs, shiftedDurationMs, outputPath);

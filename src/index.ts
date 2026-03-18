@@ -11,6 +11,9 @@ export {
   type TTSEngine,
   type VideoConfig,
   type ExportConfig,
+  type TransitionType,
+  type TransitionConfig,
+  type SpeedRampConfig,
 } from './config.js';
 
 // Fixtures
@@ -75,6 +78,21 @@ export { validateDemo, type ValidateOptions, type ValidateResult } from './valid
 
 // Doctor
 export { runDoctor, formatDoctorResults } from './doctor.js';
+
+// Pipeline
+export { runPipeline, runBatchPipeline, discoverDemos, type PipelineOptions } from './pipeline.js';
+
+// Transitions
+export { buildTransitionFilters } from './transitions.js';
+
+// Speed Ramp
+export { computeSegments, applySpeedRamp } from './speed-ramp.js';
+
+// Progress
+export { runFfmpegWithProgress } from './progress.js';
+
+// Dashboard
+export { startDashboardServer } from './dashboard.js';
 
 // Init
 export { init } from './init.js';
