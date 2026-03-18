@@ -807,6 +807,27 @@ const PREVIEW_HTML = `<!DOCTYPE html>
     --radius: 6px;
     --transition: 0.15s ease;
   }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f5f5f5;
+      --surface: #ffffff;
+      --surface2: #f0f0f0;
+      --surface3: #e8e8e8;
+      --border: #d4d4d4;
+      --border-subtle: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #666;
+      --text-dim: #999;
+      --accent: #4f46e5;
+      --accent-hover: #6366f1;
+      --accent-glow: rgba(79,70,229,0.1);
+      --accent-glow-strong: rgba(79,70,229,0.2);
+      --success: #16a34a;
+      --success-glow: rgba(22,163,74,0.1);
+      --warning: #d97706;
+      --error: #dc2626;
+    }
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: var(--sans);
