@@ -265,6 +265,18 @@ export function createProgram(): Command {
           outputDir: config.outputDir,
           port: cmdOpts.port,
           ttsDefaults: { voice: config.tts.defaultVoice, speed: config.tts.defaultSpeed },
+          exportConfig: {
+            preset: config.export.preset,
+            crf: config.export.crf,
+            fps: config.video.fps,
+            outputWidth: config.video.width,
+            outputHeight: config.video.height,
+            deviceScaleFactor: config.video.deviceScaleFactor,
+            thumbnailPath: config.export.thumbnailPath,
+            formats: config.export.formats,
+            transition: config.export.transition,
+            speedRamp: config.export.speedRamp,
+          },
         });
         console.log(`\nArgo Dashboard running at: ${url}`);
         console.log('Press Ctrl+C to stop.\n');
@@ -282,6 +294,18 @@ export function createProgram(): Command {
         ttsDefaults: {
           voice: config.tts.defaultVoice,
           speed: config.tts.defaultSpeed,
+        },
+        exportConfig: {
+          preset: config.export.preset,
+          crf: config.export.crf,
+          fps: config.video.fps,
+          outputWidth: config.video.width,
+          outputHeight: config.video.height,
+          deviceScaleFactor: config.video.deviceScaleFactor,
+          thumbnailPath: config.export.thumbnailPath,
+          formats: config.export.formats,
+          transition: config.export.transition,
+          speedRamp: config.export.speedRamp,
         },
       });
       console.log(`\nArgo Preview running at: ${url}`);

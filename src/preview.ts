@@ -21,6 +21,19 @@ import { generateSrt, generateVtt } from './subtitles.js';
 import { generateChapterMetadata } from './chapters.js';
 import { exportVideo, checkFfmpeg } from './export.js';
 
+export interface PreviewExportConfig {
+  preset?: string;
+  crf?: number;
+  fps?: number;
+  outputWidth?: number;
+  outputHeight?: number;
+  deviceScaleFactor?: number;
+  thumbnailPath?: string;
+  formats?: Array<'1:1' | '9:16' | 'gif'>;
+  transition?: import('./config.js').TransitionConfig;
+  speedRamp?: import('./config.js').SpeedRampConfig;
+}
+
 export interface PreviewOptions {
   demoName: string;
   argoDir?: string;
@@ -29,6 +42,7 @@ export interface PreviewOptions {
   port?: number;
   open?: boolean;
   ttsDefaults?: { voice?: string; speed?: number };
+  exportConfig?: PreviewExportConfig;
   regenerateTts?: (args: { manifestPath: string; scene: string }) => Promise<void>;
 }
 
@@ -590,12 +604,24 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             writeFileSync(join(outputDir, `${demoName}.vtt`), generateVtt(placements, sceneTexts), 'utf-8');
           } catch { /* subtitles are best-effort */ }
 
-          // Export
+          // Export — use full config if provided so output matches argo pipeline
+          const ec = options.exportConfig;
           await exportVideo({
             demoName,
             argoDir,
             outputDir,
+            preset: ec?.preset,
+            crf: ec?.crf,
+            fps: ec?.fps,
+            outputWidth: ec?.outputWidth,
+            outputHeight: ec?.outputHeight,
+            deviceScaleFactor: ec?.deviceScaleFactor,
+            thumbnailPath: ec?.thumbnailPath,
             chapterMetadataPath,
+            formats: ec?.formats,
+            transition: ec?.transition,
+            placements,
+            totalDurationMs: shiftedDurationMs,
             headTrimMs: headTrimMs > 0 ? headTrimMs : undefined,
           });
 

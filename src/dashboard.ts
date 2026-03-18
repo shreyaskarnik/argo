@@ -6,7 +6,7 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { existsSync, readFileSync, statSync, readdirSync, createReadStream } from 'node:fs';
+import { existsSync, readFileSync, statSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { discoverDemos } from './pipeline.js';
 import { startPreviewServer } from './preview.js';
@@ -17,6 +17,7 @@ export interface DashboardOptions {
   argoDir?: string;
   port?: number;
   ttsDefaults?: { voice: string; speed: number };
+  exportConfig?: import('./preview.js').PreviewExportConfig;
 }
 
 interface DemoStatus {
@@ -146,7 +147,7 @@ function renderDashboardHTML(statuses: DemoStatus[], port: number): string {
 }
 
 export async function startDashboardServer(options: DashboardOptions): Promise<{ url: string }> {
-  const { demosDir, outputDir, port: preferredPort, ttsDefaults } = options;
+  const { demosDir, outputDir, port: preferredPort, ttsDefaults, exportConfig } = options;
 
   // Track spawned preview servers to avoid duplicates
   const previewServers = new Map<string, string>(); // demo name → preview URL
@@ -174,6 +175,7 @@ export async function startDashboardServer(options: DashboardOptions): Promise<{
             demosDir,
             outputDir,
             ttsDefaults: ttsDefaults ?? { voice: 'af_heart', speed: 1.0 },
+            exportConfig,
           });
           previewServers.set(name, preview.url);
           res.writeHead(302, { Location: preview.url });
@@ -193,6 +195,9 @@ export async function startDashboardServer(options: DashboardOptions): Promise<{
     });
 
     const listenPort = preferredPort ?? 0;
+    server.on('error', (err) => {
+      throw new Error(`Dashboard server failed to start: ${(err as Error).message}`);
+    });
     server.listen(listenPort, '127.0.0.1', () => {
       const addr = server.address() as { port: number };
       const url = `http://127.0.0.1:${addr.port}`;
