@@ -1,6 +1,40 @@
 import type { Placement } from './tts/align.js';
 import type { TransitionConfig } from './config.js';
 
+/**
+ * Build an ffmpeg `eq` brightness expression for a fade at a scene boundary.
+ *
+ * The `eq` filter's `brightness` parameter accepts ffmpeg expressions with
+ * `between()`, `if()`, etc. natively — no comma escaping needed, unlike `geq`.
+ *
+ * - Fade out: brightness ramps from 0 to -1 over [fadeOutStart, boundary]
+ * - Fade in:  brightness ramps from -1 to 0 over [boundary, fadeInEnd]
+ * - Outside:  brightness stays at 0 (no change)
+ *
+ * `minBrightness` controls the dip depth: -1 = full black, -0.65 = gentle dim (dissolve).
+ */
+function buildBrightnessExpr(
+  boundarySec: number,
+  halfDur: number,
+  minBrightness: number,
+): string {
+  const fos = (boundarySec - halfDur).toFixed(4);
+  const bs = boundarySec.toFixed(4);
+  const fie = (boundarySec + halfDur).toFixed(4);
+  const hd = halfDur.toFixed(4);
+  const min = minBrightness.toFixed(4);
+
+  // Fade out: ramp from 0 → min over [fos, bs]
+  // Fade in:  ramp from min → 0 over [bs, fie]
+  return (
+    `if(between(t,${fos},${bs}),` +
+    `${min}*(t-${fos})/${hd},` +
+    `if(between(t,${bs},${fie}),` +
+    `${min}*(1-(t-${bs})/${hd}),` +
+    `0))`
+  );
+}
+
 function buildDirectionalWipe(
   direction: 'left' | 'right',
   boundarySec: number,
@@ -25,21 +59,22 @@ function buildDirectionalWipe(
 }
 
 /**
- * Generate ffmpeg complex filter graph for scene transitions.
+ * Generate ffmpeg filter expressions for scene transitions.
  *
- * For fade-through-black with multiple boundaries, we use a filter_complex
- * approach: add alpha channel → apply multiple alpha fades → overlay on black.
- * This avoids the limitation of ffmpeg's fade filter (only one fade-out and
- * fade-in per stream instance).
+ * Uses the `eq` (equalization) filter for brightness-based transitions.
+ * The eq filter's expression parser handles between(), if(), etc. natively
+ * without comma escaping issues (unlike geq). Each boundary gets one eq
+ * filter with an enable window.
  *
- * Returns either:
- * - Simple string[] filters for -vf (dissolve, wipe)
- * - Or a { filterComplex, outputLabel } for -filter_complex (fade-through-black)
+ * Transition types:
+ * - `fade-through-black`: brightness dips to -1 (full black) at boundary
+ * - `dissolve`: brightness dips to -0.65 (gentle dim) at boundary
+ * - `wipe-left`/`wipe-right`: directional drawbox mask
  */
 export function buildTransitionFilters(
   placements: Placement[],
   transition: TransitionConfig,
-): string[] | { filterComplex: string; outputLabel: string } {
+): string[] {
   if (placements.length < 2) return [];
 
   const durMs = transition.durationMs ?? 500;
@@ -61,44 +96,20 @@ export function buildTransitionFilters(
     return parts;
   }
 
-  // For dissolve, use alpha fades — these work independently per boundary
-  if (transition.type === 'dissolve') {
-    const parts: string[] = [];
-    for (let i = 1; i < placements.length; i++) {
-      const boundarySec = placements[i].startMs / 1000;
-      const startSec = boundarySec - halfDur;
-      parts.push(
-        `fade=t=out:st=${startSec.toFixed(3)}:d=${halfDur.toFixed(3)}:alpha=1`,
-        `fade=t=in:st=${boundarySec.toFixed(3)}:d=${halfDur.toFixed(3)}:alpha=1`,
-      );
-    }
-    return parts;
-  }
+  // Dissolve: gentle brightness dip (not full black)
+  const minBrightness = transition.type === 'dissolve' ? -0.65 : -1.0;
 
-  // For fade-through-black: use filter_complex to add alpha, apply fades,
-  // then composite over black. This supports unlimited boundaries because
-  // each fade operates on the alpha channel independently.
-  //
-  // Graph: [0:v] → format=yuva420p → fade(alpha) × N → [fg]
-  //        color=black → [bg]
-  //        [bg][fg] overlay → [out]
-  const fadeChain: string[] = [];
+  const filters: string[] = [];
   for (let i = 1; i < placements.length; i++) {
     const boundarySec = placements[i].startMs / 1000;
-    const startSec = (boundarySec - halfDur).toFixed(3);
-    const bs = boundarySec.toFixed(3);
-    const hd = halfDur.toFixed(3);
-    fadeChain.push(`fade=t=out:st=${startSec}:d=${hd}:alpha=1`);
-    fadeChain.push(`fade=t=in:st=${bs}:d=${hd}:alpha=1`);
+    const fos = (boundarySec - halfDur).toFixed(4);
+    const fie = (boundarySec + halfDur).toFixed(4);
+    const brightnessExpr = buildBrightnessExpr(boundarySec, halfDur, minBrightness);
+
+    filters.push(
+      `eq=brightness='${brightnessExpr}':enable='between(t,${fos},${fie})'`,
+    );
   }
 
-  // Use scale2ref to match the black background to the video dimensions,
-  // then overlay the alpha-faded foreground on top.
-  const filterComplex =
-    `color=black:s=2x2:r=30[bgraw];` +
-    `[0:v]format=yuva420p,${fadeChain.join(',')}[fg];` +
-    `[bgraw][fg]scale2ref[bg][fg2];` +
-    `[bg][fg2]overlay=shortest=1:format=auto[out]`;
-
-  return { filterComplex, outputLabel: '[out]' };
+  return filters;
 }
