@@ -131,7 +131,7 @@ export default defineConfig({
   },
   export: {
     preset: 'slow', crf: 16,
-    transition: { type: 'fade-through-black', durationMs: 400 },   // scene transitions
+    transition: { type: 'fade-through-black', durationMs: 2000 },   // scene transitions (2s+ recommended)
     speedRamp: { gapSpeed: 2.0 },                                   // speed up gaps between scenes
     formats: ['gif', '9:16'],                                       // additional export formats
   },
@@ -345,9 +345,11 @@ Add smooth transitions between scenes:
 
 ```js
 export: {
-  transition: { type: 'fade-through-black', durationMs: 500 },
+  transition: { type: 'fade-through-black', durationMs: 2000 },
 }
 ```
+
+> **Tip:** Use `durationMs: 2000` or higher for transitions that are clearly visible during narration. Short durations (500ms) look like glitches rather than intentional transitions.
 
 Transition types: `fade-through-black`, `dissolve`, `wipe-left`, `wipe-right`.
 
@@ -374,7 +376,7 @@ export: {
 ```
 
 - `1:1` — Square crop (centered) for Instagram/LinkedIn
-- `9:16` — Vertical crop (centered) for TikTok/Reels
+- `9:16` — Vertical crop (centered) for TikTok/Reels. Note: center-crops from 16:9, so wide text may be clipped. Works best when key content is centered.
 - `gif` — Animated GIF with palette optimization for docs/READMEs
 
 ### Batch Pipeline

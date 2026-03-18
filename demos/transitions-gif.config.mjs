@@ -14,9 +14,7 @@ export default defineConfig({
   export: {
     preset: 'slow',
     crf: 16,
-    transition: { type: 'fade-through-black', durationMs: 2000 },
-  },
-  overlays: {
-    autoBackground: true,
+    transition: { type: 'fade-through-black', durationMs: 3000 },
+    formats: ['gif', '1:1', '9:16'],
   },
 });

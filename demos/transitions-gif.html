@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920" />
+  <title>Transitions & GIF Demo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --bg: #0a0a0a; --card: #141414; --border: #222; --text: #e0e0e0; --muted: #666; --accent: #6366f1; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .slide {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100vw;
+      height: 100vh;
+      padding: 80px;
+      text-align: center;
+    }
+    .slide.active { display: flex; }
+    .slide h1 { font-size: 64px; font-weight: 800; margin-bottom: 24px; letter-spacing: -2px; }
+    .slide p { font-size: 28px; color: var(--muted); max-width: 700px; line-height: 1.5; }
+    .slide .emoji { font-size: 96px; margin-bottom: 32px; }
+    .slide .tag { display: inline-block; background: var(--accent); color: white; padding: 8px 20px; border-radius: 24px; font-size: 18px; font-weight: 600; margin-top: 24px; }
+    .slide.purple { background: #1e1035; }
+    .slide.blue { background: #0c1929; }
+    .slide.green { background: #0a1f14; }
+    .slide.warm { background: #1f1410; }
+  </style>
+</head>
+<body>
+  <div class="slide active" id="slide-1">
+    <div class="emoji">🎬</div>
+    <h1>Scene Transitions</h1>
+    <p>Smooth fade-through-black between every scene — one line of config.</p>
+  </div>
+
+  <div class="slide purple" id="slide-2">
+    <div class="emoji">✨</div>
+    <h1>Watch the Fade</h1>
+    <p>Each scene boundary gets a brightness dip to black and back. No cuts, no jumps.</p>
+  </div>
+
+  <div class="slide blue" id="slide-3">
+    <div class="emoji">🎞️</div>
+    <h1>GIF Export</h1>
+    <p>Export as palette-optimized animated GIF for docs, READMEs, and pull requests.</p>
+    <span class="tag">formats: ['gif']</span>
+  </div>
+
+  <div class="slide green" id="slide-4">
+    <div class="emoji">⚡</div>
+    <h1>Config-Driven</h1>
+    <p>transition: { type: 'fade-through-black', durationMs: 500 }</p>
+    <span class="tag">Zero code changes</span>
+  </div>
+
+  <div class="slide warm" id="slide-5">
+    <div class="emoji">🚀</div>
+    <h1>Try It</h1>
+    <p>npm i -D @argo-video/cli</p>
+  </div>
+
+  <script>
+    window.showSlide = function(n) {
+      document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+      document.getElementById('slide-' + n)?.classList.add('active');
+    };
+  </script>
+</body>
+</html>
