@@ -12,7 +12,7 @@ import { spotlight, focusRing, dimAround, zoomTo, resetCamera } from '@argo-vide
 import { cursorHighlight } from '@argo-video/cli';
 
 test('new-features', async ({ page, narration }) => {
-  test.setTimeout(120000);
+  test.setTimeout(180000);
   await page.goto('/new-features.html');
   cursorHighlight(page, { color: '#3b82f6', radius: 18 });
   await page.waitForTimeout(800);
