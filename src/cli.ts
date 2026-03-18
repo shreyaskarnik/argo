@@ -130,7 +130,11 @@ export function createProgram(): Command {
       }
 
       if (cmdOpts.all) {
-        await runBatchPipeline(config, { headed: cmdOpts.headed });
+        const demos = (await import('./pipeline.js')).discoverDemos(config.demosDir);
+        const results = await runBatchPipeline(config, { headed: cmdOpts.headed });
+        if (results.length < demos.length) {
+          process.exitCode = 1;
+        }
       } else if (demo) {
         validateDemoName(demo);
         await runPipeline(demo, config, { headed: cmdOpts.headed });

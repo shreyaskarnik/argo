@@ -27,7 +27,7 @@
   },
   {
     "scene": "transitions",
-    "text": "Scene transitions add smooth visual breaks between scenes. Fade through black is the classic film cut. Dissolve does a quick opacity crossfade. And wipe slides the next scene in from the left or right. One line of config, four options.",
+    "text": "Scene transitions add smooth visual breaks between scenes. Fade through black is the classic film cut. And dissolve does a quick opacity crossfade. One line of config and your scenes flow together.",
     "speed": 0.9,
     "overlay": {
       "type": "lower-third",
@@ -88,7 +88,7 @@
   },
   {
     "scene": "closing",
-    "text": "All six features are available today. Update your config, run the pipeline, and you're set. And yes — this demo used scene transitions and speed ramp to record itself.",
+    "text": "All six features are available today. Update your config, run the pipeline, and you're set.",
     "voice": "am_michael",
     "speed": 0.9,
     "overlay": {

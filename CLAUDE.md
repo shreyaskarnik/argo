@@ -179,6 +179,9 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - `convertToWav` (ffmpeg pipe to stdout) writes WAV with `0xFFFFFFFF` data size — `parseWavHeader` falls back to actual buffer length. All engines using `convertToWav` are affected.
 - Showcase demo video hosted via GitHub gist comment upload: https://gist.github.com/shreyaskarnik/6a0996942a96528a984010f36de76079
 - `tsc` build may silently fail if `tsconfig.json` is missing — verify it exists before trusting `npm run build` output
+- `wipe-left` / `wipe-right` transitions fall back to `fade-through-black` — the wipe filter is stubbed but not implemented. Only `fade-through-black` and `dissolve` produce distinct visuals.
+- `speedRamp` drops chapter metadata and thumbnail from the final MP4 — the ramp runs as a post-processing pass after export, and only remaps video/audio streams. Subtitles, chapters, scene report, and extra formats still reflect unramped timing.
+- `argo export <demo>` does not support `transition` or `speedRamp` — these require scene placements which are only computed during the full pipeline. The standalone export path produces different output than `argo pipeline`.
 
 ## Security Invariants
 

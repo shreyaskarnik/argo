@@ -8,7 +8,7 @@
  */
 import { test } from '@argo-video/cli';
 import { showOverlay, withOverlay, showConfetti } from '@argo-video/cli';
-import { spotlight, focusRing, dimAround, zoomTo, resetCamera } from '@argo-video/cli';
+import { spotlight, focusRing, dimAround, resetCamera } from '@argo-video/cli';
 import { cursorHighlight } from '@argo-video/cli';
 
 test('new-features', async ({ page, narration }) => {
@@ -64,10 +64,9 @@ test('new-features', async ({ page, narration }) => {
   await page.waitForTimeout(400);
   await withOverlay(page, 'formats', async () => {
     const fmtDur = Math.floor(narration.durationFor('formats') / 3);
-    await zoomTo(page, '#fmt-square', { scale: 1.3, duration: fmtDur, wait: true });
-    await zoomTo(page, '#fmt-vertical', { scale: 1.3, duration: fmtDur, wait: true });
-    await zoomTo(page, '#fmt-gif', { scale: 1.3, duration: fmtDur, wait: true });
-    await resetCamera(page);
+    await focusRing(page, '#fmt-square', { color: '#3b82f6', duration: fmtDur, wait: true });
+    await focusRing(page, '#fmt-vertical', { color: '#8b5cf6', duration: fmtDur, wait: true });
+    await focusRing(page, '#fmt-gif', { color: '#06b6d4', duration: fmtDur, wait: true });
   });
 
   // Scene 6: Batch pipeline — zoom into terminal output
