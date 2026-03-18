@@ -212,14 +212,39 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
   }
 
   // Scene transitions
+  let transitionComplex: { filterComplex: string; videoOutput: string; audioOutput: string | null } | null = null;
   if (transition && placements && placements.length > 1) {
-    const transitionFilters = buildTransitionFilters(placements, transition);
-    if (Array.isArray(transitionFilters)) {
-      vFilters.push(...transitionFilters);
+    const transitionResult = buildTransitionFilters(placements, transition, hasAudio);
+    if (Array.isArray(transitionResult)) {
+      // Simple -vf filters (wipe)
+      vFilters.push(...transitionResult);
+    } else if (transitionResult.filterComplex) {
+      // Complex filter graph (fade/dissolve — split+trim+fade+concat)
+      transitionComplex = transitionResult;
     }
   }
 
-  if (vFilters.length > 0) {
+  if (transitionComplex) {
+    // Fade transitions use filter_complex with split+concat.
+    // Apply any vFilters (scale, tpad) before the transition.
+    let fc = transitionComplex.filterComplex;
+    if (speedRampFilter) {
+      fc = fc.replace('[0:v]', `[${videoSource}]`);
+      if (audioSource && transitionComplex.audioOutput) {
+        fc = fc.replace('[1:a]', `[${audioSource}]`);
+      }
+    }
+    if (vFilters.length > 0) {
+      // Prepend vFilters to the video input before split
+      const inputRef = speedRampFilter ? `[${videoSource}]` : '[0:v]';
+      fc = fc.replace(inputRef + 'split=', `${inputRef}${vFilters.join(',')},split=`);
+    }
+    filterParts.push(fc);
+    videoSource = transitionComplex.videoOutput.replace(/[\[\]]/g, '');
+    if (hasAudio && transitionComplex.audioOutput) {
+      audioSource = transitionComplex.audioOutput.replace(/[\[\]]/g, '');
+    }
+  } else if (vFilters.length > 0) {
     if (speedRampFilter || filterParts.length > 0) {
       filterParts.push(`[${videoSource}]${vFilters.join(',')}[outvfinal]`);
       videoSource = 'outvfinal';

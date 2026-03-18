@@ -1,40 +1,6 @@
 import type { Placement } from './tts/align.js';
 import type { TransitionConfig } from './config.js';
 
-/**
- * Build an ffmpeg `eq` brightness expression for a fade at a scene boundary.
- *
- * The `eq` filter's `brightness` parameter accepts ffmpeg expressions with
- * `between()`, `if()`, etc. natively — no comma escaping needed, unlike `geq`.
- *
- * - Fade out: brightness ramps from 0 to -1 over [fadeOutStart, boundary]
- * - Fade in:  brightness ramps from -1 to 0 over [boundary, fadeInEnd]
- * - Outside:  brightness stays at 0 (no change)
- *
- * `minBrightness` controls the dip depth: -1 = full black, -0.65 = gentle dim (dissolve).
- */
-function buildBrightnessExpr(
-  boundarySec: number,
-  halfDur: number,
-  minBrightness: number,
-): string {
-  const fos = (boundarySec - halfDur).toFixed(4);
-  const bs = boundarySec.toFixed(4);
-  const fie = (boundarySec + halfDur).toFixed(4);
-  const hd = halfDur.toFixed(4);
-  const min = minBrightness.toFixed(4);
-
-  // Fade out: ramp from 0 → min over [fos, bs]
-  // Fade in:  ramp from min → 0 over [bs, fie]
-  return (
-    `if(between(t,${fos},${bs}),` +
-    `${min}*(t-${fos})/${hd},` +
-    `if(between(t,${bs},${fie}),` +
-    `${min}*(1-(t-${bs})/${hd}),` +
-    `0))`
-  );
-}
-
 function buildDirectionalWipe(
   direction: 'left' | 'right',
   boundarySec: number,
@@ -59,22 +25,103 @@ function buildDirectionalWipe(
 }
 
 /**
- * Generate ffmpeg filter expressions for scene transitions.
+ * Build a filter_complex string for fade-through-black or dissolve transitions.
  *
- * Uses the `eq` (equalization) filter for brightness-based transitions.
- * The eq filter's expression parser handles between(), if(), etc. natively
- * without comma escaping issues (unlike geq). Each boundary gets one eq
- * filter with an enable window.
+ * Uses split → trim → fade → concat, which is the only reliable way to apply
+ * multiple fade transitions in ffmpeg. The fade filter only supports one
+ * fade-out and one fade-in per stream instance, so we split the video at each
+ * scene boundary, apply fades to each segment independently, then concatenate.
  *
- * Transition types:
- * - `fade-through-black`: brightness dips to -1 (full black) at boundary
- * - `dissolve`: brightness dips to -0.65 (gentle dim) at boundary
- * - `wipe-left`/`wipe-right`: directional drawbox mask
+ * For dissolve, we use a shorter fade duration to create a gentle dip effect
+ * rather than a full black transition.
+ */
+function buildFadeFilterComplex(
+  placements: Placement[],
+  halfDur: number,
+  isDissolveDip: boolean,
+  videoInputLabel: string,
+  audioInputLabel: string | null,
+): { filterComplex: string; videoOutput: string; audioOutput: string | null } {
+  // Build boundary times from placements (scene starts after the first)
+  const boundaries: number[] = [];
+  for (let i = 1; i < placements.length; i++) {
+    boundaries.push(placements[i].startMs / 1000);
+  }
+
+  // For dissolve, use shorter fade duration for a dip effect
+  const fadeDur = isDissolveDip ? halfDur * 0.6 : halfDur;
+
+  const numSegments = boundaries.length + 1;
+  const parts: string[] = [];
+
+  // Split video into N segments
+  parts.push(`${videoInputLabel}split=${numSegments}${Array.from({ length: numSegments }, (_, i) => `[vs${i}]`).join('')}`);
+
+  // Split audio if present
+  if (audioInputLabel) {
+    parts.push(`${audioInputLabel}asplit=${numSegments}${Array.from({ length: numSegments }, (_, i) => `[as${i}]`).join('')}`);
+  }
+
+  // Trim and fade each segment
+  const segLabels: string[] = [];
+  const aSegLabels: string[] = [];
+
+  for (let i = 0; i < numSegments; i++) {
+    const start = i === 0 ? 0 : boundaries[i - 1];
+    const end = i < boundaries.length ? boundaries[i] : '';
+    const trimEnd = end !== '' ? `:${end.toFixed(4)}` : '';
+    const label = `v${i}`;
+
+    let chain = `[vs${i}]trim=${start.toFixed(4)}${trimEnd},setpts=PTS-STARTPTS`;
+
+    // Fade out at end of segment (except last)
+    if (i < boundaries.length) {
+      const segDuration = (end as number) - start;
+      const fadeStart = Math.max(0, segDuration - fadeDur);
+      chain += `,fade=t=out:st=${fadeStart.toFixed(4)}:d=${fadeDur.toFixed(4)}`;
+    }
+
+    // Fade in at start of segment (except first)
+    if (i > 0) {
+      chain += `,fade=t=in:st=0:d=${fadeDur.toFixed(4)}`;
+    }
+
+    chain += `[${label}]`;
+    parts.push(chain);
+    segLabels.push(`[${label}]`);
+
+    // Audio: just trim, no fading (voiceover should play through)
+    if (audioInputLabel) {
+      const aLabel = `a${i}`;
+      parts.push(`[as${i}]atrim=${start.toFixed(4)}${trimEnd},asetpts=PTS-STARTPTS[${aLabel}]`);
+      aSegLabels.push(`[${aLabel}]`);
+    }
+  }
+
+  // Concat all segments
+  const videoOutput = 'vfaded';
+  if (audioInputLabel) {
+    const audioOutput = 'afaded';
+    parts.push(`${segLabels.join('')}${aSegLabels.join('')}concat=n=${numSegments}:v=1:a=1[${videoOutput}][${audioOutput}]`);
+    return { filterComplex: parts.join(';\n'), videoOutput: `[${videoOutput}]`, audioOutput: `[${audioOutput}]` };
+  } else {
+    parts.push(`${segLabels.join('')}concat=n=${numSegments}:v=1:a=0[${videoOutput}]`);
+    return { filterComplex: parts.join(';\n'), videoOutput: `[${videoOutput}]`, audioOutput: null };
+  }
+}
+
+/**
+ * Generate ffmpeg transition filters for scene boundaries.
+ *
+ * Returns either:
+ * - Simple string[] for -vf (wipe transitions only)
+ * - A filterComplex object for filter_complex (fade/dissolve — uses split+trim+fade+concat)
  */
 export function buildTransitionFilters(
   placements: Placement[],
   transition: TransitionConfig,
-): string[] {
+  hasAudio?: boolean,
+): string[] | { filterComplex: string; videoOutput: string; audioOutput: string | null } {
   if (placements.length < 2) return [];
 
   const durMs = transition.durationMs ?? 500;
@@ -96,20 +143,15 @@ export function buildTransitionFilters(
     return parts;
   }
 
-  // Dissolve: gentle brightness dip (not full black)
-  const minBrightness = transition.type === 'dissolve' ? -0.65 : -1.0;
-
-  const filters: string[] = [];
-  for (let i = 1; i < placements.length; i++) {
-    const boundarySec = placements[i].startMs / 1000;
-    const fos = (boundarySec - halfDur).toFixed(4);
-    const fie = (boundarySec + halfDur).toFixed(4);
-    const brightnessExpr = buildBrightnessExpr(boundarySec, halfDur, minBrightness);
-
-    filters.push(
-      `eq=brightness='${brightnessExpr}':enable='between(t,${fos},${fie})'`,
-    );
-  }
-
-  return filters;
+  // Fade-through-black and dissolve use filter_complex with split+trim+fade+concat.
+  // This is the only approach that reliably applies multiple fade transitions —
+  // ffmpeg's fade filter only supports one fade-out per stream instance.
+  const isDissolveDip = transition.type === 'dissolve';
+  return buildFadeFilterComplex(
+    placements,
+    halfDur,
+    isDissolveDip,
+    '[0:v]',
+    hasAudio ? '[1:a]' : null,
+  );
 }
