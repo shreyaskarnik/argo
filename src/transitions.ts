@@ -66,31 +66,27 @@ function buildFadeFilterComplex(
   const segLabels: string[] = [];
   const aSegLabels: string[] = [];
 
-  // Small overlap (2 frames at 30fps ≈ 0.067s) ensures the fade-out reaches
-  // full black before the next segment starts, eliminating the brief flash
-  // of the un-faded source at segment boundaries.
-  const overlapSec = 0.067;
-
   for (let i = 0; i < numSegments; i++) {
     const start = i === 0 ? 0 : boundaries[i - 1];
     const end = i < boundaries.length ? boundaries[i] : '';
-    // Extend each segment's end slightly past the boundary so fade-out
-    // reaches full black. Start the next segment at the boundary (the
-    // fade-in covers the overlap).
-    const trimEndVal = end !== '' ? (end as number) + overlapSec : '';
-    const trimEnd = trimEndVal !== '' ? `:${(trimEndVal as number).toFixed(4)}` : '';
+    const trimEnd = end !== '' ? `:${(end as number).toFixed(4)}` : '';
     const label = `v${i}`;
 
     let chain = `[vs${i}]trim=${start.toFixed(4)}${trimEnd},setpts=PTS-STARTPTS`;
 
-    // Fade out at end of segment (except last)
+    // Fade out at end of segment (except last).
+    // The fade completes exactly at the trim boundary — the last frame
+    // of this segment is full black, so the cut to the next segment
+    // (which starts with fade-in from black) is seamless.
     if (i < boundaries.length) {
-      const segDuration = (end as number) - start + overlapSec;
+      const segDuration = (end as number) - start;
       const fadeStart = Math.max(0, segDuration - fadeDur);
       chain += `,fade=t=out:st=${fadeStart.toFixed(4)}:d=${fadeDur.toFixed(4)}`;
     }
 
-    // Fade in at start of segment (except first)
+    // Fade in at start of segment (except first).
+    // First frame is black (opacity 0), matching the last frame of the
+    // previous segment's fade-out.
     if (i > 0) {
       chain += `,fade=t=in:st=0:d=${fadeDur.toFixed(4)}`;
     }
