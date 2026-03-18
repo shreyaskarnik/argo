@@ -10,7 +10,7 @@
  *   3. Optional clips:  npx argo release-prep showcase --gif
  */
 import { test, demoType } from '@argo-video/cli';
-import { showOverlay, withOverlay, showConfetti, zoomTo } from '@argo-video/cli';
+import { showOverlay, withOverlay, showConfetti } from '@argo-video/cli';
 import { spotlight, focusRing, dimAround, resetCamera } from '@argo-video/cli';
 import { cursorHighlight, resetCursor } from '@argo-video/cli';
 
@@ -69,7 +69,7 @@ test('showcase', async ({ page, narration }) => {
   await page.waitForTimeout(cameraBeat + 220);
   dimAround(page, '#effect-dim-around', { duration: cameraBeat });
   await page.waitForTimeout(cameraBeat + 220);
-  zoomTo(page, '#effect-zoom-to', { scale: 1.14, duration: cameraBeat });
+  focusRing(page, '#effect-cursor', { color: '#60a5fa', duration: cameraBeat });
   await page.waitForTimeout(cameraBeat + 220);
   showConfetti(page, { spread: 'rain', duration: cameraBeat, pieces: 130 });
   await page.waitForTimeout(cameraBeat + 260);
