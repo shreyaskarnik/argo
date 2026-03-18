@@ -15,7 +15,7 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 - ~~Camera language.~~ **SHIPPED** — `spotlight`, `focusRing`, `dimAround`, `zoomTo`, `resetCamera` helpers for directed demo recordings.
 - ~~Multi-format export.~~ **SHIPPED** — `export.formats: ['1:1', '9:16']` crops from 16:9 source. Overlay reflow deferred.
 - Resumable pipeline. Cache per-step artifacts so changing one voice line or one scene does not force a full rerun.
-- Per-scene transitions. Add fades, wipes, hold-freezes, and section bumpers so the final result feels more editorial.
+- ~~Per-scene transitions.~~ **SHIPPED** — `fade-through-black`, `dissolve`, `wipe-left`, `wipe-right` via `export.transition` config. ffmpeg filter expressions generated at scene boundaries.
 - Theme packs for overlays. Provide reusable visual styles like `terminal`, `product-keynote`, `minimal-docs`, and `launch-trailer`.
 
 ## Developer Experience
@@ -46,7 +46,7 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 ## Production Quality
 
 - Audio ducking and background music. Mix in a background track with automatic volume ducking under voiceover clips.
-- Cursor smoothing and highlighting. Smooth jittery Playwright mouse paths and add click-ripple effects to make interactions more visible.
+- ~~Cursor smoothing and highlighting.~~ **SHIPPED** — `cursorHighlight(page)` with pulse animation and click ripple effects.
 - Watermark and branding strip. Config-driven persistent logo or "DEMO" watermark overlay for draft vs. final renders.
 - ~~Chapter markers.~~ **SHIPPED** — MP4 chapter metadata embedded from scene marks via ffmpeg.
 - Burned-in captions. Render voiceover text as styled subtitles directly into the video frame, not just `.srt` sidecar files. Many social platforms ignore external subtitle tracks.
@@ -63,7 +63,7 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 
 ## Distribution
 
-- GIF export. Auto-generate a looping GIF snippet (first N seconds or a specific scene range) for embedding in READMEs and PRs.
+- ~~GIF export.~~ **SHIPPED** — `export.formats: ['gif']` produces two-pass palette-optimized animated GIFs.
 - Thumbnail auto-generation. Auto-capture a frame at a configurable timestamp as the video thumbnail instead of requiring a manual PNG.
 
 ## Longer Horizon
@@ -89,11 +89,32 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 - Unified `.scenes.json` manifest (replaces separate `.voiceover.json` + `.overlays.json`)
 - Manifest-based `showOverlay`/`withOverlay` — overlay content resolved from manifest at runtime
 - Voice cloning with mlx-audio (`refAudio` + `refText`)
+- Scene transitions — `fade-through-black`, `dissolve`, `wipe-left`, `wipe-right`
+- Speed ramp — compress inter-scene gaps at configurable speed (`export.speedRamp`)
+- GIF export — two-pass palette-optimized animated GIFs via `export.formats: ['gif']`
+- Batch pipeline — `argo pipeline --all` runs every demo sequentially, continues on failure
+- Multi-demo dashboard — `argo preview` (no args) lists all demos with build status, sizes, metadata
+- Export progress bar — real-time ffmpeg encoding progress via `-progress pipe:1`
+- `cursorHighlight` / `resetCursor` — persistent cursor ring with pulse and click ripple
+- Emoji confetti — `showConfetti(page, { emoji: '🎉' })` renders emoji instead of rectangles
+- Transformers.js engine — generic HuggingFace `text-to-speech` adapter with auto-resampling
+- Text chunking — long voiceover auto-split at sentence boundaries for Kokoro and Transformers
+- Mobile demos — `isMobile`, `hasTouch`, `contextOptions` passthrough to Playwright config
+- Auto-trim — trims video before first `narration.mark()`, persists `headTrimMs` in `.meta.json`
+- Preview light/dark mode — follows system `prefers-color-scheme`
+- `new-features` demo — showcases transitions, speed ramp, GIF, batch, dashboard, progress bar
 
 ## Suggested Priority
 
 Next up from what's remaining:
 
-1. Per-scene transitions (fades, wipes)
-2. Theme packs for overlays
-3. Timeline preview UI with overlay thumbnails
+1. Theme packs for overlays (`terminal`, `product-keynote`, `minimal-docs`, `launch-trailer`)
+2. Timeline preview UI with overlay thumbnails on the `argo preview` timeline bar
+3. Resumable pipeline with per-step artifact caching
+4. Burned-in captions (render subtitles into the video frame for social platforms)
+5. Audio ducking and background music
+6. `argo diff` — compare two pipeline runs side-by-side
+7. i18n — locale variants of scenes manifests for multi-language renders
+8. `argo ci` — opinionated CI mode (lint → pipeline → assert bounds → upload artifact)
+9. Keyframed text mutations in overlays
+10. AI assist for demo polish (pacing, copy, overlay placement suggestions)
