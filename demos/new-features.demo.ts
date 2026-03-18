@@ -4,7 +4,7 @@
  *
  * Prerequisites:
  *   1. Serve the HTML:  python3 -m http.server 8976 --directory demos
- *   2. Run pipeline:    BASE_URL=http://127.0.0.1:8976 npx tsx bin/argo.js pipeline new-features --browser webkit
+ *   2. Run pipeline:    npx tsx bin/argo.js pipeline new-features --browser webkit --config demos/new-features.config.mjs
  */
 import { test } from '@argo-video/cli';
 import { showOverlay, withOverlay, showConfetti } from '@argo-video/cli';
