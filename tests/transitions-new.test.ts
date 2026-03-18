@@ -24,6 +24,8 @@ describe('buildTransitionFilters', () => {
     // Should NOT use alpha fades or drawbox stepping
     expect(fc).not.toContain('alpha=1');
     expect(fc).not.toContain('drawbox=x=0:y=0:w=iw:h=ih:color=black@');
+    expect(fc).not.toContain('color=black:s=');
+    expect(fc).not.toContain('aevalsrc=');
   });
 
   it('builds dissolve with split+trim+fade+concat (shorter fade duration)', () => {
@@ -55,8 +57,23 @@ describe('buildTransitionFilters', () => {
     const fc = (result as any).filterComplex;
     expect(fc).not.toContain('asplit=');
     expect(fc).not.toContain('atrim=');
-    // 2 segments + 1 black gap = 3 concat inputs
-    expect(fc).toContain('concat=n=3:v=1:a=0');
+    expect(fc).not.toContain('aevalsrc=');
+    expect(fc).toContain('concat=n=2:v=1:a=0');
     expect((result as any).audioOutput).toBeNull();
+  });
+
+  it('uses the provided fps to make fade-out end one frame before the cut', () => {
+    const result = buildTransitionFilters(
+      placements,
+      { type: 'fade-through-black', durationMs: 400 },
+      true,
+      60,
+    );
+
+    expect(Array.isArray(result)).toBe(false);
+    const fc = (result as any).filterComplex;
+    expect(fc).toContain('fade=t=out:st=1.7833:d=0.2000');
+    expect(fc).not.toContain('0.067');
+    expect(fc).not.toContain(':r=30');
   });
 });

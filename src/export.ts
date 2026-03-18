@@ -214,7 +214,7 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
   // Scene transitions
   let transitionComplex: { filterComplex: string; videoOutput: string; audioOutput: string | null } | null = null;
   if (transition && placements && placements.length > 1) {
-    const transitionResult = buildTransitionFilters(placements, transition, hasAudio, outputWidth, outputHeight);
+    const transitionResult = buildTransitionFilters(placements, transition, hasAudio, fps ?? 30);
     if (Array.isArray(transitionResult)) {
       // Simple -vf filters (wipe)
       vFilters.push(...transitionResult);
