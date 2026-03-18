@@ -20,6 +20,7 @@ import type { OverlayManifestEntry, SceneEffect, Zone } from './overlays/types.j
 import { generateSrt, generateVtt } from './subtitles.js';
 import { generateChapterMetadata } from './chapters.js';
 import { exportVideo, checkFfmpeg } from './export.js';
+import { applySpeedRampToTimeline } from './speed-ramp.js';
 
 export interface PreviewExportConfig {
   preset?: string;
@@ -597,15 +598,25 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
           for (const entry of scenes) {
             if (entry.scene && entry.text) sceneTexts[entry.scene] = entry.text;
           }
+          const { mkdirSync } = await import('node:fs');
+          mkdirSync(outputDir, { recursive: true });
+
+          // Apply speed ramp to timeline if configured (must happen before
+          // chapters/subtitles/export so all artifacts reflect ramped timing)
+          const ec = options.exportConfig;
+          const rampResult = applySpeedRampToTimeline(placements, shiftedDurationMs, ec?.speedRamp);
+          const finalPlacements = rampResult.placements;
+          const finalDurationMs = rampResult.totalDurationMs;
+          const speedRampSegments = rampResult.segments.length > 0 ? rampResult.segments : undefined;
+
+          // Regenerate chapters/subtitles with ramped timing
+          writeFileSync(chapterMetadataPath, generateChapterMetadata(finalPlacements, finalDurationMs), 'utf-8');
           try {
-            const { mkdirSync } = await import('node:fs');
-            mkdirSync(outputDir, { recursive: true });
-            writeFileSync(join(outputDir, `${demoName}.srt`), generateSrt(placements, sceneTexts), 'utf-8');
-            writeFileSync(join(outputDir, `${demoName}.vtt`), generateVtt(placements, sceneTexts), 'utf-8');
+            writeFileSync(join(outputDir, `${demoName}.srt`), generateSrt(finalPlacements, sceneTexts), 'utf-8');
+            writeFileSync(join(outputDir, `${demoName}.vtt`), generateVtt(finalPlacements, sceneTexts), 'utf-8');
           } catch { /* subtitles are best-effort */ }
 
-          // Export — use full config if provided so output matches argo pipeline
-          const ec = options.exportConfig;
+          // Export — use full config so output matches argo pipeline
           await exportVideo({
             demoName,
             argoDir,
@@ -620,9 +631,10 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             chapterMetadataPath,
             formats: ec?.formats,
             transition: ec?.transition,
-            placements,
-            totalDurationMs: shiftedDurationMs,
+            placements: finalPlacements,
+            totalDurationMs: finalDurationMs,
             headTrimMs: headTrimMs > 0 ? headTrimMs : undefined,
+            speedRampSegments,
           });
 
           // Switch to serving the new MP4

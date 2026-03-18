@@ -147,12 +147,12 @@ function renderDashboardHTML(statuses: DemoStatus[], port: number): string {
 }
 
 export async function startDashboardServer(options: DashboardOptions): Promise<{ url: string }> {
-  const { demosDir, outputDir, port: preferredPort, ttsDefaults, exportConfig } = options;
+  const { demosDir, outputDir, argoDir: customArgoDir, port: preferredPort, ttsDefaults, exportConfig } = options;
 
   // Track spawned preview servers to avoid duplicates
   const previewServers = new Map<string, string>(); // demo name → preview URL
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
       const url = req.url ?? '/';
 
@@ -171,7 +171,7 @@ export async function startDashboardServer(options: DashboardOptions): Promise<{
         try {
           const preview = await startPreviewServer({
             demoName: name,
-            argoDir: '.argo',
+            argoDir: customArgoDir ?? '.argo',
             demosDir,
             outputDir,
             ttsDefaults: ttsDefaults ?? { voice: 'af_heart', speed: 1.0 },
@@ -196,7 +196,7 @@ export async function startDashboardServer(options: DashboardOptions): Promise<{
 
     const listenPort = preferredPort ?? 0;
     server.on('error', (err) => {
-      throw new Error(`Dashboard server failed to start: ${(err as Error).message}`);
+      reject(new Error(`Dashboard server failed to start: ${(err as Error).message}`));
     });
     server.listen(listenPort, '127.0.0.1', () => {
       const addr = server.address() as { port: number };
