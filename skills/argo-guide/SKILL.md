@@ -191,6 +191,7 @@ These are the failure modes that come up repeatedly:
 | ESM warnings from config | Config file is `.js` in non-module project | Rename to `argo.config.mjs` |
 | Overlays scale weirdly | `zoomTo` transforms documentElement | Avoid overlapping `withOverlay` and `zoomTo` on same scene |
 | App looks wrong in recording | App uses system dark/light mode | Use `page.emulateMedia({ colorScheme: 'dark' })` — see `references/config-and-quality.md` |
+| Gray bar at bottom of video | Used `--headed` on macOS | Re-run without `--headed`; browser chrome reduces viewport in headed mode. Headless (default) is correct. |
 
 ---
 
