@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920" />
+  <title>Argo — New Features</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --bg-card: #111111;
+      --bg-card-hover: #161616;
+      --border: #1f1f1f;
+      --border-accent: #2a2a2a;
+      --text: #e0e0e0;
+      --text-muted: #888888;
+      --text-dim: #555555;
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.15);
+      --green: #4ade80;
+      --amber: #f59e0b;
+      --purple: #8b5cf6;
+      --teal: #06b6d4;
+      --red: #ef4444;
+      --font-mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    }
+
+    html { scroll-behavior: smooth; font-size: 16px; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-sans); line-height: 1.6; overflow-x: hidden; }
+
+    /* ── Hero ── */
+    #hero {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 100vh; text-align: center; padding: 4rem 2rem;
+      background: radial-gradient(ellipse at center, rgba(59,130,246,0.08) 0%, transparent 70%);
+    }
+    #hero .badge { display: inline-block; padding: 0.4rem 1rem; border-radius: 999px; background: var(--accent-glow); border: 1px solid rgba(59,130,246,0.3); color: var(--accent); font-size: 0.85rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 1.5rem; }
+    #hero h1 { font-size: 4rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; max-width: 900px; margin-bottom: 1rem; }
+    #hero h1 span { background: linear-gradient(135deg, var(--accent), var(--teal)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    #hero p { font-size: 1.35rem; color: var(--text-muted); max-width: 700px; margin-bottom: 2rem; }
+    #hero .version-tag { font-family: var(--font-mono); font-size: 0.9rem; color: var(--text-dim); padding: 0.4rem 0.8rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; }
+
+    /* ── Section ── */
+    section { padding: 6rem 2rem; max-width: 1200px; margin: 0 auto; }
+    section h2 { font-size: 2.2rem; font-weight: 700; margin-bottom: 1rem; letter-spacing: -0.02em; }
+    section .subtitle { font-size: 1.1rem; color: var(--text-muted); margin-bottom: 3rem; max-width: 700px; }
+
+    /* ── Feature Cards ── */
+    .feature-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 3rem;
+    }
+    .feature-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 2rem; transition: border-color 0.2s, transform 0.2s;
+    }
+    .feature-card:hover { border-color: var(--border-accent); transform: translateY(-2px); }
+    .feature-card .icon { font-size: 2rem; margin-bottom: 1rem; }
+    .feature-card h3 { font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .feature-card p { color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; }
+
+    /* ── Transitions Section ── */
+    #transitions { border-top: 1px solid var(--border); }
+    .transition-demos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+    .transition-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 1.5rem; text-align: center; position: relative; overflow: hidden;
+    }
+    .transition-card .preview {
+      height: 100px; border-radius: 6px; margin-bottom: 1rem; position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .transition-card .preview .bar {
+      width: 100%; height: 100%; position: absolute; border-radius: 6px;
+    }
+    #t-fade .preview .bar { background: linear-gradient(90deg, var(--accent) 40%, #000 50%, var(--teal) 60%); }
+    #t-dissolve .preview .bar { background: linear-gradient(90deg, var(--purple) 35%, rgba(139,92,246,0.3) 50%, var(--amber) 65%); }
+    #t-wipe-left .preview .bar { background: linear-gradient(90deg, var(--green) 45%, var(--border) 50%, var(--red) 55%); }
+    #t-wipe-right .preview .bar { background: linear-gradient(270deg, var(--teal) 45%, var(--border) 50%, var(--accent) 55%); }
+    .transition-card h4 { font-size: 1rem; margin-bottom: 0.3rem; }
+    .transition-card p { font-size: 0.85rem; color: var(--text-muted); }
+
+    /* ── Speed Ramp Section ── */
+    #speed-ramp { border-top: 1px solid var(--border); }
+    .speed-timeline {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 2rem; margin-bottom: 2rem;
+    }
+    .timeline-bar {
+      display: flex; gap: 4px; height: 48px; border-radius: 6px; overflow: hidden; margin-bottom: 1rem;
+    }
+    .timeline-bar .scene { background: var(--accent); border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.8rem; }
+    .timeline-bar .gap { background: var(--border-accent); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: var(--text-dim); position: relative; }
+    .timeline-bar .gap::after { content: '2×'; position: absolute; font-weight: 700; color: var(--amber); font-size: 0.85rem; }
+    .speed-config {
+      background: #000; border-radius: 8px; padding: 1.2rem 1.5rem; font-family: var(--font-mono);
+      font-size: 0.9rem; color: var(--green); line-height: 1.7;
+    }
+    .speed-config .key { color: var(--accent); }
+    .speed-config .val { color: var(--amber); }
+
+    /* ── Multi-Format Section ── */
+    #formats { border-top: 1px solid var(--border); }
+    .format-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+    .format-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 2rem; text-align: center;
+    }
+    .format-card .ratio-preview {
+      background: var(--border-accent); border-radius: 8px; margin: 0 auto 1.2rem; display: flex;
+      align-items: center; justify-content: center; font-family: var(--font-mono);
+      color: var(--text-muted); font-size: 0.9rem;
+    }
+    #fmt-square .ratio-preview { width: 120px; height: 120px; }
+    #fmt-vertical .ratio-preview { width: 68px; height: 120px; }
+    #fmt-gif .ratio-preview { width: 160px; height: 100px; border: 2px dashed var(--green); background: transparent; }
+    .format-card h3 { font-size: 1.15rem; margin-bottom: 0.4rem; }
+    .format-card p { font-size: 0.9rem; color: var(--text-muted); }
+
+    /* ── Batch & Dashboard Section ── */
+    #batch { border-top: 1px solid var(--border); }
+    .batch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+    .batch-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem;
+    }
+    .batch-card h3 { font-size: 1.3rem; font-weight: 600; margin-bottom: 0.8rem; }
+    .batch-card p { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.2rem; }
+    .terminal {
+      background: #000; border-radius: 8px; padding: 1.2rem 1.5rem; font-family: var(--font-mono);
+      font-size: 0.85rem; line-height: 1.8;
+    }
+    .terminal .prompt { color: var(--green); }
+    .terminal .cmd { color: #f0f0f0; }
+    .terminal .output { color: var(--text-dim); }
+    .terminal .success { color: var(--green); }
+    .terminal .separator { color: var(--border-accent); }
+
+    /* ── Dashboard Preview ── */
+    .dashboard-preview {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+    }
+    .dashboard-preview .header { background: var(--border); padding: 0.8rem 1.2rem; display: flex; align-items: center; gap: 0.5rem; }
+    .dashboard-preview .header .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dashboard-preview .header .dot.r { background: #ef4444; }
+    .dashboard-preview .header .dot.y { background: #f59e0b; }
+    .dashboard-preview .header .dot.g { background: #22c55e; }
+    .dashboard-preview .header .url { margin-left: 0.8rem; font-size: 0.8rem; color: var(--text-dim); font-family: var(--font-mono); }
+    .dashboard-preview table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .dashboard-preview th { text-align: left; padding: 0.6rem 1rem; color: var(--text-dim); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+    .dashboard-preview td { padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); }
+
+    /* ── Progress Section ── */
+    #progress { border-top: 1px solid var(--border); }
+    .progress-demo {
+      background: #000; border-radius: 12px; padding: 2rem; font-family: var(--font-mono);
+      max-width: 600px;
+    }
+    .progress-line { margin-bottom: 0.3rem; }
+    .progress-line .label { color: var(--text-muted); font-size: 0.85rem; }
+    .progress-bar-container { display: flex; align-items: center; gap: 0.8rem; margin-top: 0.5rem; }
+    .progress-bar { flex: 1; height: 16px; background: var(--border); border-radius: 4px; overflow: hidden; }
+    .progress-bar .fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--teal)); border-radius: 4px; width: 73%; transition: width 0.3s; }
+    .progress-pct { color: var(--green); font-weight: 600; font-size: 0.9rem; min-width: 4ch; }
+
+    /* ── CTA ── */
+    #cta {
+      text-align: center; padding: 6rem 2rem; border-top: 1px solid var(--border);
+      background: radial-gradient(ellipse at center, rgba(59,130,246,0.06) 0%, transparent 70%);
+    }
+    #cta h2 { font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; }
+    #cta p { font-size: 1.1rem; color: var(--text-muted); margin-bottom: 2rem; }
+    #cta .cmd-box {
+      display: inline-block; padding: 0.8rem 1.5rem; background: #000; border: 1px solid var(--border);
+      border-radius: 8px; font-family: var(--font-mono); font-size: 1rem; color: var(--green);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Hero ── -->
+  <section id="hero">
+    <span class="badge">What's New</span>
+    <h1>Six new features in <span>Argo</span></h1>
+    <p>Scene transitions, speed ramp, GIF export, batch pipeline, multi-demo dashboard, and a progress bar.</p>
+    <span class="version-tag">v0.14.0</span>
+  </section>
+
+  <!-- ── Feature Overview ── -->
+  <section id="overview">
+    <h2>At a Glance</h2>
+    <p class="subtitle">Every feature ships in this release — no API keys, no cloud services, just config.</p>
+    <div class="feature-grid">
+      <div class="feature-card" id="card-transitions">
+        <div class="icon">🎬</div>
+        <h3>Scene Transitions</h3>
+        <p>Fade through black, dissolve, or wipe between scenes. Configured per-project in your export settings.</p>
+      </div>
+      <div class="feature-card" id="card-speed-ramp">
+        <div class="icon">⚡</div>
+        <h3>Speed Ramp</h3>
+        <p>Compress gaps between scenes at 2× or more. Navigation and page loads fly by; key interactions stay at full speed.</p>
+      </div>
+      <div class="feature-card" id="card-gif">
+        <div class="icon">🖼️</div>
+        <h3>GIF Export</h3>
+        <p>Two-pass palette-optimized animated GIFs for docs, READMEs, and pull request previews.</p>
+      </div>
+      <div class="feature-card" id="card-batch">
+        <div class="icon">📦</div>
+        <h3>Batch Pipeline</h3>
+        <p>Build every demo in one command. Continues on failure — one broken demo won't block the rest.</p>
+      </div>
+      <div class="feature-card" id="card-dashboard">
+        <div class="icon">📊</div>
+        <h3>Dashboard</h3>
+        <p>See all your demos at a glance with build status, file sizes, and quick-action links.</p>
+      </div>
+      <div class="feature-card" id="card-progress">
+        <div class="icon">📈</div>
+        <h3>Progress Bar</h3>
+        <p>Watch encoding progress in real time. No more staring at a silent terminal wondering if ffmpeg is still alive.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Transitions ── -->
+  <section id="transitions">
+    <h2>Scene Transitions</h2>
+    <p class="subtitle">Smooth visual breaks at scene boundaries. One line of config, four transition types.</p>
+    <div class="transition-demos">
+      <div class="transition-card" id="t-fade">
+        <div class="preview"><div class="bar"></div></div>
+        <h4>Fade Through Black</h4>
+        <p>Classic film transition</p>
+      </div>
+      <div class="transition-card" id="t-dissolve">
+        <div class="preview"><div class="bar"></div></div>
+        <h4>Dissolve</h4>
+        <p>Quick opacity crossfade</p>
+      </div>
+      <div class="transition-card" id="t-wipe-left">
+        <div class="preview"><div class="bar"></div></div>
+        <h4>Wipe Left</h4>
+        <p>Directional reveal</p>
+      </div>
+      <div class="transition-card" id="t-wipe-right">
+        <div class="preview"><div class="bar"></div></div>
+        <h4>Wipe Right</h4>
+        <p>Reverse directional</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Speed Ramp ── -->
+  <section id="speed-ramp">
+    <h2>Speed Ramp</h2>
+    <p class="subtitle">Keep demos tight — compress boring gaps while preserving key interactions at full speed.</p>
+    <div class="speed-timeline">
+      <div class="timeline-bar">
+        <div class="scene" style="flex: 3;">Intro</div>
+        <div class="gap" style="flex: 2;"></div>
+        <div class="scene" style="flex: 4;">Feature</div>
+        <div class="gap" style="flex: 3;"></div>
+        <div class="scene" style="flex: 3;">Closing</div>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-dim);">
+        <span>0s</span>
+        <span style="color: var(--amber);">Gaps compressed at 2× speed</span>
+        <span>30s → 22s</span>
+      </div>
+    </div>
+    <div class="speed-config">
+      <span class="key">speedRamp</span>: { <span class="key">gapSpeed</span>: <span class="val">2.0</span>, <span class="key">minGapMs</span>: <span class="val">500</span> }
+    </div>
+  </section>
+
+  <!-- ── Multi-Format Export ── -->
+  <section id="formats">
+    <h2>Multi-Format Export</h2>
+    <p class="subtitle">One pipeline run, multiple outputs. Square for socials, vertical for mobile, GIF for docs.</p>
+    <div class="format-grid">
+      <div class="format-card" id="fmt-square">
+        <div class="ratio-preview">1:1</div>
+        <h3>Square</h3>
+        <p>Instagram, LinkedIn feed</p>
+      </div>
+      <div class="format-card" id="fmt-vertical">
+        <div class="ratio-preview">9:16</div>
+        <h3>Vertical</h3>
+        <p>TikTok, Reels, Shorts</p>
+      </div>
+      <div class="format-card" id="fmt-gif">
+        <div class="ratio-preview">.gif</div>
+        <h3>Animated GIF</h3>
+        <p>Docs, READMEs, PRs</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Batch & Dashboard ── -->
+  <section id="batch">
+    <h2>Batch Pipeline & Dashboard</h2>
+    <p class="subtitle">Build everything at once. See everything at a glance.</p>
+    <div class="batch-grid">
+      <div class="batch-card" id="batch-pipeline">
+        <h3>argo pipeline --all</h3>
+        <p>Discovers every demo in your project and runs the full pipeline for each, sequentially.</p>
+        <div class="terminal">
+          <div><span class="prompt">$</span> <span class="cmd">npx argo pipeline --all</span></div>
+          <div><span class="output">Found 3 demo(s): example, showcase, mobile</span></div>
+          <div><span class="separator">══════════════════════════════</span></div>
+          <div><span class="output">  Pipeline: example</span></div>
+          <div><span class="success">✓ That's a wrap! → videos/example.mp4</span></div>
+          <div><span class="separator">══════════════════════════════</span></div>
+          <div><span class="output">  Pipeline: showcase</span></div>
+          <div><span class="success">✓ That's a wrap! → videos/showcase.mp4</span></div>
+          <div><span class="separator">══════════════════════════════</span></div>
+          <div><span class="output">  Batch complete: 3/3 succeeded</span></div>
+        </div>
+      </div>
+      <div class="batch-card" id="batch-dashboard">
+        <h3>argo preview</h3>
+        <p>Omit the demo name to get a dashboard listing all demos with their build status.</p>
+        <div class="dashboard-preview">
+          <div class="header">
+            <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+            <span class="url">127.0.0.1:3456</span>
+          </div>
+          <table>
+            <thead><tr><th></th><th>Demo</th><th>Script</th><th>Video</th><th>Size</th></tr></thead>
+            <tbody>
+              <tr><td>🟢</td><td><strong>example</strong></td><td>✓</td><td>✓</td><td>4.2 MB</td></tr>
+              <tr><td>🟢</td><td><strong>showcase</strong></td><td>✓</td><td>✓</td><td>12.8 MB</td></tr>
+              <tr><td>🟡</td><td><strong>mobile</strong></td><td>✓</td><td>—</td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Progress Bar ── -->
+  <section id="progress">
+    <h2>Export Progress Bar</h2>
+    <p class="subtitle">Real-time encoding progress — no more guessing when ffmpeg will finish.</p>
+    <div class="progress-demo" id="progress-bar">
+      <div class="progress-line"><span class="label">★ Cutting the final take...</span></div>
+      <div class="progress-bar-container">
+        <div class="progress-bar"><div class="fill" id="progress-fill"></div></div>
+        <span class="progress-pct" id="progress-pct">73.2%</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CTA ── -->
+  <section id="cta">
+    <h2>Try it now</h2>
+    <p>All features are available today — just update your config and re-run the pipeline.</p>
+    <div class="cmd-box">npm i -D @argo-video/cli && npx argo pipeline --all</div>
+  </section>
+
+  <script>
+    // Animate the progress bar
+    let pct = 0;
+    const fill = document.getElementById('progress-fill');
+    const pctEl = document.getElementById('progress-pct');
+    function animateProgress() {
+      if (pct < 100) {
+        pct += 0.4;
+        if (pct > 100) pct = 100;
+        fill.style.width = pct + '%';
+        pctEl.textContent = pct.toFixed(1) + '%';
+        requestAnimationFrame(animateProgress);
+      }
+    }
+    // Start animation when progress section is visible
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        pct = 0;
+        animateProgress();
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.getElementById('progress-bar'));
+  </script>
+
+</body>
+</html>
