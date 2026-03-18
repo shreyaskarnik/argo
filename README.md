@@ -129,7 +129,12 @@ export default defineConfig({
     browser: 'webkit',           // webkit > firefox > chromium on macOS
     // deviceScaleFactor: 2,     // enable after webkit 2x fix
   },
-  export: { preset: 'slow', crf: 16 },
+  export: {
+    preset: 'slow', crf: 16,
+    transition: { type: 'fade-through-black', durationMs: 400 },   // scene transitions
+    speedRamp: { gapSpeed: 2.0 },                                   // speed up gaps between scenes
+    formats: ['gif', '9:16'],                                       // additional export formats
+  },
   overlays: {
     autoBackground: true,
     // defaultPlacement: 'top-right',
@@ -207,8 +212,10 @@ argo record <demo>                 Record browser session
 argo tts generate <manifest>       Generate TTS clips from manifest
 argo export <demo>                 Merge video + audio to MP4
 argo pipeline <demo>               Run all steps end-to-end
+argo pipeline --all                Run pipeline for every demo in demosDir
 argo validate <demo>               Check scene name consistency (no TTS/recording)
 argo preview <demo>                Browser-based editor for voiceover, overlays, timing
+argo preview                       Multi-demo dashboard (lists all demos with status)
 argo doctor                        Check environment (ffmpeg, Playwright, config)
 argo --config <path> <command>     Use a custom config file
 
@@ -216,6 +223,7 @@ Options:
   --browser <engine>               chromium | webkit | firefox (overrides config)
   --base-url <url>                 Override baseURL from config
   --headed                         Run browser in visible mode
+  --all                            Run pipeline for all demos
   --port <number>                  Preview server port (default: auto)
 ```
 
@@ -329,7 +337,65 @@ choco install ffmpeg       # Windows
 
 3. **Align** — Each TTS clip is placed at its scene's recorded timestamp. Overlapping clips are pushed forward with a 100ms gap. All clips are mixed into a single `narration-aligned.wav`.
 
-4. **Export** — ffmpeg combines the screen recording (WebM) with the aligned narration (WAV) into an H.264 MP4 with chapter markers. Subtitle files (`.srt` + `.vtt`) and a scene report are generated alongside the video.
+4. **Export** — ffmpeg combines the screen recording (WebM) with the aligned narration (WAV) into an H.264 MP4 with chapter markers. Subtitle files (`.srt` + `.vtt`) and a scene report are generated alongside the video. A progress bar shows encoding percentage during export.
+
+### Scene Transitions
+
+Add smooth transitions between scenes:
+
+```js
+export: {
+  transition: { type: 'fade-through-black', durationMs: 500 },
+}
+```
+
+Transition types: `fade-through-black`, `dissolve`, `wipe-left`, `wipe-right`.
+
+### Speed Ramp
+
+Compress gaps between scenes (navigation, page loads) to keep demos tight:
+
+```js
+export: {
+  speedRamp: { gapSpeed: 2.0, minGapMs: 500 },
+}
+```
+
+`gapSpeed: 2.0` means inter-scene gaps play at 2× speed. Only gaps longer than `minGapMs` (default 500ms) are affected. Both video and audio are sped up together.
+
+### Multi-Format Export
+
+Export additional formats alongside the main 16:9 MP4:
+
+```js
+export: {
+  formats: ['1:1', '9:16', 'gif'],
+}
+```
+
+- `1:1` — Square crop (centered) for Instagram/LinkedIn
+- `9:16` — Vertical crop (centered) for TikTok/Reels
+- `gif` — Animated GIF with palette optimization for docs/READMEs
+
+### Batch Pipeline
+
+Build all demos in one command:
+
+```bash
+npx argo pipeline --all
+```
+
+Discovers all `.scenes.json` files in `demosDir` and runs the full pipeline for each.
+
+### Dashboard
+
+View all demos at a glance:
+
+```bash
+npx argo preview
+```
+
+Opens a dashboard listing every discovered demo with build status, video size, resolution, and quick-action links. Run `argo preview <demo>` for the single-demo editor.
 
 ## Example
 

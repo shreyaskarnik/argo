@@ -172,10 +172,12 @@ Use **one or the other** per scene:
 
 ```bash
 npx argo pipeline <name>                    # Full pipeline (recommended)
+npx argo pipeline --all                     # Run pipeline for ALL demos in demosDir
 npx argo pipeline <name> --browser webkit   # Override browser
 npx argo pipeline <name> --base-url <url>   # Override baseURL
 npx argo validate <name>                    # Dry run — checks scene name consistency
 npx argo preview <name>                     # Interactive replay viewer (iterate without re-recording)
+npx argo preview                            # Multi-demo dashboard (lists all demos with status)
 npx argo init                               # Scaffold example demo + config
 npx argo init --from tests/spec.ts          # Convert existing Playwright test
 ```
@@ -188,6 +190,25 @@ npx argo export <name>                            # Step 3+4: Align + Export (ta
 ```
 
 Pipeline order is **TTS -> Record -> Align -> Export** — TTS runs first so `durationFor()` has clip lengths during recording.
+
+### Scene Transitions, Speed Ramp & Multi-Format Export
+
+Configure in `argo.config.mjs` under `export`:
+
+```javascript
+export: {
+  preset: 'slow',
+  crf: 16,
+  transition: { type: 'fade-through-black', durationMs: 400 },  // scene transitions
+  speedRamp: { gapSpeed: 2.0, minGapMs: 500 },                  // speed up gaps between scenes
+  formats: ['gif', '9:16', '1:1'],                               // additional export formats
+}
+```
+
+- **Transitions:** `fade-through-black` | `dissolve` | `wipe-left` | `wipe-right` — applied at scene boundaries during export
+- **Speed ramp:** Compresses inter-scene gaps (navigation, page loads) to keep demos tight. `gapSpeed: 2.0` = 2× speed for gaps. Only gaps > `minGapMs` (default 500ms) are affected.
+- **Formats:** `1:1` (square, Instagram), `9:16` (vertical, TikTok), `gif` (palette-optimized animated GIF for docs/READMEs)
+- **Progress bar:** Export shows encoding progress automatically when duration is known
 
 ### Preview Iteration Workflow
 
