@@ -139,6 +139,36 @@ export default defineConfig({
 
 > **Tip:** Use `browser: 'webkit'` for sharper video on macOS. Chromium has a [known video capture quality issue](https://github.com/microsoft/playwright/issues/31424). Set `deviceScaleFactor: 2` for retina-quality recordings (captured at 2x, downscaled with lanczos in export).
 
+### Mobile Demos
+
+Record mobile-viewport demos with touch support:
+
+```ts
+// In your demo script
+test.use({
+  viewport: { width: 390, height: 664 },
+  isMobile: true,
+  hasTouch: true,
+  video: { mode: 'on' as const, size: { width: 390, height: 664 } },
+});
+```
+
+Or set mobile options globally in config:
+
+```js
+video: {
+  width: 390,
+  height: 664,
+  browser: 'webkit',
+  isMobile: true,
+  hasTouch: true,
+},
+```
+
+> **Important:** Set `video.size` to match the viewport in `test.use()`, otherwise the capture canvas defaults to 1920×1080 and the mobile viewport renders with gray padding. Use `.tap()` instead of `.click()` for touch interactions.
+
+See `demos/mobile.demo.ts` for a complete mobile demo example.
+
 ### `playwright.config.ts`
 
 Argo scaffolds this for you via `argo init`. The key settings:

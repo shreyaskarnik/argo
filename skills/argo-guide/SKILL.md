@@ -80,6 +80,26 @@ const stepDur = Math.floor(narration.durationFor('feature') / 3);
 spotlight(page, '#target', { duration: stepDur });
 ```
 
+### Mobile Demos
+
+For mobile viewport recording, set `isMobile`, `hasTouch`, and `video.size` in the demo script via `test.use()`:
+
+```typescript
+test.use({
+  viewport: { width: 390, height: 664 },
+  isMobile: true,
+  hasTouch: true,
+  video: { mode: 'on' as const, size: { width: 390, height: 664 } },
+});
+```
+
+The `video.size` override is essential — without it, the capture canvas defaults to 1920x1080 and the mobile viewport renders in the top-left with gray padding. Use `.tap()` instead of `.click()` for touch interactions.
+
+These options can also be set in `argo.config.mjs` under `video` for all demos:
+```javascript
+video: { width: 390, height: 664, isMobile: true, hasTouch: true }
+```
+
 ### Auto-Trim (Off-Camera Setup)
 
 The pipeline trims video to start ~200ms before the first `narration.mark()`. Everything before (login, feature flags, data seeding) and after the last scene is cut from the final MP4. This means setup code never appears in the video — no need for separate test fixtures.
