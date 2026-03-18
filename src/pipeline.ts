@@ -1,5 +1,4 @@
 import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import { join, basename } from 'node:path';
 import { generateClips } from './tts/generate.js';
 import { record } from './record.js';
@@ -9,32 +8,16 @@ import { exportVideo, checkFfmpeg } from './export.js';
 import { generateSrt, generateVtt } from './subtitles.js';
 import { generateChapterMetadata } from './chapters.js';
 import { buildSceneReport, formatSceneReport } from './report.js';
-import { computeSegments, applySpeedRamp } from './speed-ramp.js';
+import { applySpeedRampToTimeline } from './speed-ramp.js';
 import type { ArgoConfig } from './config.js';
-
-function getVideoDurationMs(videoPath: string): number {
-  let raw: string;
-  try {
-    raw = execFileSync(
-      'ffprobe',
-      ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', videoPath],
-      { encoding: 'utf-8' },
-    ).trim();
-  } catch (err) {
-    throw new Error(
-      `Failed to get video duration from ${videoPath}. ` +
-      `Ensure ffprobe is installed (it usually comes with ffmpeg). ` +
-      `Original error: ${(err as Error).message}`
-    );
-  }
-  const durationMs = Math.round(parseFloat(raw) * 1000);
-  if (isNaN(durationMs) || durationMs <= 0) {
-    throw new Error(
-      `ffprobe returned invalid duration "${raw}" for ${videoPath}. The video file may be corrupt.`
-    );
-  }
-  return durationMs;
-}
+import { getVideoDurationMs } from './media.js';
+import {
+  buildPlacementsFromTimingAndDurations,
+  buildSceneTexts,
+  computeHeadTrimMs,
+  readScenesManifest,
+  shiftPlacements,
+} from './timeline.js';
 
 export interface PipelineOptions {
   headed?: boolean;
@@ -104,6 +87,7 @@ export async function runPipeline(
   checkFfmpeg();
 
   const argoDir = join('.argo', demoName);
+  mkdirSync(argoDir, { recursive: true });
 
   // Step 1: Generate TTS clips
   console.log('★ Brewing voiceover clips...');
@@ -162,13 +146,7 @@ export async function runPipeline(
   let shiftedDurationMs = totalDurationMs;
 
   // Auto-trim: skip setup before first scene mark (with 200ms lead-in)
-  const markTimes = Object.values(timing);
-  let headTrimMs = 0;
-  if (markTimes.length > 0) {
-    const firstMarkMs = Math.min(...markTimes);
-    headTrimMs = Math.max(0, firstMarkMs - 200);
-    if (headTrimMs <= 500) headTrimMs = 0;
-  }
+  const headTrimMs = computeHeadTrimMs(timing);
 
   if (!isSilent) {
     console.log('★ Mixing the soundtrack...');
@@ -198,48 +176,37 @@ export async function runPipeline(
       );
     }
 
-    // Merge voiced placements with silent scenes (scenes that have timing marks but no TTS clips)
-    const voicedScenes = new Set(aligned.placements.map(p => p.scene));
-    const sortedMarks = Object.entries(timing).sort((a, b) => a[1] - b[1]);
-    const silentPlacements = sortedMarks
-      .filter(([scene]) => !voicedScenes.has(scene))
-      .map(([scene, startMs], _i, arr) => {
-        const idx = sortedMarks.findIndex(([s]) => s === scene);
-        const endMs = idx + 1 < sortedMarks.length ? sortedMarks[idx + 1][1] : totalDurationMs;
-        return { scene, startMs, endMs };
-      });
-    const allPlacements = [...aligned.placements, ...silentPlacements].sort((a, b) => a.startMs - b.startMs);
-
-    shiftedPlacements = headTrimMs > 0
-      ? allPlacements.map(p => ({ ...p, startMs: p.startMs - headTrimMs, endMs: p.endMs - headTrimMs }))
-      : allPlacements;
+    const allPlacements = buildPlacementsFromTimingAndDurations(timing, sceneDurations, totalDurationMs);
+    shiftedPlacements = shiftPlacements(allPlacements, headTrimMs);
     shiftedDurationMs = Math.max(totalDurationMs, aligned.requiredDurationMs) - headTrimMs;
   } else {
     console.log('★ Silent mode — no voiceover clips');
     shiftedDurationMs = totalDurationMs - headTrimMs;
-    // Build placements from timing marks for chapters (each scene runs until the next mark)
-    const sortedMarks = Object.entries(timing).sort((a, b) => a[1] - b[1]);
-    shiftedPlacements = sortedMarks.map(([scene, startMs], i) => {
-      const endMs = i + 1 < sortedMarks.length ? sortedMarks[i + 1][1] : totalDurationMs;
-      return { scene, startMs: startMs - headTrimMs, endMs: endMs - headTrimMs };
-    });
+    shiftedPlacements = shiftPlacements(
+      buildPlacementsFromTimingAndDurations(timing, sceneDurations, totalDurationMs),
+      headTrimMs,
+    );
   }
+
+  const speedRampPlan = applySpeedRampToTimeline(
+    shiftedPlacements,
+    shiftedDurationMs,
+    config.export.speedRamp,
+  );
+  const finalPlacements = speedRampPlan.placements;
+  const finalDurationMs = speedRampPlan.totalDurationMs;
 
   // Ensure output directory exists before writing subtitles
   mkdirSync(config.outputDir, { recursive: true });
 
   // Build scene text map for subtitles
   const manifestPath = `${config.demosDir}/${demoName}.scenes.json`;
-  const sceneTexts: Record<string, string> = {};
   try {
-    const manifestContent = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-    for (const entry of manifestContent) {
-      if (entry.scene && entry.text) sceneTexts[entry.scene] = entry.text;
-    }
+    const sceneTexts = buildSceneTexts(readScenesManifest(manifestPath));
 
-    // Generate subtitles (shifted if head-trimming)
-    const srt = generateSrt(shiftedPlacements, sceneTexts);
-    const vtt = generateVtt(shiftedPlacements, sceneTexts);
+    // Generate subtitles on the final export timeline.
+    const srt = generateSrt(finalPlacements, sceneTexts);
+    const vtt = generateVtt(finalPlacements, sceneTexts);
     writeFileSync(join(config.outputDir, `${demoName}.srt`), srt, 'utf-8');
     writeFileSync(join(config.outputDir, `${demoName}.vtt`), vtt, 'utf-8');
   } catch {
@@ -248,7 +215,7 @@ export async function runPipeline(
 
   // Generate chapter metadata for ffmpeg
   const chapterMetadataPath = join(argoDir, 'chapters.txt');
-  const chapterMetadata = generateChapterMetadata(shiftedPlacements, shiftedDurationMs);
+  const chapterMetadata = generateChapterMetadata(finalPlacements, finalDurationMs);
   writeFileSync(chapterMetadataPath, chapterMetadata, 'utf-8');
 
   // Step 4: Export final video
@@ -267,26 +234,17 @@ export async function runPipeline(
     chapterMetadataPath,
     formats: config.export.formats,
     transition: config.export.transition,
-    placements: shiftedPlacements,
-    totalDurationMs: shiftedDurationMs,
+    placements: finalPlacements,
+    totalDurationMs: finalDurationMs,
+    speedRampSegments: speedRampPlan.segments,
   };
   if (tailPadMs !== undefined) exportOptions.tailPadMs = tailPadMs;
   if (headTrimMs > 0) exportOptions.headTrimMs = headTrimMs;
 
   const outputPath = await exportVideo(exportOptions);
 
-  // Step 4b: Speed ramp — compress gaps between scenes
-  if (config.export.speedRamp && config.export.speedRamp.gapSpeed > 1.0 && shiftedPlacements.length > 0) {
-    console.log(`★ Applying speed ramp (${config.export.speedRamp.gapSpeed}× gaps)...`);
-    const hasAudioFile = !isSilent;
-    const segments = computeSegments(shiftedPlacements, shiftedDurationMs, config.export.speedRamp);
-    if (segments.length > 0) {
-      await applySpeedRamp(outputPath, segments, hasAudioFile, config.export.preset, config.export.crf);
-    }
-  }
-
   // Scene report
-  const report = buildSceneReport(demoName, shiftedPlacements, overflowMs, shiftedDurationMs, outputPath);
+  const report = buildSceneReport(demoName, finalPlacements, overflowMs, finalDurationMs, outputPath);
   writeFileSync(join(argoDir, 'scene-report.json'), JSON.stringify(report, null, 2), 'utf-8');
   console.log(formatSceneReport(report));
 

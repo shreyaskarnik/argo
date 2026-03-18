@@ -1,6 +1,7 @@
 import { Command, Option } from 'commander';
 import { basename } from 'node:path';
 import { createRequire } from 'node:module';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { loadConfig, type ArgoConfig, type BrowserEngine } from './config.js';
 import { record } from './record.js';
 import { generateClips } from './tts/generate.js';
@@ -11,6 +12,19 @@ import { startPreviewServer } from './preview.js';
 import { startDashboardServer } from './dashboard.js';
 import { validateDemo } from './validate.js';
 import { runDoctor, formatDoctorResults } from './doctor.js';
+import { getVideoDurationMs } from './media.js';
+import {
+  buildPlacementsFromTimingAndDurations,
+  buildSceneDurationsFromCache,
+  buildSceneTexts,
+  computeHeadTrimMs,
+  readScenesManifest,
+  shiftPlacements,
+} from './timeline.js';
+import { generateChapterMetadata } from './chapters.js';
+import { generateSrt, generateVtt } from './subtitles.js';
+import { applySpeedRampToTimeline, type Segment } from './speed-ramp.js';
+import type { Placement } from './tts/align.js';
 
 function validateDemoName(name: string): string {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(name)) {
@@ -96,6 +110,58 @@ export function createProgram(): Command {
       validateDemoName(demo);
       const configPath = program.opts().config;
       const config = await loadConfig(process.cwd(), configPath);
+      const demoDir = `.argo/${demo}`;
+      const timingPath = `${demoDir}/.timing.json`;
+      const manifestPath = `${config.demosDir}/${demo}.scenes.json`;
+      let chapterMetadataPath: string | undefined;
+      let placements: Placement[] | undefined;
+      let totalDurationMs: number | undefined;
+      let headTrimMs: number | undefined;
+      let speedRampSegments: Segment[] | undefined;
+
+      if (existsSync(timingPath) && existsSync(manifestPath)) {
+        const timing = JSON.parse(readFileSync(timingPath, 'utf-8')) as Record<string, number>;
+        const manifestEntries = readScenesManifest(manifestPath);
+        const rawVideoDurationMs = getVideoDurationMs(`${demoDir}/video.webm`);
+        const sceneDurations = buildSceneDurationsFromCache(
+          demo,
+          manifestEntries,
+          { voice: config.tts.defaultVoice, speed: config.tts.defaultSpeed },
+        );
+        const untrimmedPlacements = buildPlacementsFromTimingAndDurations(
+          timing,
+          sceneDurations,
+          rawVideoDurationMs,
+        );
+        const computedHeadTrimMs = computeHeadTrimMs(timing);
+        const shiftedPlacements = shiftPlacements(untrimmedPlacements, computedHeadTrimMs);
+        const shiftedDurationMs = rawVideoDurationMs - computedHeadTrimMs;
+        const speedRampPlan = applySpeedRampToTimeline(
+          shiftedPlacements,
+          shiftedDurationMs,
+          config.export.speedRamp,
+        );
+
+        placements = speedRampPlan.placements;
+        totalDurationMs = speedRampPlan.totalDurationMs;
+        speedRampSegments = speedRampPlan.segments;
+        headTrimMs = computedHeadTrimMs > 0 ? computedHeadTrimMs : undefined;
+
+        chapterMetadataPath = `${demoDir}/chapters.txt`;
+        writeFileSync(chapterMetadataPath, generateChapterMetadata(placements, totalDurationMs), 'utf-8');
+
+        const sceneTexts = buildSceneTexts(manifestEntries);
+        if (Object.keys(sceneTexts).length > 0) {
+          mkdirSync(config.outputDir, { recursive: true });
+          writeFileSync(`${config.outputDir}/${demo}.srt`, generateSrt(placements, sceneTexts), 'utf-8');
+          writeFileSync(`${config.outputDir}/${demo}.vtt`, generateVtt(placements, sceneTexts), 'utf-8');
+        }
+      } else {
+        console.warn(
+          `Warning: missing timing or manifest for ${demo}; exporting without chapters, subtitles, transitions, or speed ramp.`,
+        );
+      }
+
       await exportVideo({
         demoName: demo,
         argoDir: '.argo',
@@ -107,8 +173,13 @@ export function createProgram(): Command {
         outputHeight: config.video.height,
         deviceScaleFactor: config.video.deviceScaleFactor,
         thumbnailPath: config.export.thumbnailPath,
+        chapterMetadataPath,
         formats: config.export.formats,
-        transition: config.export.transition,
+        transition: chapterMetadataPath ? config.export.transition : undefined,
+        placements,
+        totalDurationMs,
+        headTrimMs,
+        speedRampSegments,
       });
     });
 

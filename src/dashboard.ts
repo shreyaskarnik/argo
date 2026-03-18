@@ -6,7 +6,7 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { existsSync, readFileSync, statSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, readdirSync, createReadStream } from 'node:fs';
 import { join } from 'node:path';
 import { discoverDemos } from './pipeline.js';
 
@@ -70,7 +70,7 @@ function renderDashboardHTML(statuses: DemoStatus[], port: number): string {
       ? `<span class="meta">${(s.meta as any).video?.width}×${(s.meta as any).video?.height} &middot; ${(s.meta as any).video?.browser}</span>`
       : '';
     const previewLink = s.hasVideo
-      ? `<a href="javascript:void(0)" onclick="alert('Run: argo preview ${s.name}')" class="btn">Preview</a>`
+      ? `<a href="/video/${s.name}" target="_blank" class="btn">Preview</a>`
       : '';
 
     return `
@@ -148,6 +148,43 @@ export async function startDashboardServer(options: DashboardOptions): Promise<{
 
   return new Promise((resolve) => {
     const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+      const url = req.url ?? '/';
+
+      // Serve video files at /video/<name>
+      const videoMatch = url.match(/^\/video\/([a-zA-Z0-9][a-zA-Z0-9_-]*)$/);
+      if (videoMatch) {
+        const name = videoMatch[1];
+        const videoPath = join(outputDir, `${name}.mp4`);
+        if (!existsSync(videoPath)) {
+          res.writeHead(404);
+          res.end('Video not found');
+          return;
+        }
+        const stat = statSync(videoPath);
+        const range = req.headers.range;
+        if (range) {
+          const parts = range.replace(/bytes=/, '').split('-');
+          const start = parseInt(parts[0], 10);
+          const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+          res.writeHead(206, {
+            'Content-Range': `bytes ${start}-${end}/${stat.size}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': end - start + 1,
+            'Content-Type': 'video/mp4',
+          });
+          createReadStream(videoPath, { start, end }).pipe(res);
+        } else {
+          res.writeHead(200, {
+            'Content-Length': stat.size,
+            'Content-Type': 'video/mp4',
+            'Accept-Ranges': 'bytes',
+          });
+          createReadStream(videoPath).pipe(res);
+        }
+        return;
+      }
+
+      // Dashboard HTML
       const statuses = gatherDemoStatuses(demosDir, outputDir);
       const actualPort = (server.address() as any)?.port ?? preferredPort ?? 3000;
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });

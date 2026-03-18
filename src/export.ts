@@ -2,9 +2,10 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Placement } from './tts/align.js';
-import type { TransitionConfig, SpeedRampConfig } from './config.js';
+import type { TransitionConfig } from './config.js';
 import { buildTransitionFilters } from './transitions.js';
 import { runFfmpegWithProgress } from './progress.js';
+import { buildSpeedRampFilter, type Segment } from './speed-ramp.js';
 
 export interface ExportOptions {
   demoName: string;
@@ -34,6 +35,8 @@ export interface ExportOptions {
   placements?: Placement[];
   /** Estimated total duration in ms — used for progress bar. */
   totalDurationMs?: number;
+  /** Precomputed speed-ramp segments on the post-trim timeline. */
+  speedRampSegments?: Segment[];
 }
 
 function formatSeconds(ms: number): string {
@@ -131,6 +134,7 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     transition,
     placements,
     totalDurationMs,
+    speedRampSegments,
   } = options;
 
   checkFfmpeg();
@@ -186,6 +190,19 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
   }
 
   // Build video filter chain
+  const filterParts: string[] = [];
+  let videoSource = '0:v';
+  let audioSource = hasAudio ? '1:a' : undefined;
+
+  const speedRampFilter = speedRampSegments && speedRampSegments.length > 0
+    ? buildSpeedRampFilter(speedRampSegments, { video: '0:v', audio: hasAudio ? '1:a' : undefined })
+    : null;
+  if (speedRampFilter) {
+    filterParts.push(speedRampFilter.filterComplex);
+    videoSource = speedRampFilter.outputLabels.video;
+    audioSource = speedRampFilter.outputLabels.audio;
+  }
+
   const vFilters: string[] = [];
   if (tailPadMs && tailPadMs > 0) {
     vFilters.push(`tpad=stop_mode=clone:stop_duration=${formatSeconds(tailPadMs)}`);
@@ -201,7 +218,16 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
   }
 
   if (vFilters.length > 0) {
-    args.push('-vf', vFilters.join(','));
+    if (speedRampFilter) {
+      filterParts.push(`[${videoSource}]${vFilters.join(',')}[outvfinal]`);
+      videoSource = 'outvfinal';
+    } else {
+      args.push('-vf', vFilters.join(','));
+    }
+  }
+
+  if (filterParts.length > 0) {
+    args.push('-filter_complex', filterParts.join(';\n'));
   }
 
   args.push(
@@ -221,10 +247,19 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     args.push('-map_metadata', String(chapterInputIdx));
   }
 
+  const usesExplicitMaps = hasThumbnail || filterParts.length > 0;
+  const mapRef = (label: string) => (label.includes(':') ? label : `[${label}]`);
+
+  if (usesExplicitMaps) {
+    args.push('-map', mapRef(videoSource));
+    if (hasAudio && audioSource) args.push('-map', mapRef(audioSource));
+  }
+
   if (hasThumbnail) {
-    // Map video, audio (if present), and thumbnail streams explicitly
-    args.push('-map', '0:v');
-    if (hasAudio) args.push('-map', '1:a');
+    if (!usesExplicitMaps) {
+      args.push('-map', '0:v');
+      if (hasAudio) args.push('-map', '1:a');
+    }
     args.push('-map', `${thumbInputIdx}:v`);
     // Encode thumbnail stream as PNG attached picture
     args.push('-c:v:1', 'png', '-disposition:v:1', 'attached_pic');

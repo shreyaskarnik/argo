@@ -18,6 +18,8 @@ vi.mock('../src/export.js', () => ({
 
 vi.mock('../src/pipeline.js', () => ({
   runPipeline: vi.fn(),
+  runBatchPipeline: vi.fn(),
+  discoverDemos: vi.fn().mockReturnValue([]),
 }));
 
 vi.mock('../src/init.js', () => ({
@@ -98,7 +100,7 @@ describe('CLI', () => {
       await run('export', 'onboarding');
 
       expect(mockedLoadConfig).toHaveBeenCalledWith(process.cwd(), undefined);
-      expect(mockedExportVideo).toHaveBeenCalledWith({
+      expect(mockedExportVideo).toHaveBeenCalledWith(expect.objectContaining({
         demoName: 'onboarding',
         argoDir: '.argo',
         outputDir: 'videos',
@@ -109,7 +111,7 @@ describe('CLI', () => {
         outputHeight: 1080,
         deviceScaleFactor: 1,
         thumbnailPath: 'assets/logo-thumb.png',
-      });
+      }));
     });
   });
 

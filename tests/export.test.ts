@@ -238,4 +238,30 @@ describe('exportVideo', () => {
     expect(a.filter(x => x === '-i').length).toBe(2);
     expect(a).not.toContain('-disposition:v:1');
   });
+
+  it('uses filter_complex speed ramp while preserving chapter and thumbnail inputs', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo',
+      argoDir: '.argo',
+      outputDir: 'out',
+      chapterMetadataPath: '.argo/demo/chapters.txt',
+      thumbnailPath: 'assets/logo-thumb.png',
+      speedRampSegments: [
+        { startMs: 0, endMs: 1000, speed: 2.0 },
+        { startMs: 1000, endMs: 2000, speed: 1.0 },
+      ],
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const a = args as string[];
+    expect(a).toContain('-filter_complex');
+    expect(a).toContain('-map_metadata');
+    expect(a).toContain('2');
+    expect(a.filter(x => x === '-map').length).toBe(3);
+    expect(a).toContain('[outv]');
+    expect(a).toContain('[outa]');
+    expect(a).toContain('3:v');
+    expect(a).toContain('-disposition:v:1');
+  });
 });

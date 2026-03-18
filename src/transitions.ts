@@ -1,6 +1,29 @@
 import type { Placement } from './tts/align.js';
 import type { TransitionConfig } from './config.js';
 
+function buildDirectionalWipe(
+  direction: 'left' | 'right',
+  boundarySec: number,
+  halfDur: number,
+): string[] {
+  const coverStart = boundarySec - halfDur;
+  const revealEnd = boundarySec + halfDur;
+  const coverDur = halfDur.toFixed(3);
+  const revealDur = halfDur.toFixed(3);
+
+  if (direction === 'left') {
+    return [
+      `drawbox=x='iw-if(between(t,${coverStart.toFixed(3)},${boundarySec.toFixed(3)}),(t-${coverStart.toFixed(3)})/${coverDur}*iw,0)':y=0:w='if(between(t,${coverStart.toFixed(3)},${boundarySec.toFixed(3)}),(t-${coverStart.toFixed(3)})/${coverDur}*iw,0)':h=ih:color=black:t=fill`,
+      `drawbox=x=0:y=0:w='if(between(t,${boundarySec.toFixed(3)},${revealEnd.toFixed(3)}),(1-(t-${boundarySec.toFixed(3)})/${revealDur})*iw,0)':h=ih:color=black:t=fill`,
+    ];
+  }
+
+  return [
+    `drawbox=x=0:y=0:w='if(between(t,${coverStart.toFixed(3)},${boundarySec.toFixed(3)}),(t-${coverStart.toFixed(3)})/${coverDur}*iw,0)':h=ih:color=black:t=fill`,
+    `drawbox=x='iw-if(between(t,${boundarySec.toFixed(3)},${revealEnd.toFixed(3)}),(1-(t-${boundarySec.toFixed(3)})/${revealDur})*iw,0)':y=0:w='if(between(t,${boundarySec.toFixed(3)},${revealEnd.toFixed(3)}),(1-(t-${boundarySec.toFixed(3)})/${revealDur})*iw,0)':h=ih:color=black:t=fill`,
+  ];
+}
+
 /**
  * Generate ffmpeg video filter expressions for scene transitions.
  *
@@ -9,7 +32,7 @@ import type { TransitionConfig } from './config.js';
  *
  * - `fade-through-black`: fade out to black, then fade in
  * - `dissolve`: quick opacity dip (simulates crossfade on continuous footage)
- * - `wipe-left` / `wipe-right`: falls back to fade-through-black (not yet implemented)
+ * - `wipe-left` / `wipe-right`: directional wipe-through-black using a moving mask
  *
  * Implementation note: ffmpeg's `fade` filter only supports a single fade-out
  * and fade-in per filter instance. For multiple scene boundaries, we build a
@@ -25,6 +48,21 @@ export function buildTransitionFilters(
   const durMs = transition.durationMs ?? 500;
   const durSec = durMs / 1000;
   const halfDur = durSec / 2;
+
+  if (transition.type === 'wipe-left' || transition.type === 'wipe-right') {
+    const parts: string[] = [];
+    for (let i = 1; i < placements.length; i++) {
+      const boundarySec = placements[i].startMs / 1000;
+      parts.push(
+        ...buildDirectionalWipe(
+          transition.type === 'wipe-left' ? 'left' : 'right',
+          boundarySec,
+          halfDur,
+        ),
+      );
+    }
+    return parts;
+  }
 
   // For dissolve, use alpha fades (one per boundary is fine since alpha
   // fades are independent). Each boundary gets its own enable window.
@@ -42,45 +80,37 @@ export function buildTransitionFilters(
     return parts;
   }
 
-  // For fade-through-black (and wipe fallback), we need to handle multiple
-  // boundaries. Build a single drawbox filter with enable expressions that
-  // activates a full-frame black box at each boundary.
-  //
-  // The approach: for each boundary, fade to black over halfDur, hold black
-  // briefly, then fade back in. We use multiple drawbox filters with
-  // graduated opacity, each enabled for a narrow time window.
+  // For fade-through-black, use a geq (generic equation) filter per boundary.
+  // geq evaluates a per-pixel expression every frame, giving perfectly smooth
+  // opacity transitions. Each boundary gets one geq that:
+  //   - During fade-out: darkens pixels linearly toward black
+  //   - During fade-in: brightens pixels linearly from black
+  //   - Outside the transition window: passes pixels unchanged
   const filters: string[] = [];
 
   for (let i = 1; i < placements.length; i++) {
     const boundarySec = placements[i].startMs / 1000;
     const fadeOutStart = boundarySec - halfDur;
     const fadeInEnd = boundarySec + halfDur;
+    const hd = halfDur.toFixed(4);
+    const fos = fadeOutStart.toFixed(4);
+    const bs = boundarySec.toFixed(4);
+    const fie = fadeInEnd.toFixed(4);
 
-    // Create a smooth fade using multiple opacity steps
-    // 10 steps per half-transition = smooth enough at 30fps
-    const steps = 10;
-    for (let s = 0; s <= steps; s++) {
-      const t = s / steps;
-      // Fade out: opacity goes 0 → 1 over [fadeOutStart, boundarySec]
-      const outTime = fadeOutStart + t * halfDur;
-      const outOpacity = t;
-      // Fade in: opacity goes 1 → 0 over [boundarySec, fadeInEnd]
-      const inTime = boundarySec + t * halfDur;
-      const inOpacity = 1 - t;
+    // Compute a brightness multiplier:
+    //   before fadeOutStart: 1.0 (full brightness)
+    //   fadeOutStart → boundary: ramps 1.0 → 0.0
+    //   boundary → fadeInEnd: ramps 0.0 → 1.0
+    //   after fadeInEnd: 1.0 (full brightness)
+    const brightnessExpr =
+      `if(between(t,${fos},${bs}),1-(t-${fos})/${hd},` +
+      `if(between(t,${bs},${fie}),(t-${bs})/${hd},1))`;
 
-      const stepDur = halfDur / steps;
-
-      if (s < steps) {
-        filters.push(
-          `drawbox=x=0:y=0:w=iw:h=ih:color=black@${outOpacity.toFixed(2)}:t=fill:enable='between(t,${outTime.toFixed(3)},${(outTime + stepDur).toFixed(3)})'`,
-        );
-      }
-      if (s > 0) {
-        filters.push(
-          `drawbox=x=0:y=0:w=iw:h=ih:color=black@${inOpacity.toFixed(2)}:t=fill:enable='between(t,${inTime.toFixed(3)},${(inTime + stepDur).toFixed(3)})'`,
-        );
-      }
-    }
+    // Apply to luma (Y) channel; chroma (U/V) channels center at 128
+    // so we lerp them toward 128 (black in YUV) proportionally.
+    filters.push(
+      `geq=lum='lum(X,Y)*${brightnessExpr}':cb='128+(cb(X,Y)-128)*${brightnessExpr}':cr='128+(cr(X,Y)-128)*${brightnessExpr}':enable='between(t,${fos},${fie})'`,
+    );
   }
 
   return filters;

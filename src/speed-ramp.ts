@@ -1,11 +1,10 @@
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import type { Placement } from './tts/align.js';
 import type { SpeedRampConfig } from './config.js';
 
-interface Segment {
-  startSec: number;
-  endSec: number;
+export interface Segment {
+  startMs: number;
+  endMs: number;
   speed: number;
 }
 
@@ -29,15 +28,15 @@ export function computeSegments(
     if (p.startMs - cursor >= minGapMs) {
       // Gap before this scene
       segments.push({
-        startSec: cursor / 1000,
-        endSec: p.startMs / 1000,
+        startMs: cursor,
+        endMs: p.startMs,
         speed: gapSpeed,
       });
     }
     // Scene itself at normal speed
     segments.push({
-      startSec: p.startMs / 1000,
-      endSec: p.endMs / 1000,
+      startMs: p.startMs,
+      endMs: p.endMs,
       speed: 1.0,
     });
     cursor = p.endMs;
@@ -46,13 +45,56 @@ export function computeSegments(
   // Trailing gap
   if (totalDurationMs - cursor >= minGapMs) {
     segments.push({
-      startSec: cursor / 1000,
-      endSec: totalDurationMs / 1000,
+      startMs: cursor,
+      endMs: totalDurationMs,
       speed: gapSpeed,
     });
   }
 
   return segments;
+}
+
+export function remapTimeMs(timeMs: number, segments: Segment[]): number {
+  if (segments.length === 0) return timeMs;
+
+  let outputMs = 0;
+  for (const segment of segments) {
+    const segDurationMs = segment.endMs - segment.startMs;
+    if (timeMs >= segment.endMs) {
+      outputMs += segDurationMs / segment.speed;
+      continue;
+    }
+    if (timeMs > segment.startMs) {
+      outputMs += (timeMs - segment.startMs) / segment.speed;
+    }
+    return Math.round(outputMs);
+  }
+  return Math.round(outputMs);
+}
+
+export function applySpeedRampToTimeline(
+  placements: Placement[],
+  totalDurationMs: number,
+  config?: SpeedRampConfig,
+): { placements: Placement[]; totalDurationMs: number; segments: Segment[] } {
+  if (!config || config.gapSpeed <= 1.0 || placements.length === 0) {
+    return { placements, totalDurationMs, segments: [] };
+  }
+
+  const segments = computeSegments(placements, totalDurationMs, config);
+  if (segments.length === 0 || segments.every((segment) => segment.speed === 1.0)) {
+    return { placements, totalDurationMs, segments: [] };
+  }
+
+  return {
+    placements: placements.map((placement) => ({
+      scene: placement.scene,
+      startMs: remapTimeMs(placement.startMs, segments),
+      endMs: remapTimeMs(placement.endMs, segments),
+    })),
+    totalDurationMs: remapTimeMs(totalDurationMs, segments),
+    segments,
+  };
 }
 
 /**
@@ -63,7 +105,7 @@ export function computeSegments(
  */
 export function buildSpeedRampFilter(
   segments: Segment[],
-  hasAudio: boolean,
+  inputs: { video: string; audio?: string },
 ): { filterComplex: string; outputLabels: { video: string; audio?: string } } | null {
   if (segments.length === 0) return null;
 
@@ -83,11 +125,11 @@ export function buildSpeedRampFilter(
 
     // Trim
     parts.push(
-      `[0:v]trim=start=${seg.startSec.toFixed(3)}:end=${seg.endSec.toFixed(3)},setpts=PTS-STARTPTS[${vLabel}]`,
+      `[${inputs.video}]trim=start=${(seg.startMs / 1000).toFixed(3)}:end=${(seg.endMs / 1000).toFixed(3)},setpts=PTS-STARTPTS[${vLabel}]`,
     );
-    if (hasAudio) {
+    if (inputs.audio) {
       parts.push(
-        `[0:a]atrim=start=${seg.startSec.toFixed(3)}:end=${seg.endSec.toFixed(3)},asetpts=PTS-STARTPTS[${aLabel}]`,
+        `[${inputs.audio}]atrim=start=${(seg.startMs / 1000).toFixed(3)}:end=${(seg.endMs / 1000).toFixed(3)},asetpts=PTS-STARTPTS[${aLabel}]`,
       );
     }
 
@@ -97,7 +139,7 @@ export function buildSpeedRampFilter(
       parts.push(`[${vLabel}]setpts=${ptsFactor}*PTS[${vOut}]`);
       videoLabels.push(`[${vOut}]`);
 
-      if (hasAudio) {
+      if (inputs.audio) {
         // atempo only supports 0.5–100.0; chain multiple for extreme values
         const tempoFilters = buildAtempoChain(seg.speed);
         parts.push(`[${aLabel}]${tempoFilters}[${aOut}]`);
@@ -105,20 +147,20 @@ export function buildSpeedRampFilter(
       }
     } else {
       videoLabels.push(`[${vLabel}]`);
-      if (hasAudio) audioLabels.push(`[${aLabel}]`);
+      if (inputs.audio) audioLabels.push(`[${aLabel}]`);
     }
   }
 
   // Concatenate
   const n = videoLabels.length;
-  const concatStreams = hasAudio ? 'v=1:a=1' : 'v=1:a=0';
+  const concatStreams = inputs.audio ? 'v=1:a=1' : 'v=1:a=0';
   parts.push(
-    `${videoLabels.join('')}${hasAudio ? audioLabels.join('') : ''}concat=n=${n}:${concatStreams}[outv]${hasAudio ? '[outa]' : ''}`,
+    `${videoLabels.join('')}${inputs.audio ? audioLabels.join('') : ''}concat=n=${n}:${concatStreams}[outv]${inputs.audio ? '[outa]' : ''}`,
   );
 
   return {
     filterComplex: parts.join(';\n'),
-    outputLabels: { video: '[outv]', audio: hasAudio ? '[outa]' : undefined },
+    outputLabels: { video: 'outv', audio: inputs.audio ? 'outa' : undefined },
   };
 }
 
@@ -152,7 +194,7 @@ export async function applySpeedRamp(
   preset: string,
   crf: number,
 ): Promise<void> {
-  const filter = buildSpeedRampFilter(segments, hasAudio);
+  const filter = buildSpeedRampFilter(segments, { video: '0:v', audio: hasAudio ? '0:a' : undefined });
   if (!filter) return;
 
   const tmpPath = inputPath.replace(/\.mp4$/, '.ramped.mp4');
@@ -160,10 +202,10 @@ export async function applySpeedRamp(
   const args = [
     '-i', inputPath,
     '-filter_complex', filter.filterComplex,
-    '-map', filter.outputLabels.video,
+    '-map', `[${filter.outputLabels.video}]`,
   ];
   if (filter.outputLabels.audio) {
-    args.push('-map', filter.outputLabels.audio);
+    args.push('-map', `[${filter.outputLabels.audio}]`);
   }
   args.push(
     '-c:v', 'libx264',
@@ -188,6 +230,6 @@ export async function applySpeedRamp(
   });
 
   // Replace original with ramped version
-  const { renameSync, unlinkSync } = await import('node:fs');
+  const { renameSync } = await import('node:fs');
   renameSync(tmpPath, inputPath);
 }
