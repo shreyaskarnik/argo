@@ -1,116 +1,116 @@
 [
   {
     "scene": "hero",
-    "text": "Meet Argo. One command turns a Playwright script into a launch-ready product video, complete with A.I. voiceover and camera direction.",
-    "speed": 0.9,
+    "text": "Meet Argo. Turn a Playwright demo into a polished narrated video, with the editing and export tooling built in.",
+    "speed": 0.92,
     "overlay": {
       "type": "headline-card",
-      "kicker": "PLAYWRIGHT TO VIDEO",
-      "title": "One command. Full demo.",
-      "body": "AI voiceover and camera direction included.",
+      "kicker": "CANONICAL SHOWCASE",
+      "title": "One demo. Full product story.",
+      "body": "Narration, overlays, camera direction, preview, and export in one flow.",
       "placement": "top-right",
       "motion": "slide-in",
       "autoBackground": true
     }
   },
   {
-    "scene": "how-it-works",
-    "text": "The pipeline is three steps. Write the demo, record the browser, export the video. Camera effects like zoom-to guide the viewer through each step automatically.",
-    "speed": 0.9,
+    "scene": "authoring",
+    "text": "Start with argo init, or convert an existing spec with init dash dash from. Keep one unified scenes manifest for voiceover and overlays, and omit text when you want a silent video.",
+    "speed": 0.92,
     "overlay": {
       "type": "headline-card",
-      "title": "Write. Record. Export.",
+      "kicker": "AUTHORING",
+      "title": "Playwright stays the source of truth.",
+      "body": "Init, init-from, unified scenes, silent mode.",
       "placement": "top-left",
       "motion": "slide-in",
       "autoBackground": true
     }
   },
   {
-    "scene": "features",
-    "text": "Four pillars make it work. Overlays for on-screen text. Voiceover with your choice of engine. Camera effects for editorial direction. And a pipeline that exports everything at once.",
-    "speed": 0.9,
-    "overlay": {
-      "type": "callout",
-      "text": "Overlays, voiceover, camera, and pipeline",
-      "placement": "top-left",
-      "motion": "fade-in",
-      "autoBackground": true
-    }
-  },
-  {
-    "scene": "tts",
-    "text": "Pick your voice. Seven engines from local to cloud. Kokoro runs locally. Transformers dot J S works with any Hugging Face model. Or clone your own voice with M.L.X. audio — record a fifteen second clip, and every demo sounds like you.",
-    "speed": 0.9,
+    "scene": "voiceover",
+    "text": "Seven T T S engines, local first. Iterate with Kokoro, bring a Hugging Face model, clone your own voice with M L X audio, or switch to hosted voices when it is time to ship.",
+    "speed": 0.92,
     "overlay": {
       "type": "lower-third",
-      "text": "Seven TTS engines — swap with one config line",
+      "text": "Local-first voices, cloud voices, and voice clone",
       "placement": "top-right",
       "motion": "fade-in",
+      "autoBackground": true
+    }
+  },
+  {
+    "scene": "preview",
+    "text": "Preview turns the recorded pass into an edit bay. Scrub by scene, rewrite one line, regenerate only that scene, and export again without re-recording.",
+    "speed": 0.92,
+    "overlay": {
+      "type": "headline-card",
+      "kicker": "PREVIEW",
+      "title": "Edit the cut without throwing away the capture.",
+      "body": "Scrub, regenerate, export, or re-record from one place.",
+      "placement": "top-left",
+      "motion": "slide-in",
       "autoBackground": true
     }
   },
   {
     "scene": "camera",
-    "text": "Four camera effects. Spotlight. Focus ring. Dim-around. And zoom-to. Each one is a single line in your demo script.",
-    "speed": 0.9
-  },
-  {
-    "scene": "code",
-    "text": "Your demo scripts are just Playwright tests with a few extra helpers. Spotlight, focus ring, dim-around, zoom-to, confetti — all one-liners in your script.",
-    "speed": 0.9,
+    "text": "Camera helpers keep feature beats readable. Spotlight, focus ring, dim around, zoom-to, cursor highlight, and confetti are all scriptable one-liners.",
+    "speed": 0.92,
     "overlay": {
-      "type": "lower-third",
-      "text": "All effects are one-liners in your Playwright script",
+      "type": "callout",
+      "text": "Direct the eye with code, not post-production guesswork.",
       "placement": "top-left",
       "motion": "fade-in",
       "autoBackground": true
     }
   },
   {
-    "scene": "transitions",
-    "text": "Scene transitions add smooth fades between scenes. Fade through black, dissolve, or directional wipes. One line of config.",
-    "speed": 0.9,
+    "scene": "export",
+    "text": "Export does the finishing work. Transitions, speed ramp, subtitles, chapters, scene reports, and extra formats like square, vertical, and G I F all come from the same timeline.",
+    "speed": 0.92,
     "overlay": {
-      "type": "lower-third",
-      "text": "transition: { type: 'fade-through-black', durationMs: 2000 }",
-      "placement": "bottom-center",
-      "motion": "fade-in",
+      "type": "headline-card",
+      "kicker": "EXPORT",
+      "title": "More than an M P 4.",
+      "body": "Transitions, speed ramp, subtitles, chapters, reports, and multi-format output.",
+      "placement": "top-right",
+      "motion": "slide-in",
       "autoBackground": true
     }
   },
   {
-    "scene": "formats",
-    "text": "Export multiple formats from one pipeline run. Square for Instagram. Vertical for TikTok. Animated GIF for docs and pull requests. And clip extraction for release notes.",
-    "speed": 0.9,
+    "scene": "ops",
+    "text": "As the demo catalog grows, validate catches wiring bugs, doctor checks the environment, pipeline dash dash all renders the fleet, and the dashboard gives you one place to inspect everything.",
+    "speed": 0.92,
     "overlay": {
-      "type": "callout",
-      "text": "MP4, GIF, 1:1, 9:16 — one pipeline run",
+      "type": "lower-third",
+      "text": "validate, doctor, pipeline --all, and dashboard",
       "placement": "top-right",
       "motion": "fade-in",
       "autoBackground": true
     }
   },
   {
-    "scene": "batch",
-    "text": "Batch pipeline and dashboard. Build all demos at once with dash-dash all. And the dashboard gives you a bird's-eye view of every demo with status, resolution, and quick preview links.",
-    "speed": 0.9,
+    "scene": "code",
+    "text": "Under the hood, it is still just Playwright. A few helpers for narration, overlays, typing, and camera language turn test code into a maintainable demo.",
+    "speed": 0.92,
     "overlay": {
-      "type": "headline-card",
-      "title": "argo pipeline --all",
-      "body": "Build everything. Preview from a dashboard.",
+      "type": "callout",
+      "text": "Still Playwright. Just more cinematic.",
       "placement": "top-left",
-      "motion": "slide-in",
+      "motion": "fade-in",
       "autoBackground": true
     }
   },
   {
     "scene": "closing",
-    "text": "Overlays auto-detect your page theme. The pipeline generates subtitles, chapters, and a timing report. And scene transitions make everything flow.",
-    "speed": 0.9,
+    "text": "That is the strategy. Keep one canonical showcase current, and the rest of the output stays in sync automatically.",
+    "speed": 0.92,
     "overlay": {
       "type": "headline-card",
-      "title": "Get Started",
-      "body": "npm i -D @argo-video/cli && npx argo init",
+      "title": "One showcase. Many outputs.",
+      "body": "Keep the story current once, then ship it everywhere.",
       "placement": "top-right",
       "motion": "fade-in",
       "autoBackground": true
@@ -118,12 +118,12 @@
   },
   {
     "scene": "mic-drop",
-    "text": "Oh, and this demo? It was recorded by Argo, using Argo.",
+    "text": "And yes. This demo was recorded by Argo, cut into scenes by Argo, and exported by Argo.",
     "voice": "am_michael",
-    "speed": 0.9,
+    "speed": 0.92,
     "overlay": {
       "type": "lower-third",
-      "text": "This demo was recorded by Argo, using Argo.",
+      "text": "Recorded by Argo. Recut by Argo. Shipped by Argo.",
       "placement": "top-left",
       "motion": "fade-in",
       "autoBackground": true
