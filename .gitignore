@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .argo/
+videos/*.mp4
+videos/*.gif
 videos/*.srt
 videos/*.vtt
 videos/*.json
