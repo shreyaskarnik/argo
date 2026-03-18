@@ -120,7 +120,19 @@ Voiceover `text` is spoken only, never displayed — overlay text is what viewer
 | `CI/CD` | `C I C D` |
 | `.env` | `dot env` |
 
-### Patterns
+### Kokoro Phoneme Overrides
+
+Kokoro supports IPA phoneme overrides wrapped in `/slashes/` — this bypasses the G2P (grapheme-to-phoneme) model entirely and gives exact pronunciation control:
+
+```
+Kokoro=/kˈOkəɹO/
+```
+
+Use this for brand names, product names, or any word where phonetic spelling isn't precise enough. Much more reliable than spelling tricks for tricky words.
+
+### Patterns (Fallback)
+
+When phoneme overrides aren't practical, use these spelling tricks:
 
 1. **Acronyms** — spell out with spaces: `CI/CD` → `C I C D`
 2. **Portmanteaus** — hyphenate syllables: `Kubernetes` → `koo-ber-net-eez`
@@ -131,7 +143,7 @@ Voiceover `text` is spoken only, never displayed — overlay text is what viewer
 
 This is engine-specific — when switching engines, review all voiceover text:
 
-- **Kokoro** needs heavy phonetic help: `tee tee ess`, `A.I.`, `M.L.X.`
+- **Kokoro** supports `/IPA phoneme/` overrides for exact control; also needs phonetic spelling for acronyms: `tee tee ess`, `A.I.`, `M.L.X.`
 - **OpenAI** handles most acronyms natively — just write `TTS`, `AI`, `MLX`
 - **Qwen3 (mlx-audio)** is similar to Kokoro — needs phonetic help
 - **Transformers** varies by model — test pronunciation and adjust
