@@ -39,11 +39,11 @@
   },
   {
     "scene": "tts",
-    "text": "Pick your voice. Six engines from local to cloud. Or clone your own voice with M.L.X. audio — record a fifteen second clip, and every demo sounds like you. Locally, privately, no data leaves your machine.",
+    "text": "Pick your voice. Seven engines from local to cloud. Kokoro runs locally. Transformers dot J S works with any Hugging Face model. Or clone your own voice with M.L.X. audio — record a fifteen second clip, and every demo sounds like you.",
     "speed": 0.9,
     "overlay": {
       "type": "lower-third",
-      "text": "Six TTS engines — swap with one config line",
+      "text": "Seven TTS engines — swap with one config line",
       "placement": "top-right",
       "motion": "fade-in",
       "autoBackground": true
