@@ -1,13 +1,13 @@
 [
   {
     "scene": "hero",
-    "text": "Meet Argo. Turn a Playwright demo into a polished narrated video, with the editing and export tooling built in.",
+    "text": "Your demo is a script, not a screen recording. Argo turns a Playwright walkthrough into a polished product video with voiceover, camera direction, and smart export built in.",
     "speed": 0.92,
     "overlay": {
       "type": "headline-card",
-      "kicker": "CANONICAL SHOWCASE",
-      "title": "One demo. Full product story.",
-      "body": "Narration, overlays, camera direction, preview, and export in one flow.",
+      "kicker": "ARGO",
+      "title": "Demos as code.",
+      "body": "Voiceover, overlays, camera effects, preview, and export — one pipeline.",
       "placement": "top-right",
       "motion": "slide-in",
       "autoBackground": true
@@ -15,13 +15,13 @@
   },
   {
     "scene": "authoring",
-    "text": "Start with argo init, or convert an existing spec with init dash dash from. Keep one unified scenes manifest for voiceover and overlays, and omit text when you want a silent video.",
+    "text": "Start with argo init, or convert an existing Playwright test with init dash dash from. Scenes, narration, and overlays live in one manifest. Omit the text field for silent scenes.",
     "speed": 0.92,
     "overlay": {
       "type": "headline-card",
       "kicker": "AUTHORING",
-      "title": "Playwright stays the source of truth.",
-      "body": "Init, init-from, unified scenes, silent mode.",
+      "title": "Playwright is the source of truth.",
+      "body": "Scaffold, convert, or write from scratch.",
       "placement": "top-left",
       "motion": "slide-in",
       "autoBackground": true
@@ -29,11 +29,11 @@
   },
   {
     "scene": "voiceover",
-    "text": "Seven T T S engines, local first. Iterate with Kokoro, bring a Hugging Face model, clone your own voice with M L X audio, or switch to hosted voices when it is time to ship.",
+    "text": "Seven tee tee ess engines. Start local with Kokoro, bring a Hugging Face model, switch to OpenAI or ElevenLabs for the polished cut, or clone your own voice with M L X audio.",
     "speed": 0.92,
     "overlay": {
       "type": "lower-third",
-      "text": "Local-first voices, cloud voices, and voice clone",
+      "text": "7 engines — local, cloud, or your own voice",
       "placement": "top-right",
       "motion": "fade-in",
       "autoBackground": true
@@ -41,13 +41,13 @@
   },
   {
     "scene": "preview",
-    "text": "Preview turns the recorded pass into an edit bay. Scrub by scene, rewrite one line, regenerate only that scene, and export again without re-recording.",
+    "text": "Preview turns your recording into an edit bay. Scrub by scene, rewrite a line, regenerate just that clip, and re-export without re-recording.",
     "speed": 0.92,
     "overlay": {
       "type": "headline-card",
       "kicker": "PREVIEW",
-      "title": "Edit the cut without throwing away the capture.",
-      "body": "Scrub, regenerate, export, or re-record from one place.",
+      "title": "Edit without re-recording.",
+      "body": "Scrub, rewrite, regenerate, export.",
       "placement": "top-left",
       "motion": "slide-in",
       "autoBackground": true
@@ -55,11 +55,11 @@
   },
   {
     "scene": "camera",
-    "text": "Camera helpers keep feature beats readable. Spotlight, focus ring, dim around, zoom-to, cursor highlight, and confetti are all scriptable one-liners.",
+    "text": "Direct the viewer's eye with code. Spotlight a button, pulse a focus ring, dim the noise, highlight the cursor, and celebrate with confetti.",
     "speed": 0.92,
     "overlay": {
       "type": "callout",
-      "text": "Direct the eye with code, not post-production guesswork.",
+      "text": "Camera direction, not post-production",
       "placement": "top-left",
       "motion": "fade-in",
       "autoBackground": true
@@ -67,13 +67,13 @@
   },
   {
     "scene": "export",
-    "text": "Export does the finishing work. Transitions, speed ramp, subtitles, chapters, scene reports, and extra formats like square, vertical, and G I F all come from the same timeline.",
+    "text": "Export does more than encode. Argo adds transitions between scenes, compresses dead time with speed ramp, writes subtitles and chapters, and renders G I F alongside the M P 4.",
     "speed": 0.92,
     "overlay": {
       "type": "headline-card",
       "kicker": "EXPORT",
-      "title": "More than an M P 4.",
-      "body": "Transitions, speed ramp, subtitles, chapters, reports, and multi-format output.",
+      "title": "Smart export, not just encoding.",
+      "body": "Transitions, speed ramp, subtitles, chapters, GIF — one timeline.",
       "placement": "top-right",
       "motion": "slide-in",
       "autoBackground": true
@@ -81,11 +81,11 @@
   },
   {
     "scene": "ops",
-    "text": "As the demo catalog grows, validate catches wiring bugs, doctor checks the environment, pipeline dash dash all renders the fleet, and the dashboard gives you one place to inspect everything.",
+    "text": "As your demo catalog grows, Argo scales with it. Validate catches wiring bugs, doctor checks the environment, pipeline dash dash all renders everything, and the dashboard shows status at a glance.",
     "speed": 0.92,
     "overlay": {
       "type": "lower-third",
-      "text": "validate, doctor, pipeline --all, and dashboard",
+      "text": "validate · doctor · pipeline --all · dashboard",
       "placement": "top-right",
       "motion": "fade-in",
       "autoBackground": true
@@ -93,7 +93,7 @@
   },
   {
     "scene": "code",
-    "text": "Under the hood, it is still just Playwright. A few helpers for narration, overlays, typing, and camera language turn test code into a maintainable demo.",
+    "text": "Under the hood, it is still Playwright. A few helpers for narration, overlays, typing, and camera effects turn familiar test code into a demo system.",
     "speed": 0.92,
     "overlay": {
       "type": "callout",
@@ -105,12 +105,12 @@
   },
   {
     "scene": "closing",
-    "text": "That is the strategy. Keep one canonical showcase current, and the rest of the output stays in sync automatically.",
+    "text": "One pipeline. Every output you need. Install Argo and start shipping demos.",
     "speed": 0.92,
     "overlay": {
       "type": "headline-card",
-      "title": "One showcase. Many outputs.",
-      "body": "Keep the story current once, then ship it everywhere.",
+      "title": "npm i -D @argo-video/cli",
+      "body": "npx argo init && npx argo pipeline my-demo",
       "placement": "top-right",
       "motion": "fade-in",
       "autoBackground": true
@@ -118,12 +118,12 @@
   },
   {
     "scene": "mic-drop",
-    "text": "And yes. This demo was recorded by Argo, cut into scenes by Argo, and exported by Argo.",
+    "text": "This demo was recorded by Argo. Directed by code. Shipped by one command.",
     "voice": "am_michael",
     "speed": 0.92,
     "overlay": {
       "type": "lower-third",
-      "text": "Recorded by Argo. Recut by Argo. Shipped by Argo.",
+      "text": "Recorded by Argo. Directed by code.",
       "placement": "top-left",
       "motion": "fade-in",
       "autoBackground": true
