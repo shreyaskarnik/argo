@@ -98,11 +98,12 @@ function buildFadeFilterComplex(
     }
   }
 
-  // Concat all segments
+  // Concat all segments — interleave video+audio pairs: [v0][a0][v1][a1]...
   const videoOutput = 'vfaded';
   if (audioInputLabel) {
     const audioOutput = 'afaded';
-    parts.push(`${segLabels.join('')}${aSegLabels.join('')}concat=n=${numSegments}:v=1:a=1[${videoOutput}][${audioOutput}]`);
+    const interleaved = segLabels.map((v, i) => `${v}${aSegLabels[i]}`).join('');
+    parts.push(`${interleaved}concat=n=${numSegments}:v=1:a=1[${videoOutput}][${audioOutput}]`);
     return { filterComplex: parts.join(';\n'), videoOutput: `[${videoOutput}]`, audioOutput: `[${audioOutput}]` };
   } else {
     parts.push(`${segLabels.join('')}concat=n=${numSegments}:v=1:a=0[${videoOutput}]`);
