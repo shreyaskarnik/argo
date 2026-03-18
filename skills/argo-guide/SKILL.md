@@ -205,7 +205,7 @@ export: {
 }
 ```
 
-- **Transitions:** `fade-through-black` | `dissolve` | `wipe-left` | `wipe-right` — applied at scene boundaries during export. Use `durationMs: 2000` or higher for transitions that are clearly visible with voiceover (500ms is too fast to notice).
+- **Transitions:** `fade-through-black` | `dissolve` | `wipe-left` | `wipe-right` — applied at scene boundaries during export. `dissolve` is a quicker dip-to-black (not a true crossfade blend). Use `durationMs: 2000` or higher for transitions that are clearly visible with voiceover (500ms is too fast to notice). Content changes (page navigation, slide switches) should happen BEFORE `narration.mark()` so the transition fades between old and new content.
 - **Speed ramp:** Compresses inter-scene gaps (navigation, page loads) to keep demos tight. `gapSpeed: 2.0` = 2× speed for gaps. Only gaps > `minGapMs` (default 500ms) are affected.
 - **Formats:** `1:1` (square center-crop), `9:16` (vertical center-crop), `gif` (palette-optimized animated GIF for docs/READMEs). Note: `9:16` center-crops from 16:9 — works best when key content is centered. Wide text may be clipped.
 - **Progress bar:** Export shows encoding progress automatically when duration is known

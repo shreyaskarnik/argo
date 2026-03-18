@@ -351,7 +351,9 @@ export: {
 
 > **Tip:** Use `durationMs: 2000` or higher for transitions that are clearly visible during narration. Short durations (500ms) look like glitches rather than intentional transitions.
 
-Transition types: `fade-through-black`, `dissolve`, `wipe-left`, `wipe-right`.
+Transition types: `fade-through-black`, `dissolve` (quicker dip-to-black, not a true crossfade), `wipe-left`, `wipe-right`.
+
+> **Tip:** Content changes (page navigation, slide switches) should happen **before** `narration.mark()` so the transition fades between the old and new content. If you change content after `mark()`, the transition just pulses the same visual.
 
 ### Speed Ramp
 

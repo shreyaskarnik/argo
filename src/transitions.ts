@@ -25,15 +25,17 @@ function buildDirectionalWipe(
 }
 
 /**
- * Build a filter_complex string for fade-through-black or dissolve transitions.
+ * Build a filter_complex string for fade transitions using split+trim+fade+concat.
  *
- * Uses split → trim → fade → concat, which is the only reliable way to apply
- * multiple fade transitions in ffmpeg. The fade filter only supports one
- * fade-out and one fade-in per stream instance, so we split the video at each
- * scene boundary, apply fades to each segment independently, then concatenate.
+ * This is the only reliable way to apply multiple fade transitions in ffmpeg —
+ * the fade filter only supports one fade-out per stream instance, so we split
+ * the video at each scene boundary, apply fades independently, then concatenate.
  *
- * For dissolve, we use a shorter fade duration to create a gentle dip effect
- * rather than a full black transition.
+ * Both fade-through-black and dissolve use dip-to-black. The difference is
+ * duration: dissolve uses a quicker dip (60% of half-duration) for a subtler
+ * effect. A true crossfade/dissolve with overlapping blend would require
+ * ffmpeg's xfade filter which needs re-encoded segment pairs — not practical
+ * for continuous recordings.
  */
 function buildFadeFilterComplex(
   placements: Placement[],
