@@ -39,11 +39,14 @@ test('showcase', async ({ page, narration }) => {
   await page.locator('#voiceover').scrollIntoViewIfNeeded();
   await page.waitForTimeout(450);
   await withOverlay(page, 'voiceover', async () => {
-    const beat = Math.max(1100, Math.floor(narration.durationFor('voiceover', { maxMs: 9200 }) / 5));
+    const beat = Math.max(800, Math.floor(narration.durationFor('voiceover', { maxMs: 10000 }) / 8));
     await dimAround(page, '#engine-kokoro', { duration: beat, wait: true });
     await dimAround(page, '#engine-transformers', { duration: beat, wait: true });
     await dimAround(page, '#engine-mlx', { duration: beat, wait: true });
     await dimAround(page, '#engine-openai', { duration: beat, wait: true });
+    await dimAround(page, '#engine-elevenlabs', { duration: beat, wait: true });
+    await dimAround(page, '#engine-gemini', { duration: beat, wait: true });
+    await dimAround(page, '#engine-sarvam', { duration: beat, wait: true });
     await focusRing(page, '#voiceover-config', { color: '#22d3ee', duration: beat, wait: true });
     await resetCamera(page);
   });

@@ -105,7 +105,7 @@
   },
   {
     "scene": "closing",
-    "text": "One pipeline. Every output you need. Install Argo and start shipping demos.",
+    "text": "Overlays adapt to your page. Toggle the theme, and the overlay contrast follows automatically. One pipeline, every output you need.",
     "speed": 0.92,
     "overlay": {
       "type": "headline-card",
