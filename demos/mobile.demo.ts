@@ -9,11 +9,15 @@ import {
   resetCamera,
 } from '@argo-video/cli';
 
-// Mobile viewport: narrow width, touch enabled
+// Mobile viewport: narrow width, touch enabled.
+// IMPORTANT: Also set video.width/height to match in argo config, or the
+// video capture canvas will be larger than the viewport (gray padding).
+// Run with: BASE_URL=http://127.0.0.1:8977 npx argo pipeline mobile --browser webkit
 test.use({
   viewport: { width: 390, height: 664 },
   isMobile: true,
   hasTouch: true,
+  video: { mode: 'on' as const, size: { width: 390, height: 664 } },
 });
 
 test('mobile', async ({ page, narration }) => {
