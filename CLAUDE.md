@@ -106,7 +106,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - `--headed` on macOS shows a gray bar at bottom of video — browser chrome reduces viewport. Use headless (default) for final recordings.
 - Voiceover `text` is spoken only, never displayed — spell words phonetically to fix TTS pronunciation (e.g., `"sass"` for SaaS, `"A P I"` for API, `"cube control"` for kubectl). Overlay text is what viewers see. Phonetics differ per engine: Kokoro needs `tee tee ess` / `A.I.` / `M.L.X.`, OpenAI handles acronyms natively. When switching engines, update voiceover text.
 - Voice cloning: mlx-audio engine supports `refAudio` + `refText` options for cloning from a 15s reference clip. Qwen3-TTS produces best clone quality (CSM is lower). Scripts: `scripts/record-voice-ref.sh` (macOS mic recording), `scripts/voice-clone-preview.sh` (batch preview with manifest).
-- Camera effect durations should derive from `narration.durationFor()` (e.g., `Math.floor(durationFor('scene') / N)`) so effects track voiceover timing.
+- Effect timing pattern: derive beat durations from `durationFor()` minus setup wait, divided by effect count: `const totalMs = narration.durationFor('scene') - setupWaitMs; const beat = Math.floor(totalMs / numberOfEffects);` This keeps camera effects synchronized with voiceover. Hardcoded durations drift.
 - When using scene transitions, content changes (page navigation, slide switches) must happen BEFORE `narration.mark()` so the transition fades between old and new content. If content changes after mark(), the transition just pulses the same visual.
 - Avoid `test.beforeEach` in demo scripts — it gets recorded into the video. Put setup before the first `narration.mark()` instead.
 - Silent demos: omit `text` from scenes manifest entries — TTS is skipped, pipeline exports video-only with no audio track. Useful for quick prototype demos with just overlays and camera effects.
@@ -183,6 +183,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - `tsc` build may silently fail if `tsconfig.json` is missing — verify it exists before trusting `npm run build` output
 - `dissolve` transition is a shorter dip-to-black, not a true crossfade blend. A real crossfade would require ffmpeg `xfade` with re-encoded segment pairs — impractical for continuous recordings.
 - `9:16` format export center-crops from 16:9 — wide text gets clipped. Works best when key content is centered.
+- `speedRamp` + `transitions` cannot be used together — both generate filter_complex graphs with conflicting stream labels. Use one or the other.
 
 ## Security Invariants
 

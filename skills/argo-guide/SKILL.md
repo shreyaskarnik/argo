@@ -75,10 +75,15 @@ All camera effects are **non-blocking by default** (fire-and-forget safe). All a
 | `cursorHighlight(page, opts?)` | Persistent ring following cursor. Remove with `resetCursor(page)`. |
 
 Derive camera durations from `narration.durationFor()` so effects track voiceover timing:
+**Effect timing pattern**: Derive beat durations from `durationFor()` so effects stay synchronized with voiceover. Subtract any setup wait time before dividing:
 ```typescript
-const stepDur = Math.floor(narration.durationFor('feature') / 3);
-spotlight(page, '#target', { duration: stepDur });
+const totalMs = narration.durationFor('scene') - setupWaitMs;
+const beat = Math.floor(totalMs / numberOfEffects);
+spotlight(page, '#target1', { duration: beat });
+await page.waitForTimeout(beat + 150); // gap between effects
+focusRing(page, '#target2', { color: '#3b82f6', duration: beat });
 ```
+Hardcoded durations (e.g., `duration: 1200`) drift from the voiceover as clip lengths change.
 
 ### Mobile Demos
 
