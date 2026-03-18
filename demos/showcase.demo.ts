@@ -26,9 +26,10 @@ test('showcase', async ({ page, narration }) => {
 
   narration.mark('authoring');
   await page.locator('#authoring').scrollIntoViewIfNeeded();
-  await page.waitForTimeout(450);
+  await page.waitForTimeout(400);
   await withOverlay(page, 'authoring', async () => {
-    const beat = Math.max(1200, Math.floor(narration.durationFor('authoring', { maxMs: 9200 }) / 4));
+    const totalMs = narration.durationFor('authoring', { maxMs: 9200 }) - 400;
+    const beat = Math.floor(totalMs / 4);
     await focusRing(page, '#step-from', { color: '#60a5fa', duration: beat, wait: true });
     await focusRing(page, '#authoring-manifest', { color: '#22d3ee', duration: beat, wait: true });
     await focusRing(page, '#authoring-silent', { color: '#a78bfa', duration: beat, wait: true });
@@ -37,9 +38,10 @@ test('showcase', async ({ page, narration }) => {
 
   narration.mark('voiceover');
   await page.locator('#voiceover').scrollIntoViewIfNeeded();
-  await page.waitForTimeout(450);
+  await page.waitForTimeout(400);
   await withOverlay(page, 'voiceover', async () => {
-    const beat = Math.max(800, Math.floor(narration.durationFor('voiceover', { maxMs: 10000 }) / 8));
+    const totalMs = narration.durationFor('voiceover', { maxMs: 10000 }) - 400;
+    const beat = Math.floor(totalMs / 8);
     await dimAround(page, '#engine-kokoro', { duration: beat, wait: true });
     await dimAround(page, '#engine-transformers', { duration: beat, wait: true });
     await dimAround(page, '#engine-mlx', { duration: beat, wait: true });
@@ -53,36 +55,46 @@ test('showcase', async ({ page, narration }) => {
 
   narration.mark('preview');
   await page.locator('#preview-editor').scrollIntoViewIfNeeded();
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(400);
   await withOverlay(page, 'preview', async () => {
-    await focusRing(page, '#preview-command', { color: '#60a5fa', duration: 1100, wait: true });
+    // 5 beats: command, type, scrubber, regen, export
+    // demoType takes ~1.8s for the text (30 chars * 60ms), so give it a beat
+    const totalMs = narration.durationFor('preview', { maxMs: 9000 }) - 400;
+    const beat = Math.floor(totalMs / 5);
+    await focusRing(page, '#preview-command', { color: '#60a5fa', duration: beat, wait: true });
     await demoType(page, '#preview-text-field', 'Tighten the preview voice line.');
-    await focusRing(page, '#preview-scrubber', { color: '#22d3ee', duration: 1000, wait: true });
-    await focusRing(page, '#preview-regen', { color: '#a78bfa', duration: 1000, wait: true });
-    await focusRing(page, '#preview-export', { color: '#4ade80', duration: 1100, wait: true });
+    await page.waitForTimeout(Math.max(0, beat - 1800)); // demoType takes ~1.8s
+    await focusRing(page, '#preview-scrubber', { color: '#22d3ee', duration: beat, wait: true });
+    await focusRing(page, '#preview-regen', { color: '#a78bfa', duration: beat, wait: true });
+    await focusRing(page, '#preview-export', { color: '#4ade80', duration: beat, wait: true });
   });
 
   narration.mark('camera');
   await page.locator('#camera-effects').scrollIntoViewIfNeeded();
-  await page.waitForTimeout(600);
-  const cameraBeat = Math.max(950, Math.floor(narration.durationFor('camera', { maxMs: 8800 }) / 5));
+  await page.waitForTimeout(400);
+  // Total scene time = durationFor. Divide evenly across 5 effects.
+  // Each beat includes the effect duration + a small gap.
+  const totalCameraMs = narration.durationFor('camera', { maxMs: 9000 });
+  const cameraGap = 150;
+  const cameraBeat = Math.floor((totalCameraMs - 400) / 5) - cameraGap;
   spotlight(page, '#effect-spotlight', { duration: cameraBeat, padding: 10 });
-  await page.waitForTimeout(cameraBeat + 220);
+  await page.waitForTimeout(cameraBeat + cameraGap);
   focusRing(page, '#effect-focus-ring', { color: '#fb7185', duration: cameraBeat });
-  await page.waitForTimeout(cameraBeat + 220);
+  await page.waitForTimeout(cameraBeat + cameraGap);
   dimAround(page, '#effect-dim-around', { duration: cameraBeat });
-  await page.waitForTimeout(cameraBeat + 220);
+  await page.waitForTimeout(cameraBeat + cameraGap);
   focusRing(page, '#effect-cursor', { color: '#60a5fa', duration: cameraBeat });
-  await page.waitForTimeout(cameraBeat + 220);
+  await page.waitForTimeout(cameraBeat + cameraGap);
   showConfetti(page, { spread: 'rain', duration: cameraBeat, pieces: 130 });
-  await page.waitForTimeout(cameraBeat + 260);
+  await page.waitForTimeout(cameraBeat + cameraGap);
   await resetCamera(page);
 
   narration.mark('export');
   await page.locator('#export-stack').scrollIntoViewIfNeeded();
-  await page.waitForTimeout(450);
+  await page.waitForTimeout(400);
   await withOverlay(page, 'export', async () => {
-    const beat = Math.max(1000, Math.floor(narration.durationFor('export', { maxMs: 9000 }) / 5));
+    const totalMs = narration.durationFor('export', { maxMs: 9000 }) - 400;
+    const beat = Math.floor(totalMs / 5);
     await focusRing(page, '#export-config', { color: '#60a5fa', duration: beat, wait: true });
     await focusRing(page, '#export-transitions', { color: '#22d3ee', duration: beat, wait: true });
     await focusRing(page, '#export-speed-ramp', { color: '#a78bfa', duration: beat, wait: true });
@@ -92,9 +104,10 @@ test('showcase', async ({ page, narration }) => {
 
   narration.mark('ops');
   await page.locator('#ops').scrollIntoViewIfNeeded();
-  await page.waitForTimeout(450);
+  await page.waitForTimeout(400);
   await withOverlay(page, 'ops', async () => {
-    const beat = Math.max(1000, Math.floor(narration.durationFor('ops', { maxMs: 8200 }) / 4));
+    const totalMs = narration.durationFor('ops', { maxMs: 8200 }) - 400;
+    const beat = Math.floor(totalMs / 4);
     await focusRing(page, '#ops-batch', { color: '#60a5fa', duration: beat, wait: true });
     await focusRing(page, '#ops-dashboard', { color: '#22d3ee', duration: beat, wait: true });
     await focusRing(page, '#ops-validate', { color: '#a78bfa', duration: beat, wait: true });
