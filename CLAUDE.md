@@ -36,7 +36,10 @@ The system is a 4-step pipeline: **TTS → Record → Align → Export**
 - **TTS** (`src/tts/`): Generates voice clips from `.scenes.json` manifests. Pluggable engine system with 7 built-in adapters in `src/tts/engines/`: Kokoro (default), OpenAI, ElevenLabs, Gemini, Sarvam, mlx-audio, Transformers (generic HuggingFace pipeline). Selected via `engines.*` factory functions in config. Cloud engines lazy-load their SDKs. All audio normalized to mono Float32 24kHz WAV via `convertToWav()` (ffmpeg). Clips are content-addressed cached (SHA256 of scene+text+voice+speed+lang) in `.argo/<demo>/clips/`. Cloud engine API keys are validated lazily at `generate()` time, not constructor — so non-TTS commands like `argo validate` work without keys. Kokoro's ONNX runtime is not safe for concurrent `generate()` calls — clips generate sequentially despite shared init promise.
 - **Record** (`src/record.ts`): Runs Playwright demo script, captures video (WebM) and timing marks (`.timing.json`). Generates a dynamic Playwright config on-the-fly.
 - **Align** (`src/tts/align.ts`): Places audio clips at scene timestamps from timing data. Prevents overlap with 100ms gaps. Mixes into single WAV (Float32, 24kHz).
-- **Export** (`src/export.ts`): Merges video + aligned audio via ffmpeg into final MP4. Supports optional MP4 thumbnail embedding via `export.thumbnailPath` config (ffmpeg attached_pic stream). CRITICAL: `-shortest` must be skipped when thumbnail is present — PNG has 0 duration and truncates the entire output. Embeds chapter markers from scene placements via ffmpeg metadata. Input indices are dynamic based on presence of chapters/thumbnail. Silent mode: when no `narration-aligned.wav` exists, exports video-only (no audio input, no `-c:a`, no `-shortest`).
+- **Export** (`src/export.ts`): Merges video + aligned audio via ffmpeg into final MP4. Supports optional MP4 thumbnail embedding via `export.thumbnailPath` config (ffmpeg attached_pic stream). CRITICAL: `-shortest` must be skipped when thumbnail is present — PNG has 0 duration and truncates the entire output. Embeds chapter markers from scene placements via ffmpeg metadata. Input indices are dynamic based on presence of chapters/thumbnail. Silent mode: when no `narration-aligned.wav` exists, exports video-only (no audio input, no `-c:a`, no `-shortest`). Shows a progress bar during encoding when total duration is known (uses ffmpeg's `-progress pipe:1`). Supports multi-format export: `1:1` (square crop), `9:16` (vertical crop), and `gif` (two-pass palette-optimized animated GIF).
+- **Transitions** (`src/transitions.ts`): Generates ffmpeg video filter expressions for scene transitions at scene boundaries. Types: `fade-through-black` (fade out/in through black), `dissolve` (opacity dip), `wipe-left`/`wipe-right` (directional wipe). Configured via `export.transition` in config. Applied as `-vf` filters during export.
+- **Speed Ramp** (`src/speed-ramp.ts`): Post-processing step that speeds up inter-scene gaps. Splits the video into segments, applies `setpts` (video) and `atempo` (audio) to gap segments, concatenates. Configured via `export.speedRamp: { gapSpeed, minGapMs }`. Applied after main export as a separate ffmpeg pass. `atempo` values outside 0.5–100.0 are chained automatically.
+- **Progress** (`src/progress.ts`): Wraps ffmpeg execution with `-progress pipe:1` to parse `out_time_us` and render a terminal progress bar showing encoding percentage. Used by the pipeline when `totalDurationMs` is known.
 - **Subtitles** (`src/subtitles.ts`): Generates `.srt` and `.vtt` files from alignment placements + scenes manifest text. Best-effort — won't fail the pipeline.
 - **Chapters** (`src/chapters.ts`): Generates ffmpeg metadata format (`TIMEBASE=1/1000`) for MP4 chapter markers from scene placements.
 - **Report** (`src/report.ts`): Builds scene timing report (JSON + formatted console output) with per-scene durations, overflow, and output path.
@@ -67,12 +70,15 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 
 ## Argo Pipeline
 
-- Order: TTS → Record → Align → Export (not Record first)
+- Order: TTS → Record → Align → Export → (optional: Speed Ramp) (not Record first)
 - `argo tts generate` takes a file path (`demos/name.scenes.json`), not a bare demo name
 - `argo record/export/pipeline/validate` take bare demo names (e.g., `argo pipeline example`)
+- `argo pipeline --all` runs the full pipeline for every demo discovered in `demosDir` (finds all `.scenes.json` files)
+- `argo pipeline [demo]` — demo argument is optional when `--all` is used
 - `argo validate <demo>` checks scene name consistency between script and scenes manifest, validates overlay fields (no TTS/recording)
 - `--base-url <url>` flag on `record` and `pipeline` overrides `config.baseURL`
 - `--headed` flag on `record` and `pipeline` runs the browser in visible mode
+- `--all` flag on `pipeline` runs all demos in batch (sequential execution, continues on failure)
 - `argo init --from <test.spec.ts>` converts existing Playwright tests into Argo demos (parses scene boundaries from `test.step()`, `page.goto()`, comments, and action clusters)
 - README config/CLI/API snippets must stay in sync with code changes (check after modifying config schema, CLI options, or scaffold templates)
 - Demo names are validated at the CLI boundary: only `[a-zA-Z0-9][a-zA-Z0-9_-]*` allowed. This prevents path traversal — maintain this validation if adding new commands that accept demo names.
@@ -123,6 +129,14 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - Uses `elementsFromPoint()` at zone coordinates, skipping `position: fixed/sticky` elements (e.g., navbars)
 - Dark background → light overlay theme; light background → dark overlay theme
 - Enable per-cue (`autoBackground: true` on overlay in `.scenes.json`) or globally via `overlays.autoBackground` in config
+
+## Dashboard (`src/dashboard.ts`)
+
+- `argo preview` (no args) starts a multi-demo dashboard server listing all discovered demos
+- Shows per-demo status: script exists, manifest exists, video exported, metadata available
+- Displays video size, last modified date, resolution, and browser from `.meta.json`
+- System dark/light mode via `prefers-color-scheme` CSS media query
+- `discoverDemos(demosDir)` finds all `.scenes.json` files and returns sorted demo names
 
 ## Preview Server (`src/preview.ts`)
 

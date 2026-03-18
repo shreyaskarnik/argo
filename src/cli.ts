@@ -5,9 +5,10 @@ import { loadConfig, type ArgoConfig, type BrowserEngine } from './config.js';
 import { record } from './record.js';
 import { generateClips } from './tts/generate.js';
 import { exportVideo } from './export.js';
-import { runPipeline } from './pipeline.js';
+import { runPipeline, runBatchPipeline } from './pipeline.js';
 import { init, initFrom } from './init.js';
 import { startPreviewServer } from './preview.js';
+import { startDashboardServer } from './dashboard.js';
 import { validateDemo } from './validate.js';
 import { runDoctor, formatDoctorResults } from './doctor.js';
 
@@ -106,17 +107,19 @@ export function createProgram(): Command {
         outputHeight: config.video.height,
         deviceScaleFactor: config.video.deviceScaleFactor,
         thumbnailPath: config.export.thumbnailPath,
+        formats: config.export.formats,
+        transition: config.export.transition,
       });
     });
 
   program
-    .command('pipeline <demo>')
+    .command('pipeline [demo]')
     .description('Run the full pipeline: TTS → record → export')
     .addOption(new Option('--browser <engine>', 'browser engine').choices(['chromium', 'webkit', 'firefox']))
     .option('--base-url <url>', 'override baseURL from config')
     .option('--headed', 'run browser in headed mode (visible window)')
-    .action(async (demo: string, cmdOpts: { browser?: string; baseUrl?: string; headed?: boolean }) => {
-      validateDemoName(demo);
+    .option('--all', 'run pipeline for all demos in demosDir')
+    .action(async (demo: string | undefined, cmdOpts: { browser?: string; baseUrl?: string; headed?: boolean; all?: boolean }) => {
       const configPath = program.opts().config;
       const loaded = await ensureTTSEngine(await loadConfig(process.cwd(), configPath));
       let config = cmdOpts.browser
@@ -125,7 +128,15 @@ export function createProgram(): Command {
       if (cmdOpts.baseUrl) {
         config = { ...config, baseURL: cmdOpts.baseUrl };
       }
-      await runPipeline(demo, config, { headed: cmdOpts.headed });
+
+      if (cmdOpts.all) {
+        await runBatchPipeline(config, { headed: cmdOpts.headed });
+      } else if (demo) {
+        validateDemoName(demo);
+        await runPipeline(demo, config, { headed: cmdOpts.headed });
+      } else {
+        throw new Error('Provide a demo name or use --all to run all demos.');
+      }
     });
 
   program
@@ -165,13 +176,27 @@ export function createProgram(): Command {
     });
 
   program
-    .command('preview <demo>')
-    .description('Start a browser-based preview server to tweak voiceover, overlays, and timing without re-recording')
+    .command('preview [demo]')
+    .description('Start a browser-based preview server (omit demo name for dashboard)')
     .option('--port <number>', 'server port (default: auto)', parseInt)
-    .action(async (demo: string, cmdOpts: { port?: number }) => {
-      validateDemoName(demo);
+    .action(async (demo: string | undefined, cmdOpts: { port?: number }) => {
       const configPath = program.opts().config;
       const config = await loadConfig(process.cwd(), configPath);
+
+      if (!demo) {
+        // Dashboard mode — list all demos
+        const { url } = await startDashboardServer({
+          demosDir: config.demosDir,
+          outputDir: config.outputDir,
+          port: cmdOpts.port,
+        });
+        console.log(`\nArgo Dashboard running at: ${url}`);
+        console.log('Press Ctrl+C to stop.\n');
+        await new Promise(() => {});
+        return;
+      }
+
+      validateDemoName(demo);
       const { url } = await startPreviewServer({
         demoName: demo,
         argoDir: '.argo',

@@ -23,6 +23,9 @@ export default defineConfig({
     preset: 'slow',           // ffmpeg preset: slower = smaller file
     crf: 16,                  // quality: 16-28 (lower = higher quality)
     thumbnailPath: 'assets/logo-thumb.png',  // optional MP4 cover art
+    transition: { type: 'fade-through-black', durationMs: 400 }, // scene transitions
+    speedRamp: { gapSpeed: 2.0, minGapMs: 500 },                // speed up gaps between scenes
+    formats: ['gif', '9:16'],                                     // additional export formats
   },
   overlays: {
     autoBackground: true,     // auto-detect dark/light for overlay contrast
@@ -109,11 +112,78 @@ video: {
 }
 ```
 
+## Scene Transitions
+
+Add smooth transitions between scenes during export:
+
+| Type | Effect |
+|------|--------|
+| `fade-through-black` | Fade out to black, then fade in at scene boundary |
+| `dissolve` | Quick opacity dip (simulates crossfade on continuous footage) |
+| `wipe-left` | Left-to-right directional transition |
+| `wipe-right` | Right-to-left directional transition |
+
+```javascript
+export: { transition: { type: 'fade-through-black', durationMs: 500 } }
+```
+
+## Speed Ramp
+
+Compress gaps between scenes (navigation, page loads) to keep demos tight:
+
+```javascript
+export: { speedRamp: { gapSpeed: 2.0, minGapMs: 500 } }
+```
+
+- `gapSpeed` — multiplier for inter-scene gap playback (2.0 = 2× faster)
+- `minGapMs` — minimum gap duration before speed ramp is applied (default 500ms)
+- Both video and audio are sped up together (alignment stays correct within scenes)
+- Applied as a post-processing ffmpeg pass after main export
+
+## Multi-Format Export
+
+Export additional formats alongside the main 16:9 MP4:
+
+```javascript
+export: { formats: ['1:1', '9:16', 'gif'] }
+```
+
+- `1:1` — Square crop (centered horizontally) for Instagram/LinkedIn
+- `9:16` — Vertical crop (centered) for TikTok/Reels
+- `gif` — Two-pass palette-optimized animated GIF (10fps, 640px wide) for docs/READMEs
+
+## Batch Pipeline
+
+Build all demos in one command:
+
+```bash
+npx argo pipeline --all
+```
+
+Discovers all `.scenes.json` files in `demosDir`, runs the full pipeline for each sequentially, and reports success/failure counts. Continues on failure — one broken demo won't block the rest.
+
+## Dashboard
+
+View all demos at a glance:
+
+```bash
+npx argo preview
+```
+
+Opens a multi-demo dashboard listing every discovered demo with:
+- Build status (script, manifest, video exported)
+- Video file size and last modified date
+- Resolution and browser from `.meta.json`
+- System dark/light mode support
+
 ## Pipeline Output
 
 After a successful run:
 
 - `videos/<name>.mp4` — final video with embedded chapter markers
+- `videos/<name>.gif` — animated GIF (if `formats` includes `'gif'`)
+- `videos/<name>.1x1.mp4` — square crop (if `formats` includes `'1:1'`)
+- `videos/<name>.9x16.mp4` — vertical crop (if `formats` includes `'9:16'`)
 - `videos/<name>.srt` — SRT subtitles
 - `videos/<name>.vtt` — WebVTT subtitles
 - `videos/<name>.meta.json` — provenance (TTS engine, voices, resolution, export settings)

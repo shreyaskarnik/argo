@@ -28,11 +28,31 @@ export interface VideoConfig {
   contextOptions?: Record<string, unknown>;
 }
 
+export type TransitionType = 'fade-through-black' | 'dissolve' | 'wipe-left' | 'wipe-right';
+
+export interface TransitionConfig {
+  /** Transition type applied between scenes. */
+  type: TransitionType;
+  /** Duration of the transition in milliseconds (default 500). */
+  durationMs?: number;
+}
+
+export interface SpeedRampConfig {
+  /** Speed multiplier for gaps between scenes (e.g., 2.0 = 2× faster). Default 1.0 (no change). */
+  gapSpeed: number;
+  /** Minimum gap duration (ms) before speed ramp is applied. Default 500. */
+  minGapMs?: number;
+}
+
 export interface ExportConfig {
   preset: string;
   crf: number;
   thumbnailPath?: string;
-  formats?: Array<'1:1' | '9:16'>;
+  formats?: Array<'1:1' | '9:16' | 'gif'>;
+  /** Scene transition applied between scenes during export. */
+  transition?: TransitionConfig;
+  /** Speed up gaps between scenes. */
+  speedRamp?: SpeedRampConfig;
 }
 
 export interface OverlayConfig {
