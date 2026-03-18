@@ -642,12 +642,6 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             videoPath = mp4Path;
             videoMime = 'video/mp4';
           }
-
-          // Switch to serving the new MP4
-          if (existsSync(mp4Path)) {
-            videoPath = mp4Path;
-            videoMime = 'video/mp4';
-          }
           res.end(JSON.stringify({ ok: true }));
         } catch (err) {
           res.end(JSON.stringify({ ok: false, error: (err as Error).message }));

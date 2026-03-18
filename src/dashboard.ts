@@ -6,7 +6,7 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { existsSync, readFileSync, statSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { discoverDemos } from './pipeline.js';
 import { startPreviewServer } from './preview.js';
@@ -146,11 +146,11 @@ function renderDashboardHTML(statuses: DemoStatus[], port: number): string {
 </html>`;
 }
 
-export async function startDashboardServer(options: DashboardOptions): Promise<{ url: string }> {
+export async function startDashboardServer(options: DashboardOptions): Promise<{ url: string; close: () => void }> {
   const { demosDir, outputDir, argoDir: customArgoDir, port: preferredPort, ttsDefaults, exportConfig } = options;
 
   // Track spawned preview servers to avoid duplicates
-  const previewServers = new Map<string, string>(); // demo name → preview URL
+  const previewServers = new Map<string, { url: string; close: () => void }>(); // demo name → preview handle
 
   return new Promise((resolve, reject) => {
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
@@ -163,7 +163,7 @@ export async function startDashboardServer(options: DashboardOptions): Promise<{
 
         // Check if a preview server is already running for this demo
         if (previewServers.has(name)) {
-          res.writeHead(302, { Location: previewServers.get(name)! });
+          res.writeHead(302, { Location: previewServers.get(name)!.url });
           res.end();
           return;
         }
@@ -177,7 +177,7 @@ export async function startDashboardServer(options: DashboardOptions): Promise<{
             ttsDefaults: ttsDefaults ?? { voice: 'af_heart', speed: 1.0 },
             exportConfig,
           });
-          previewServers.set(name, preview.url);
+          previewServers.set(name, preview);
           res.writeHead(302, { Location: preview.url });
           res.end();
         } catch (err) {
@@ -201,7 +201,15 @@ export async function startDashboardServer(options: DashboardOptions): Promise<{
     server.listen(listenPort, '127.0.0.1', () => {
       const addr = server.address() as { port: number };
       const url = `http://127.0.0.1:${addr.port}`;
-      resolve({ url });
+      resolve({
+        url,
+        close: () => {
+          for (const preview of previewServers.values()) {
+            preview.close();
+          }
+          server.close();
+        },
+      });
     });
   });
 }

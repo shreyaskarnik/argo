@@ -212,13 +212,34 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
   }
 
   // Scene transitions
+  let transitionComplex: { filterComplex: string; outputLabel: string } | null = null;
   if (transition && placements && placements.length > 1) {
-    const transitionFilters = buildTransitionFilters(placements, transition);
-    vFilters.push(...transitionFilters);
+    const transitionResult = buildTransitionFilters(placements, transition);
+    if (Array.isArray(transitionResult)) {
+      // Simple -vf filters (dissolve, wipe)
+      vFilters.push(...transitionResult);
+    } else {
+      // Complex filter graph (fade-through-black) — needs filter_complex
+      transitionComplex = transitionResult;
+    }
   }
 
-  if (vFilters.length > 0) {
+  if (transitionComplex) {
+    // Fade-through-black uses filter_complex with alpha overlay.
+    // Merge any existing vFilters into the chain before the alpha processing.
+    const preFilters = vFilters.length > 0 ? vFilters.join(',') + ',' : '';
+    // Replace [0:v] with the current video source if using speed ramp
+    let fc = transitionComplex.filterComplex;
     if (speedRampFilter) {
+      fc = fc.replace('[0:v]', `[${videoSource}]`);
+    }
+    if (preFilters) {
+      fc = fc.replace('format=yuva420p', `${preFilters}format=yuva420p`);
+    }
+    filterParts.push(fc);
+    videoSource = transitionComplex.outputLabel.replace(/[\[\]]/g, '');
+  } else if (vFilters.length > 0) {
+    if (speedRampFilter || filterParts.length > 0) {
       filterParts.push(`[${videoSource}]${vFilters.join(',')}[outvfinal]`);
       videoSource = 'outvfinal';
     } else {
