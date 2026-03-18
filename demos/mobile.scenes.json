@@ -1,0 +1,48 @@
+[
+  {
+    "scene": "intro",
+    "text": "A mobile-first ordering experience. Browse the menu and tap to add items.",
+    "overlay": {
+      "type": "headline-card",
+      "title": "Café Argo",
+      "body": "Mobile ordering demo",
+      "placement": "center",
+      "motion": "fade-in",
+      "autoBackground": true
+    }
+  },
+  {
+    "scene": "select",
+    "text": "Tap any item to add it. The cart updates instantly with your total.",
+    "overlay": {
+      "type": "lower-third",
+      "text": "Tap to add items",
+      "placement": "bottom-center",
+      "motion": "slide-in",
+      "autoBackground": true
+    }
+  },
+  {
+    "scene": "checkout",
+    "text": "When you're ready, hit Place Order.",
+    "overlay": {
+      "type": "callout",
+      "text": "One-tap checkout",
+      "placement": "top-right",
+      "motion": "fade-in",
+      "autoBackground": true
+    }
+  },
+  {
+    "scene": "done",
+    "text": "Order placed. Your coffee will be ready in five minutes.",
+    "overlay": {
+      "type": "headline-card",
+      "title": "Order Confirmed",
+      "body": "Ready in 5 min",
+      "placement": "center",
+      "motion": "fade-in",
+      "autoBackground": true
+    }
+  }
+]

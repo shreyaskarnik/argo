@@ -51,7 +51,7 @@ Overlay cues use discriminated unions — each template type has its own TypeScr
 
 ### Effects (`src/effects.ts`)
 
-`showConfetti(page, opts?)` — non-blocking by default (fire-and-forget safe). Injects a canvas-based confetti animation via `page.evaluate()`. Two spread modes: `burst` (Raycast-style, center-top fan) and `rain` (full-width fall). Set `wait: true` to block until animation completes. Errors from page/context disposal are swallowed; all other errors surface as warnings.
+`showConfetti(page, opts?)` — non-blocking by default (fire-and-forget safe). Injects a canvas-based confetti animation via `page.evaluate()`. Two spread modes: `burst` (Raycast-style, center-top fan) and `rain` (full-width fall). `emoji: '🎃'` or `emoji: ['🎄', '⭐']` renders emoji characters instead of colored rectangles. Set `wait: true` to block until animation completes. Errors from page/context disposal are swallowed; all other errors surface as warnings.
 
 ### Camera (`src/camera.ts`)
 
@@ -95,6 +95,8 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - Showcase demo (`demos/showcase.demo.ts`) requires a local HTTP server serving `demos/`: `python3 -m http.server 8976 --directory demos` then `BASE_URL=http://127.0.0.1:8976 npx tsx bin/argo.js pipeline showcase --browser webkit`
 - Browser default is `chromium`. Video quality ranking on macOS: **webkit > firefox > chromium**. Chromium has a known video capture quality issue (see [playwright#31424](https://github.com/microsoft/playwright/issues/31424)). Use `--browser webkit` for best results.
 - `deviceScaleFactor: 2` captures at 2x resolution; export downscales with lanczos. Value is rounded to integer (min 1).
+- Mobile demos: set `isMobile: true`, `hasTouch: true` in `video` config. These are passed through to the generated Playwright config. `contextOptions` also flows through (for `colorScheme`, `locale`, `geolocation`, `permissions`, etc.).
+- `--headed` on macOS shows a gray bar at bottom of video — browser chrome reduces viewport. Use headless (default) for final recordings.
 - Voiceover `text` is spoken only, never displayed — spell words phonetically to fix TTS pronunciation (e.g., `"sass"` for SaaS, `"A P I"` for API, `"cube control"` for kubectl). Overlay text is what viewers see. Phonetics differ per engine: Kokoro needs `tee tee ess` / `A.I.` / `M.L.X.`, OpenAI handles acronyms natively. When switching engines, update voiceover text.
 - Voice cloning: mlx-audio engine supports `refAudio` + `refText` options for cloning from a 15s reference clip. Qwen3-TTS produces best clone quality (CSM is lower). Scripts: `scripts/record-voice-ref.sh` (macOS mic recording), `scripts/voice-clone-preview.sh` (batch preview with manifest).
 - Camera effect durations should derive from `narration.durationFor()` (e.g., `Math.floor(durationFor('scene') / N)`) so effects track voiceover timing.
@@ -114,6 +116,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - `ARGO_OVERLAYS_PATH` — path to `.scenes.json` manifest (loaded by overlay functions for manifest-based resolution)
 - `ARGO_AUTO_BACKGROUND` — set to `'1'` when config `overlays.autoBackground` is true
 - `ARGO_OUTPUT_DIR` — output directory for timing JSON
+- `DEBUG` — when set (e.g., `DEBUG=pw:api`), Playwright debug output is forwarded to stderr even on success
 
 ## autoBackground Detection
 
@@ -134,6 +137,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - Export button re-aligns audio + generates chapters/subtitles + exports MP4 without re-recording (for TTS-only changes)
 - Re-record and Export both update the served video path so the new MP4 is served immediately without restarting
 - Preview reads `headTrimMs` from `.meta.json` to shift timeline — only shifts when metadata confirms trimming was applied (standalone `argo export` produces untrimmed video)
+- Preview UI follows system light/dark mode via `prefers-color-scheme` CSS media query
 
 ## Thumbnail
 
@@ -148,12 +152,13 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - Marketplace config: `.claude-plugin/marketplace.json`
 - Install via: `/plugin marketplace add shreyaskarnik/argo`
 - When modifying CLI commands, config schema, overlay API, or fixture exports, update the skill alongside README
+- Skill uses progressive disclosure: core SKILL.md (~200 lines) + reference files in `references/` loaded on demand + example templates in `examples/`
 - Cross-client discovery: `.agents/skills/argo-guide` symlink follows the Agent Skills spec so non-Claude LLM clients auto-discover the skill
 
 ## Known Issues
 
 - ~~`demoType` selector gotcha~~ — FIXED: `demoType(page, selectorOrLocator, text)` now accepts a CSS selector string or a Playwright Locator directly.
-- `deviceScaleFactor: 2` is broken with webkit — viewport renders at 1/4 of the frame. Stick to `deviceScaleFactor: 1` until fixed.
+- `deviceScaleFactor > 1` is broken with webkit — viewport renders at a fraction of the frame. Affects 2x and 3x equally. Stick to `deviceScaleFactor: 1` until fixed.
 - ~~`argo init` ESM warnings~~ — FIXED: now scaffolds `argo.config.mjs` with `defineConfig()`.
 - `zoomTo` transforms `documentElement` — overlays active during zoom will scale with the page. Avoid overlapping `withOverlay` and `zoomTo` on the same scene for best results.
 - OpenAI engine requests raw PCM (`response_format: 'pcm'`) and converts to Float32 directly — do not use `convertToWav` (ffmpeg pipe introduces 0xFFFFFFFF data size artifacts).

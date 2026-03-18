@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Café Order — Mobile Demo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f8f8f8;
+      --card: #ffffff;
+      --border: #e5e5e5;
+      --text: #1a1a1a;
+      --muted: #666;
+      --accent: #e85d04;
+      --accent-light: #fef3ec;
+      --radius: 12px;
+      --font: system-ui, -apple-system, sans-serif;
+    }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* Header */
+    .header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header h1 { font-size: 18px; font-weight: 700; }
+    .header .cart {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .cart-count {
+      background: white;
+      color: var(--accent);
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    /* Menu */
+    .section-title {
+      padding: 20px 20px 12px;
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .section-subtitle {
+      padding: 0 20px 16px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .menu-list { padding: 0 16px; }
+    .menu-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .menu-item:hover, .menu-item:active { border-color: var(--accent); background: var(--accent-light); }
+    .menu-item.selected { border-color: var(--accent); background: var(--accent-light); }
+    .item-info h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .item-info p { font-size: 13px; color: var(--muted); }
+    .item-price { font-size: 16px; font-weight: 700; color: var(--accent); white-space: nowrap; margin-left: 16px; }
+    .item-check {
+      width: 24px; height: 24px; border-radius: 50%;
+      border: 2px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      margin-left: 12px; flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .menu-item.selected .item-check {
+      background: var(--accent); border-color: var(--accent);
+    }
+    .menu-item.selected .item-check::after {
+      content: '✓'; color: white; font-size: 14px; font-weight: 700;
+    }
+
+    /* Bottom bar */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      padding: 16px 20px;
+      padding-bottom: calc(16px + env(safe-area-inset-bottom, 0));
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .total { flex: 1; }
+    .total-label { font-size: 13px; color: var(--muted); }
+    .total-amount { font-size: 22px; font-weight: 700; }
+    .order-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: var(--radius);
+      padding: 14px 28px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .order-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .order-btn:not(:disabled):active { opacity: 0.8; }
+
+    /* Confirmation */
+    .confirmation {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px;
+    }
+    .confirmation.show { display: flex; }
+    .confirmation .emoji { font-size: 64px; margin-bottom: 20px; }
+    .confirmation h2 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+    .confirmation p { font-size: 15px; color: var(--muted); line-height: 1.5; }
+
+    /* Spacer for fixed bottom bar */
+    .spacer { height: 100px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Café Argo</h1>
+    <button class="cart">Cart <span class="cart-count" id="cart-count">0</span></button>
+  </div>
+
+  <h2 class="section-title">Today's Menu</h2>
+  <p class="section-subtitle">Pick your favorites — we'll have them ready in 5 min.</p>
+
+  <div class="menu-list" id="menu">
+    <div class="menu-item" data-price="4.50" onclick="toggleItem(this)">
+      <div class="item-info"><h3>Flat White</h3><p>Double ristretto, steamed milk</p></div>
+      <span class="item-price">$4.50</span>
+      <div class="item-check"></div>
+    </div>
+    <div class="menu-item" data-price="5.00" onclick="toggleItem(this)">
+      <div class="item-info"><h3>Matcha Latte</h3><p>Ceremonial grade, oat milk</p></div>
+      <span class="item-price">$5.00</span>
+      <div class="item-check"></div>
+    </div>
+    <div class="menu-item" data-price="6.50" onclick="toggleItem(this)">
+      <div class="item-info"><h3>Açaí Bowl</h3><p>Granola, banana, blueberries</p></div>
+      <span class="item-price">$6.50</span>
+      <div class="item-check"></div>
+    </div>
+    <div class="menu-item" data-price="4.00" onclick="toggleItem(this)">
+      <div class="item-info"><h3>Avocado Toast</h3><p>Sourdough, chili flakes, lime</p></div>
+      <span class="item-price">$4.00</span>
+      <div class="item-check"></div>
+    </div>
+    <div class="menu-item" data-price="3.50" onclick="toggleItem(this)">
+      <div class="item-info"><h3>Croissant</h3><p>Butter, flaky, warm</p></div>
+      <span class="item-price">$3.50</span>
+      <div class="item-check"></div>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+
+  <div class="bottom-bar">
+    <div class="total">
+      <div class="total-label">Total</div>
+      <div class="total-amount" id="total">$0.00</div>
+    </div>
+    <button class="order-btn" id="order-btn" disabled onclick="placeOrder()">Place Order</button>
+  </div>
+
+  <div class="confirmation" id="confirmation">
+    <div class="emoji">☕</div>
+    <h2>Order Placed!</h2>
+    <p>Your order will be ready in about 5 minutes.<br>We'll call your name.</p>
+  </div>
+
+  <script>
+    let total = 0;
+    let count = 0;
+
+    function toggleItem(el) {
+      const price = parseFloat(el.dataset.price);
+      el.classList.toggle('selected');
+      if (el.classList.contains('selected')) {
+        total += price;
+        count++;
+      } else {
+        total -= price;
+        count--;
+      }
+      document.getElementById('total').textContent = '$' + total.toFixed(2);
+      document.getElementById('cart-count').textContent = count;
+      document.getElementById('order-btn').disabled = count === 0;
+    }
+
+    function placeOrder() {
+      document.getElementById('confirmation').classList.add('show');
+    }
+  </script>
+</body>
+</html>
