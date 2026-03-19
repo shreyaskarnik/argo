@@ -121,8 +121,13 @@ test('showcase', async ({ page, narration }) => {
   await showOverlay(page, 'code', narration.durationFor('code', { maxMs: 7600 }));
 
   narration.mark('closing');
-  // Scroll CTA to center of viewport, not just into view
+  // Center the CTA section by adding temporary bottom padding so
+  // scrollIntoView({ block: 'center' }) actually has room to center it.
   await page.evaluate(() => {
+    const spacer = document.createElement('div');
+    spacer.id = 'argo-scroll-spacer';
+    spacer.style.height = '100vh';
+    document.body.appendChild(spacer);
     const cta = document.querySelector('#cta');
     if (cta) cta.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
