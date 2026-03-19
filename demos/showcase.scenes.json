@@ -75,7 +75,7 @@
   },
   {
     "scene": "export",
-    "text": "Export does more than encode. Argo adds transitions between scenes, compresses dead time with speed ramp, writes subtitles and chapters, and renders gif alongside the MP4.",
+    "text": "Export does more than encode. Argo adds transitions between scenes, compresses dead time with speed ramp, writes subtitles and chapters, renders gif alongside the MP4, and records mobile viewports with touch emulation.",
     "speed": 0.92,
     "overlay": {
       "type": "headline-card",
