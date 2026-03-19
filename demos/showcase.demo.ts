@@ -11,7 +11,7 @@
  */
 import { test, demoType } from '@argo-video/cli';
 import { showOverlay, withOverlay, showConfetti } from '@argo-video/cli';
-import { spotlight, focusRing, dimAround, resetCamera } from '@argo-video/cli';
+import { spotlight, focusRing, dimAround, zoomTo, resetCamera } from '@argo-video/cli';
 import { cursorHighlight, resetCursor } from '@argo-video/cli';
 
 test('showcase', async ({ page, narration }) => {
@@ -117,7 +117,15 @@ test('showcase', async ({ page, narration }) => {
   narration.mark('code');
   await page.locator('#code-example').scrollIntoViewIfNeeded();
   await page.waitForTimeout(500);
-  focusRing(page, '#demo-script-card', { color: '#22d3ee', duration: narration.durationFor('code', { maxMs: 7600 }) });
+  // Post-export zoom into the code block — ffmpeg crop+scale, overlay-safe
+  zoomTo(page, '#demo-script-card', {
+    narration,
+    scale: 1.2,
+    duration: narration.durationFor('code', { maxMs: 7600 }),
+    fadeIn: 1000,
+    fadeOut: 1000,
+    holdMs: 3000,
+  });
   await showOverlay(page, 'code', narration.durationFor('code', { maxMs: 7600 }));
 
   narration.mark('closing');

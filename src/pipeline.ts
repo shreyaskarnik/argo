@@ -389,6 +389,20 @@ export async function runPipeline(
         writeFileSync(join(config.outputDir, `${demoName}.${variant.name}.vtt`), generateVtt(variantPlacements, variantSceneTexts), 'utf-8');
       } catch { /* subtitles are best-effort */ }
 
+      // Read camera moves for this variant if recorded
+      let variantCameraMoves: CameraMove[] = [];
+      const variantCameraMovesPath = join('.argo', variantSubdir, '.timing.camera-moves.json');
+      try {
+        if (existsSync(variantCameraMovesPath)) {
+          variantCameraMoves = JSON.parse(readFileSync(variantCameraMovesPath, 'utf-8'));
+        }
+      } catch { /* optional */ }
+
+      if (variantCameraMoves.length > 0) {
+        variantCameraMoves = shiftCameraMoves(variantCameraMoves, variantHeadTrimMs);
+        variantCameraMoves = scaleCameraMoves(variantCameraMoves, config.video.deviceScaleFactor ?? 1);
+      }
+
       const variantOutputPath = await exportVideo({
         demoName: variantSubdir,
         argoDir: '.argo',
@@ -404,6 +418,7 @@ export async function runPipeline(
         totalDurationMs: variantShiftedDurationMs,
         headTrimMs: variantHeadTrimMs > 0 ? variantHeadTrimMs : undefined,
         loudnorm: config.export.audio?.loudnorm,
+        cameraMoves: variantCameraMoves.length > 0 ? variantCameraMoves : undefined,
       });
 
       console.log(`✓ Variant saved to: ${variantOutputPath}`);

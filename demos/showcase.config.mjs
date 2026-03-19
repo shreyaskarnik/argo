@@ -18,10 +18,10 @@ export default defineConfig({
     // speedRamp: { gapSpeed: 2.0, minGapMs: 600 },  // disabled for now — conflicts with transitions
     formats: ['gif'],
     audio: { loudnorm: true },
-    variants: [
-      { name: 'vertical', video: { width: 1080, height: 1920 } },
-      { name: 'square',   video: { width: 1080, height: 1080 } },
-    ],
+    // variants: [
+    //   { name: 'vertical', video: { width: 1080, height: 1920 } },
+    //   { name: 'square',   video: { width: 1080, height: 1080 } },
+    // ],
   },
   overlays: {
     autoBackground: true,

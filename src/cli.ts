@@ -24,6 +24,7 @@ import {
 import { generateChapterMetadata } from './chapters.js';
 import { generateSrt, generateVtt } from './subtitles.js';
 import { applySpeedRampToTimeline, type Segment } from './speed-ramp.js';
+import { shiftCameraMoves, scaleCameraMoves, type CameraMove } from './camera-move.js';
 import type { Placement } from './tts/align.js';
 
 function validateDemoName(name: string): string {
@@ -181,6 +182,18 @@ export function createProgram(): Command {
         headTrimMs,
         speedRampSegments,
         loudnorm: config.export.audio?.loudnorm,
+        cameraMoves: (() => {
+          const cameraMovesPath = `${demoDir}/.timing.camera-moves.json`;
+          try {
+            if (existsSync(cameraMovesPath)) {
+              let moves: CameraMove[] = JSON.parse(readFileSync(cameraMovesPath, 'utf-8'));
+              if (headTrimMs && headTrimMs > 0) moves = shiftCameraMoves(moves, headTrimMs);
+              moves = scaleCameraMoves(moves, config.video.deviceScaleFactor ?? 1);
+              return moves;
+            }
+          } catch { /* optional */ }
+          return undefined;
+        })(),
       });
     });
 

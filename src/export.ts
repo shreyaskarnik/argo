@@ -208,20 +208,6 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     audioSource = speedRampFilter.outputLabels.audio;
   }
 
-  // Post-export camera moves (zoom/pan)
-  const cameraMoves = options.cameraMoves;
-  if (cameraMoves && cameraMoves.length > 0) {
-    // Camera moves use crop+scale on the video frame.
-    // Input dimensions: if deviceScaleFactor > 1, video is at scaled resolution.
-    const frameW = (outputWidth ?? 1920) * deviceScaleFactor;
-    const frameH = (outputHeight ?? 1080) * deviceScaleFactor;
-    const camFilter = buildCameraMoveFilter(cameraMoves, frameW, frameH, `[${videoSource}]`);
-    if (camFilter) {
-      filterParts.push(camFilter.filter);
-      videoSource = camFilter.outputLabel;
-    }
-  }
-
   const vFilters: string[] = [];
   if (tailPadMs && tailPadMs > 0) {
     vFilters.push(`tpad=stop_mode=clone:stop_duration=${formatSeconds(tailPadMs)}`);
@@ -247,15 +233,18 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     // Fade transitions use filter_complex with split+concat.
     // Apply any vFilters (scale, tpad) before the transition.
     let fc = transitionComplex.filterComplex;
-    if (speedRampFilter) {
+    // Replace default stream refs when upstream filters (speed ramp, camera moves) change the labels
+    const hasUpstreamVideo = videoSource !== '0:v';
+    const hasUpstreamAudio = audioSource !== '1:a';
+    if (hasUpstreamVideo) {
       fc = fc.replace('[0:v]', `[${videoSource}]`);
-      if (audioSource && transitionComplex.audioOutput) {
-        fc = fc.replace('[1:a]', `[${audioSource}]`);
-      }
+    }
+    if (hasUpstreamAudio && transitionComplex.audioOutput) {
+      fc = fc.replace('[1:a]', `[${audioSource}]`);
     }
     if (vFilters.length > 0) {
       // Prepend vFilters to the video input before split
-      const inputRef = speedRampFilter ? `[${videoSource}]` : '[0:v]';
+      const inputRef = hasUpstreamVideo ? `[${videoSource}]` : '[0:v]';
       fc = fc.replace(inputRef + 'split=', `${inputRef}${vFilters.join(',')},split=`);
     }
     filterParts.push(fc);
@@ -269,6 +258,19 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
       videoSource = 'outvfinal';
     } else {
       args.push('-vf', vFilters.join(','));
+    }
+  }
+
+  // Post-export camera moves (zoom/pan) — applied AFTER transitions so that
+  // the time variable `t` is continuous across the concatenated output.
+  const cameraMoves = options.cameraMoves;
+  if (cameraMoves && cameraMoves.length > 0) {
+    const frameW = (outputWidth ?? 1920) * deviceScaleFactor;
+    const frameH = (outputHeight ?? 1080) * deviceScaleFactor;
+    const camFilter = buildCameraMoveFilter(cameraMoves, frameW, frameH, `[${videoSource}]`);
+    if (camFilter) {
+      filterParts.push(camFilter.filter);
+      videoSource = camFilter.outputLabel;
     }
   }
 

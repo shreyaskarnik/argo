@@ -111,10 +111,13 @@ export function buildCameraMoveFilter(
   if (parts.length === 0) return null;
 
   const finalLabel = `camfinal`;
-  // Rename the last output label
+  // Rename the last output label — find the actual label used in the last part,
+  // not moves.length-1 (which may refer to a skipped move with scale <= 1)
   const lastPart = parts[parts.length - 1];
-  const lastLabel = `cam${moves.length - 1}`;
-  parts[parts.length - 1] = lastPart.replace(`[${lastLabel}]`, `[${finalLabel}]`);
+  const lastLabelMatch = lastPart.match(/\[cam(\d+)\]$/);
+  if (lastLabelMatch) {
+    parts[parts.length - 1] = lastPart.replace(`[cam${lastLabelMatch[1]}]`, `[${finalLabel}]`);
+  }
 
   return {
     filter: parts.join(';\n'),
