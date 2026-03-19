@@ -255,7 +255,7 @@ import { defineConfig, demosProject, engines } from '@argo-video/cli';
 | `spotlight(page, selector, opts?)` | Dark overlay with hole around target element |
 | `focusRing(page, selector, opts?)` | Pulsing glow border on target |
 | `dimAround(page, selector, opts?)` | Fade sibling elements to highlight target |
-| `zoomTo(page, selector, opts?)` | Scale viewport centered on target |
+| `zoomTo(page, selector, opts?)` | Scale viewport centered on target. Pass `{ narration }` for overlay-safe ffmpeg post-export zoom (recommended). |
 | `resetCamera(page)` | Clear all active camera effects |
 | `showCaption(page, scene, text, durationMs)` | Show a simple text caption |
 | `withCaption(page, scene, text, action)` | Show caption during an async action |
@@ -391,6 +391,22 @@ export: {
 ```
 
 EBU R128 loudness normalization (-16 LUFS) — makes voiceover volume consistent across TTS engines and scenes.
+
+### Post-Export Camera Moves
+
+Zoom into specific elements with frame-exact ffmpeg crop+scale — overlays stay unaffected:
+
+```ts
+import { zoomTo, resetCamera } from '@argo-video/cli';
+
+narration.mark('details');
+await zoomTo(page, '#revenue-chart', { narration, scale: 1.5, holdMs: 2000 });
+await page.waitForTimeout(narration.durationFor('details'));
+```
+
+When `narration` is passed, `zoomTo` records the target's bounding box as a camera move mark instead of manipulating the DOM. During export, the pipeline applies animated `crop+scale` filters via ffmpeg with lanczos resampling. This is overlay-safe (overlays are already burned into the video before the zoom is applied) and frame-exact.
+
+Without `narration`, `zoomTo` falls back to browser-side CSS transforms (for VS Code preview / standalone Playwright runs).
 
 ### Batch Pipeline
 

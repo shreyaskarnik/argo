@@ -28,10 +28,13 @@ After running `init --from`, follow these steps to complete the demo:
 
 1. **Fill in voiceover text** — open `<name>.scenes.json`. Each entry has a `_hint` field describing the scene. Write natural narration for each `text` field using hints as context. Remove `_hint` fields when done.
 
-2. **Add camera effects** — open `<name>.demo.ts`. Add `spotlight()`, `focusRing()`, `dimAround()` at key moments. Derive durations from `narration.durationFor()`:
+2. **Add camera effects** — open `<name>.demo.ts`. Add `spotlight()`, `focusRing()`, `dimAround()`, `zoomTo()` at key moments. Derive durations from `narration.durationFor()`:
    ```typescript
    const stepDur = Math.floor(narration.durationFor('checkout') / 3);
    spotlight(page, '#price-total', { duration: stepDur });
+
+   // Post-export zoom (overlay-safe, recommended over browser-side CSS)
+   await zoomTo(page, '#price-total', { narration, scale: 1.5, holdMs: 2000 });
    ```
 
 3. **Refine overlays** — upgrade placeholder lower-thirds to `headline-card`, `callout`, or `image-card` where appropriate. Add `motion: 'slide-in'` and `autoBackground: true`.

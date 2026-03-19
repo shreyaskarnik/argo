@@ -69,7 +69,7 @@ All camera effects are **non-blocking by default** (fire-and-forget safe). All a
 | `spotlight(page, target, opts?)` | Dark overlay with hole around target |
 | `focusRing(page, target, opts?)` | Pulsing glow border |
 | `dimAround(page, target, opts?)` | Fade siblings to highlight target |
-| `zoomTo(page, target, opts?)` | Scale viewport centered on target. Note: active overlays scale with the page. |
+| `zoomTo(page, target, opts?)` | Scale viewport centered on target. Pass `{ narration }` for overlay-safe ffmpeg post-export zoom (recommended). Without `narration`, falls back to browser-side CSS transforms (overlays scale with the page). |
 | `resetCamera(page)` | Clear all active camera effects |
 | `showConfetti(page, opts?)` | Confetti burst. `spread: 'burst'` (center-top fan) or `'rain'` (full-width fall). `emoji: '🎃'` or `emoji: ['🎃', '👻']` renders emoji instead of colored rectangles. |
 | `cursorHighlight(page, opts?)` | Persistent ring following cursor. Remove with `resetCursor(page)`. |
@@ -84,6 +84,14 @@ await page.waitForTimeout(beat + 150); // gap between effects
 focusRing(page, '#target2', { color: '#3b82f6', duration: beat });
 ```
 Hardcoded durations (e.g., `duration: 1200`) drift from the voiceover as clip lengths change.
+
+**Post-export camera moves (recommended for `zoomTo`)**: Pass `narration` to record as an ffmpeg camera move instead of DOM transforms. Overlay-safe and frame-exact:
+```typescript
+narration.mark('details');
+await zoomTo(page, '#revenue-chart', { narration, scale: 1.5, holdMs: 2000 });
+await page.waitForTimeout(narration.durationFor('details'));
+```
+The zoom is applied during export via ffmpeg `crop+scale` with lanczos resampling. Camera moves are written to `.timing.camera-moves.json` and auto-shifted for head trim + scaled for `deviceScaleFactor`.
 
 ### Mobile Demos
 
@@ -249,7 +257,7 @@ These are the failure modes that come up repeatedly:
 | Soft/blurry video on macOS | Using chromium (known capture issue) | Switch to `--browser webkit` |
 | `deviceScaleFactor: 2` broken with webkit | Known bug — viewport renders at 1/4 | Stick to `deviceScaleFactor: 1` until fixed |
 | ESM warnings from config | Config file is `.js` in non-module project | Rename to `argo.config.mjs` |
-| Overlays scale weirdly | `zoomTo` transforms documentElement | Avoid overlapping `withOverlay` and `zoomTo` on same scene |
+| Overlays scale weirdly | Legacy `zoomTo` (without `narration`) transforms DOM | Use `zoomTo(page, target, { narration })` for overlay-safe post-export zoom |
 | App looks wrong in recording | App uses system dark/light mode | Use `page.emulateMedia({ colorScheme: 'dark' })` — see `references/config-and-quality.md` |
 | Gray bar at bottom of video | Used `--headed` on macOS | Re-run without `--headed`; browser chrome reduces viewport in headed mode. Headless (default) is correct. |
 
