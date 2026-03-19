@@ -13,10 +13,10 @@ export default defineConfig({
   },
   export: {
     preset: 'slow',
-    crf: 16,
+    crf: 23,
     transition: { type: 'fade-through-black', durationMs: 2000 },
     // speedRamp: { gapSpeed: 2.0, minGapMs: 600 },  // disabled for now — conflicts with transitions
-    formats: ['gif', '9:16'],
+    formats: ['gif', '9:16', '1:1'],
     audio: { loudnorm: true },
   },
   overlays: {
