@@ -29,7 +29,7 @@
   },
   {
     "scene": "voiceover",
-    "text": "Seven tee tee ess engines. Start local with Kokoro, bring a Hugging Face model, switch to OpenAI or ElevenLabs for the polished cut, or clone your own voice with M L X audio.",
+    "text": "Seven TTS engines. Start local with Kokoro, bring a HuggingFace model, switch to OpenAI or Eleven Labs for the polished cut, or clone your own voice with MLX audio.",
     "speed": 0.92,
     "overlay": {
       "type": "lower-third",
@@ -63,7 +63,15 @@
       "placement": "top-left",
       "motion": "fade-in",
       "autoBackground": true
-    }
+    },
+    "effects": [
+      {
+        "type": "confetti",
+        "spread": "burst",
+        "pieces": 150,
+        "duration": 3000
+      }
+    ]
   },
   {
     "scene": "export",
