@@ -21,6 +21,7 @@ import { generateSrt, generateVtt } from './subtitles.js';
 import { generateChapterMetadata } from './chapters.js';
 import { exportVideo, checkFfmpeg } from './export.js';
 import { applySpeedRampToTimeline } from './speed-ramp.js';
+import { shiftCameraMoves, scaleCameraMoves, type CameraMove } from './camera-move.js';
 
 export interface PreviewExportConfig {
   preset?: string;
@@ -33,6 +34,7 @@ export interface PreviewExportConfig {
   formats?: Array<'1:1' | '9:16' | 'gif'>;
   transition?: import('./config.js').TransitionConfig;
   speedRamp?: import('./config.js').SpeedRampConfig;
+  loudnorm?: boolean;
 }
 
 export interface PreviewOptions {
@@ -616,6 +618,18 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             writeFileSync(join(outputDir, `${demoName}.vtt`), generateVtt(finalPlacements, sceneTexts), 'utf-8');
           } catch { /* subtitles are best-effort */ }
 
+          // Read camera moves if recorded by zoomTo with narration option
+          let cameraMoves: CameraMove[] | undefined;
+          const cameraMovesPath = join(demoDir, '.timing.camera-moves.json');
+          try {
+            if (existsSync(cameraMovesPath)) {
+              let moves: CameraMove[] = JSON.parse(readFileSync(cameraMovesPath, 'utf-8'));
+              if (headTrimMs > 0) moves = shiftCameraMoves(moves, headTrimMs);
+              moves = scaleCameraMoves(moves, ec?.deviceScaleFactor ?? 1);
+              if (moves.length > 0) cameraMoves = moves;
+            }
+          } catch { /* optional */ }
+
           // Export — use full config so output matches argo pipeline
           await exportVideo({
             demoName,
@@ -635,6 +649,8 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             totalDurationMs: finalDurationMs,
             headTrimMs: headTrimMs > 0 ? headTrimMs : undefined,
             speedRampSegments,
+            loudnorm: ec?.loudnorm,
+            cameraMoves,
           });
 
           // Switch to serving the new MP4

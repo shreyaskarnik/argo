@@ -335,6 +335,7 @@ export function createProgram(): Command {
             formats: config.export.formats,
             transition: config.export.transition,
             speedRamp: config.export.speedRamp,
+            loudnorm: config.export.audio?.loudnorm,
           },
         });
         console.log(`\nArgo Dashboard running at: ${url}`);
@@ -365,6 +366,7 @@ export function createProgram(): Command {
           formats: config.export.formats,
           transition: config.export.transition,
           speedRamp: config.export.speedRamp,
+          loudnorm: config.export.audio?.loudnorm,
         },
       });
       console.log(`\nArgo Preview running at: ${url}`);
