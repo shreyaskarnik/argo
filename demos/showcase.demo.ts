@@ -121,16 +121,9 @@ test('showcase', async ({ page, narration }) => {
   await showOverlay(page, 'code', narration.durationFor('code', { maxMs: 7600 }));
 
   narration.mark('closing');
-  // Center the CTA section by adding temporary bottom padding so
-  // scrollIntoView({ block: 'center' }) actually has room to center it.
-  await page.evaluate(() => {
-    const spacer = document.createElement('div');
-    spacer.id = 'argo-scroll-spacer';
-    spacer.style.height = '100vh';
-    document.body.appendChild(spacer);
-    const cta = document.querySelector('#cta');
-    if (cta) cta.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  });
+  // CTA section is min-height: 100vh with flexbox centering,
+  // so scrolling it into view naturally fills the viewport.
+  await page.locator('#cta').scrollIntoViewIfNeeded();
   await page.waitForTimeout(800);
   focusRing(page, '#theme-toggle', { color: '#f59e0b', duration: 1200 });
   await page.waitForTimeout(650);
