@@ -273,7 +273,6 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     if (camFilter) {
       filterParts.push(camFilter.filter);
       videoSource = camFilter.outputLabel;
-      console.log(`  Camera move filter applied (input: ${frameW}x${frameH} @ ${sourceFps.toFixed(2)}fps, output: [${videoSource}])`);
     }
   }
 
