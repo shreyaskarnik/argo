@@ -255,6 +255,18 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     }
   }
 
+  // Audio loudnorm — must be added before filter_complex is finalized
+  let useLoudnormSimple = false;
+  if (hasAudio && options.loudnorm) {
+    if (filterParts.length > 0) {
+      // Append loudnorm inside the filter_complex audio chain
+      filterParts.push(`[${audioSource}]loudnorm=I=-16:TP=-1.5:LRA=11[anorm]`);
+      audioSource = 'anorm';
+    } else {
+      useLoudnormSimple = true;
+    }
+  }
+
   if (filterParts.length > 0) {
     args.push('-filter_complex', filterParts.join(';\n'));
   }
@@ -265,7 +277,7 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     '-crf', String(crf),
   );
   if (hasAudio) {
-    if (options.loudnorm) {
+    if (useLoudnormSimple) {
       args.push('-af', 'loudnorm=I=-16:TP=-1.5:LRA=11');
     }
     args.push('-c:a', 'aac', '-b:a', '192k');
