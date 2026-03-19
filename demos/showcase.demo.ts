@@ -72,11 +72,11 @@ test('showcase', async ({ page, narration }) => {
   narration.mark('camera');
   await page.locator('#camera-effects').scrollIntoViewIfNeeded();
   await page.waitForTimeout(400);
-  // Total scene time = durationFor. Divide evenly across 5 effects.
+  // Total scene time = durationFor. Divide evenly across 6 effects.
   // Each beat includes the effect duration + a small gap.
   const totalCameraMs = narration.durationFor('camera', { maxMs: 9000 });
   const cameraGap = 150;
-  const cameraBeat = Math.floor((totalCameraMs - 400) / 5) - cameraGap;
+  const cameraBeat = Math.floor((totalCameraMs - 400) / 6) - cameraGap;
   spotlight(page, '#effect-spotlight', { duration: cameraBeat, padding: 10 });
   await page.waitForTimeout(cameraBeat + cameraGap);
   focusRing(page, '#effect-focus-ring', { color: '#fb7185', duration: cameraBeat });
@@ -84,6 +84,9 @@ test('showcase', async ({ page, narration }) => {
   dimAround(page, '#effect-dim-around', { duration: cameraBeat });
   await page.waitForTimeout(cameraBeat + cameraGap);
   focusRing(page, '#effect-cursor', { color: '#60a5fa', duration: cameraBeat });
+  await page.waitForTimeout(cameraBeat + cameraGap);
+  // Post-export zoom on the zoomTo card itself — meta!
+  zoomTo(page, '#effect-zoom', { narration, scale: 1.5, duration: cameraBeat, fadeIn: 300, holdMs: cameraBeat - 600 });
   await page.waitForTimeout(cameraBeat + cameraGap);
   showConfetti(page, { spread: 'rain', duration: cameraBeat, pieces: 130 });
   await page.waitForTimeout(cameraBeat + cameraGap);

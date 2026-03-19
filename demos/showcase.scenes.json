@@ -55,7 +55,7 @@
   },
   {
     "scene": "camera",
-    "text": "Direct the viewer's eye with code. Spotlight a button, pulse a focus ring, dim the noise, highlight the cursor, and celebrate with confetti.",
+    "text": "Direct the viewer's eye with code. Spotlight a button, pulse a focus ring, dim the noise, highlight the cursor, zoom into a card, and celebrate with confetti.",
     "speed": 0.92,
     "overlay": {
       "type": "callout",
