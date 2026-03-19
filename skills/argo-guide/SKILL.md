@@ -218,6 +218,10 @@ export: {
   speedRamp: { gapSpeed: 2.0, minGapMs: 500 },                   // speed up gaps between scenes
   audio: { loudnorm: true },                                      // EBU R128 loudness normalization
   formats: ['gif', '9:16', '1:1'],                                // additional export formats
+  variants: [                                                       // viewport-native re-recording
+    { name: 'vertical', video: { width: 1080, height: 1920 } },
+    { name: 'square',   video: { width: 1080, height: 1080 } },
+  ],
 }
 ```
 
@@ -225,7 +229,24 @@ export: {
 - **Speed ramp:** Compresses inter-scene gaps (navigation, page loads) to keep demos tight. `gapSpeed: 2.0` = 2× speed for gaps. Only gaps > `minGapMs` (default 500ms) are affected.
 - **Formats:** `1:1` (square), `9:16` (vertical), `gif` (palette-optimized animated GIF). Both `1:1` and `9:16` use **blur-fill** — the source is scaled to fit, overlaid on a blurred version of itself. No more hard crop clipping.
 - **Audio:** `audio: { loudnorm: true }` applies EBU R128 loudness normalization (-16 LUFS). Makes voiceover consistent across engines and scenes.
+- **Variants:** Re-record at different viewports for pixel-perfect multi-format. TTS runs once, then pipeline records + exports per variant. Output: `videos/<demo>-<variant>.mp4`. Much better than blur-fill for responsive content.
 - **Progress bar:** Export shows encoding progress automatically when duration is known
+
+### Post-Export Camera Moves
+
+`zoomTo` with `narration` option records zoom effects during Playwright recording, then applies them as ffmpeg `zoompan` filters during export. Frame-exact, overlay-safe — no DOM manipulation.
+
+```ts
+zoomTo(page, '#code-block', {
+  narration,           // pass the narration fixture
+  scale: 1.35,         // 135% zoom
+  duration: 5000,      // total effect duration
+  fadeIn: 1000,        // zoom-in ramp
+  holdMs: 3000,        // hold at max zoom
+});
+```
+
+Camera moves are written to `.timing.camera-moves.json`, shifted for head trim, scaled for deviceScaleFactor, and applied after transitions in the filter graph. Works across pipeline, standalone `argo export`, and preview Export button. Without `narration` option, falls back to browser-side CSS transform (for VS Code preview).
 
 ### VS Code Playwright Integration
 

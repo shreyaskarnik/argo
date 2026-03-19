@@ -125,6 +125,8 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 - Plan-then-render pipeline — compute placements/chapters/subtitles before export for consistent timing
 - Shared timeline module — extracted `src/timeline.ts` for placement building, head-trim, duration computation
 - Canonical showcase demo — single 10-scene demo covering all Argo capabilities
+- Post-export camera moves — `zoomTo(page, target, { narration })` records zoom marks, applied as ffmpeg `zoompan` during export. Overlay-safe, frame-exact.
+- Viewport-native variants — `export.variants` re-records at different viewports (TTS shared). Pixel-perfect multi-format without blur-fill artifacts.
 
 ## Suggested Priority
 

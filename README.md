@@ -394,19 +394,40 @@ EBU R128 loudness normalization (-16 LUFS) — makes voiceover volume consistent
 
 ### Post-Export Camera Moves
 
-Zoom into specific elements with frame-exact ffmpeg crop+scale — overlays stay unaffected:
+Zoom into specific elements with frame-exact ffmpeg `zoompan` — overlays stay unaffected:
 
 ```ts
-import { zoomTo, resetCamera } from '@argo-video/cli';
+import { zoomTo } from '@argo-video/cli';
 
 narration.mark('details');
-await zoomTo(page, '#revenue-chart', { narration, scale: 1.5, holdMs: 2000 });
-await page.waitForTimeout(narration.durationFor('details'));
+zoomTo(page, '#revenue-chart', {
+  narration,
+  scale: 1.35,
+  duration: 5000,
+  fadeIn: 1000,
+  holdMs: 3000,
+});
+await showOverlay(page, 'details', narration.durationFor('details'));
 ```
 
-When `narration` is passed, `zoomTo` records the target's bounding box as a camera move mark instead of manipulating the DOM. During export, the pipeline applies animated `crop+scale` filters via ffmpeg with lanczos resampling. This is overlay-safe (overlays are already burned into the video before the zoom is applied) and frame-exact.
+When `narration` is passed, `zoomTo` records the target's bounding box as a camera move mark instead of manipulating the DOM. During export, the pipeline applies animated `zoompan` filters via ffmpeg. This is overlay-safe (overlays are already burned into the video before the zoom is applied) and frame-exact.
 
 Without `narration`, `zoomTo` falls back to browser-side CSS transforms (for VS Code preview / standalone Playwright runs).
+
+### Viewport-Native Variants
+
+Re-record at different viewports for pixel-perfect multi-format output. CSS handles layout — much better than blur-fill for responsive content:
+
+```js
+export: {
+  variants: [
+    { name: 'vertical', video: { width: 1080, height: 1920 } },
+    { name: 'square',   video: { width: 1080, height: 1080 } },
+  ]
+}
+```
+
+TTS runs once, then the pipeline records and exports each variant separately. Output: `videos/<demo>-vertical.mp4`, `videos/<demo>-square.mp4`.
 
 ### Batch Pipeline
 

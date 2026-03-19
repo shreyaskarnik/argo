@@ -81,7 +81,7 @@ That matters for Argo because some effects are clunky or brittle in-browser but 
 
 If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
 
-1. **Post-export camera moves**
+1. ~~**Post-export camera moves**~~ **SHIPPED** — `zoompan` filter with `in_time` expressions
    - Why: browser `zoomTo()` is the clearest current example of something better done after capture.
 2. **Better transitions**
    - Why: transitions affect the whole polish level and are already part of the product story.
@@ -209,9 +209,10 @@ If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
 ## Hard
 
 - ~~Post-export camera moves~~ **SHIPPED** — `zoomTo(page, target, { narration })` + `buildCameraMoveFilter()` in `src/camera-move.ts`
-  - FFmpeg primitives: crop + scale + animated `between(t,...)` expressions
+  - FFmpeg primitives: `zoompan` with `in_time` expressions (NOT `crop` — crop w/h are not per-frame)
   - Coordinates captured at record time via `boundingBox()`, shifted for headTrim, scaled for deviceScaleFactor
-  - Applied in filter_complex after speed ramp, before transitions/downscale
+  - Applied in filter_complex AFTER transitions (zoompan's `in_time` must be continuous across concat output)
+  - Driven at source recording fps (`getVideoFrameRate()`) to avoid duration mismatch
 
 - Real segmented `xfade` scene composition
   - FFmpeg primitives: scene splitting, overlap planning, `xfade`, audio crossfades
