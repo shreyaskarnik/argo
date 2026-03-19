@@ -62,6 +62,7 @@ That matters for Argo because some effects are clunky or brittle in-browser but 
 ### Multi-Format
 
 - ~~Smart reframing for `9:16` and `1:1`~~ → **Viewport-native recording** is the better path. Instead of post-processing a 16:9 recording (blur-fill or crop), re-record at the target viewport so CSS handles layout natively. Blur-fill shipped in v0.18.0 as a quick fallback, but content isn't readable at extreme aspect ratios. The real solution:
+
   ```js
   export: {
     variants: [
@@ -71,6 +72,7 @@ That matters for Argo because some effects are clunky or brittle in-browser but 
     ]
   }
   ```
+
   Pipeline runs TTS once, then records + exports per variant. Demo script stays identical.
 - Scene-safe title placement by aspect ratio
 - Alternate pacing/export presets by destination
@@ -97,6 +99,7 @@ If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
 - ~~Loudness normalization~~ **SHIPPED** — `export.audio.loudnorm: true` applies EBU R128 (-16 LUFS)
   - FFmpeg primitives: `loudnorm`, `volume`, `acompressor`
   - Suggested API:
+
     ```js
     export: {
       audio: {
@@ -109,6 +112,7 @@ If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
 - Background music ducking
   - FFmpeg primitives: sidechain compression
   - Suggested API:
+
     ```js
     export: {
       audio: {
@@ -121,6 +125,7 @@ If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
 - ~~Blur-fill / gradient-fill for alternate aspect ratios~~ **SHIPPED** — `9:16` and `1:1` use blurred background + scaled-to-fit overlay
   - FFmpeg primitives: scale, blur, overlay
   - Suggested API:
+
     ```js
     export: {
       formats: [
@@ -133,6 +138,7 @@ If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
 - Watermark / brand bug
   - FFmpeg primitives: overlay
   - Suggested API:
+
     ```js
     export: {
       watermark: {
@@ -148,6 +154,7 @@ If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
 - Freeze-frame hold
   - FFmpeg primitives: trim, `tpad`, concat
   - Suggested API:
+
     ```json
     {
       "scene": "cta",
@@ -158,6 +165,7 @@ If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
 - Title cards / bumpers
   - FFmpeg primitives: color source, drawtext, overlay, concat
   - Suggested API:
+
     ```json
     {
       "scene": "preview",
@@ -168,6 +176,7 @@ If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
 - Spotlight blur / vignette
   - FFmpeg primitives: masked blur, boxblur, geq
   - Suggested API:
+
     ```json
     {
       "scene": "camera",
@@ -178,6 +187,7 @@ If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
 - Smarter reframing
   - FFmpeg primitives: crop, scale, overlay
   - Suggested API:
+
     ```js
     export: {
       formats: [
@@ -189,6 +199,7 @@ If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
 - Progress chapter bar
   - FFmpeg primitives: drawbox, timeline expressions
   - Suggested API:
+
     ```js
     export: {
       progressBar: { chapters: true, position: 'bottom' }
@@ -201,6 +212,7 @@ If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
   - FFmpeg primitives: crop + scale + motion expressions
   - Why hard: requires stable target coordinates and scene-aware interpolation.
   - Suggested API:
+
     ```json
     {
       "scene": "camera",
@@ -220,6 +232,7 @@ If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
   - FFmpeg primitives: scene splitting, overlap planning, `xfade`, audio crossfades
   - Why hard: timeline planning must stay aligned with subtitles, chapters, and scene report.
   - Suggested API:
+
     ```js
     export: {
       transition: { type: 'push-left', durationMs: 1400 }
@@ -230,6 +243,7 @@ If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
   - FFmpeg primitives: subtitle burn-in or drawtext timing overlays
   - Why hard: needs word-level timing, not just scene-level timing.
   - Suggested API:
+
     ```js
     export: {
       captions: {
@@ -242,6 +256,7 @@ If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
 - Picture-in-picture / before-after compare
   - FFmpeg primitives: multiple inputs, scale, overlay, masks, timed layout
   - Suggested API:
+
     ```json
     {
       "scene": "compare",

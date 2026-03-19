@@ -9,7 +9,7 @@ export default defineConfig({
     width: 1920,
     height: 1080,
     fps: 30,
-    browser: 'webkit',
+    browser: 'chromium',
   },
   export: {
     preset: 'slow',
@@ -20,6 +20,7 @@ export default defineConfig({
     audio: { loudnorm: true },
     variants: [
       { name: 'vertical', video: { width: 1080, height: 1920 } },
+      { name: 'square',   video: { width: 1080, height: 1080 } },
     ],
   },
   overlays: {
