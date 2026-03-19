@@ -51,6 +51,22 @@ function loadSceneDurations(): Record<string, number> | undefined {
 
 export const test = base.extend<{ narration: NarrationTimeline }>({
   narration: async ({}, use, testInfo) => {
+    // Auto-discover overlay manifest when running from VS Code or standalone
+    // Playwright (without argo pipeline setting ARGO_OVERLAYS_PATH).
+    if (!process.env.ARGO_OVERLAYS_PATH) {
+      const demoName = testInfo.title;
+      const candidates = [
+        `demos/${demoName}.scenes.json`,
+        `${demoName}.scenes.json`,
+      ];
+      for (const candidate of candidates) {
+        if (existsSync(candidate)) {
+          process.env.ARGO_OVERLAYS_PATH = candidate;
+          break;
+        }
+      }
+    }
+
     const durations = loadSceneDurations();
     const timeline = new NarrationTimeline(durations);
     timeline.start();
