@@ -66,6 +66,21 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 - ~~GIF export.~~ **SHIPPED** — `export.formats: ['gif']` produces two-pass palette-optimized animated GIFs.
 - Thumbnail auto-generation. Auto-capture a frame at a configurable timestamp as the video thumbnail instead of requiring a manual PNG.
 
+## Desktop App Recording (Tauri / Electron)
+
+- **Tauri apps** — Record demos of Tauri desktop apps. Two approaches:
+  - **Mock approach (works today):** Inject `__TAURI_INTERNALS__` stubs via `page.addInitScript()` before navigating to the Vite dev server. The React UI renders fully with overlays, camera effects, and voiceover — but no backend functionality (no kernel execution, no file I/O). Good for UI walkthroughs. See `~/work/rnd/tauri-exp/nteract.demo.ts` for a working example with nteract.
+  - **`tauri-plugin-localhost` (ideal, needs app changes):** The app author adds `tauri-plugin-localhost` which serves the frontend on `http://localhost:<port>` with the full Tauri runtime active. Argo points at that URL — no mocking, real backend, real kernel execution. Requires changing window creation to `WebviewUrl::External(url)`. Kyle (nteract) is adding this.
+  - **What doesn't work:** `WEBKIT_INSPECTOR_SERVER` (wry doesn't pass it to WebKit on macOS), `tauri-driver` (Linux-only, WebKitGTK), plain Vite dev server without mocks (`@tauri-apps/api` crashes).
+
+- **Electron apps** — Playwright has first-class Electron support via `electron.launch()`. This gives page objects for each `BrowserWindow`. Argo would need:
+  - A new fixture mode that accepts an Electron app path instead of a browser URL
+  - The `narration` fixture wired into `electron.launch()` context
+  - Video capture from the Electron window (Playwright supports this natively)
+  - This is a deeper integration than Tauri mocking but Playwright already does the heavy lifting.
+
+- **Generic screen recording fallback** — For any desktop app (native, Qt, SwiftUI, etc.), bypass Playwright entirely and use macOS screen recording (`screencapture` or `ffmpeg -f avfoundation`). Argo would handle just TTS + overlays (injected as a transparent overlay window) + export. The recording source changes but the rest of the pipeline stays the same.
+
 ## Longer Horizon
 
 - Timeline preview UI. Visual overlay representations on the `argo preview` timeline bar (like a video editor's track view).
@@ -108,9 +123,10 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 
 Next up from what's remaining:
 
-1. Theme packs for overlays (`terminal`, `product-keynote`, `minimal-docs`, `launch-trailer`)
-2. Timeline preview UI with overlay thumbnails on the `argo preview` timeline bar
-3. Resumable pipeline with per-step artifact caching
+1. Electron app recording (Playwright has native support, needs fixture integration)
+2. Theme packs for overlays (`terminal`, `product-keynote`, `minimal-docs`, `launch-trailer`)
+3. Timeline preview UI with overlay thumbnails on the `argo preview` timeline bar
+4. Resumable pipeline with per-step artifact caching
 4. Burned-in captions (render subtitles into the video frame for social platforms)
 5. Audio ducking and background music
 6. `argo diff` — compare two pipeline runs side-by-side
