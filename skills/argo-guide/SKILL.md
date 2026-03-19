@@ -219,6 +219,16 @@ export: {
 - **Audio:** `audio: { loudnorm: true }` applies EBU R128 loudness normalization (-16 LUFS). Makes voiceover consistent across engines and scenes.
 - **Progress bar:** Export shows encoding progress automatically when duration is known
 
+### VS Code Playwright Integration
+
+Argo demos are standard Playwright tests — they show up in VS Code's Playwright test panel automatically. Click play to run a demo directly from the editor:
+
+- Overlays resolve automatically (fixture auto-discovers `demos/<name>.scenes.json`)
+- Camera effects, confetti, cursor highlight all work
+- Timing uses fallback defaults (3000ms per scene) — for exact TTS timing, run `argo pipeline` first
+
+**Workflow:** Write → click play in VS Code to preview → run `argo pipeline` for the final video.
+
 ### Preview Iteration Workflow
 
 Run `argo pipeline` once, then `argo preview` to iterate on voiceover and overlays without re-recording. Preview provides editable text/voice/speed per scene, per-scene TTS regeneration, overlay editing, and a Save button that persists to manifests. Only re-run `pipeline` when the demo script changes.
