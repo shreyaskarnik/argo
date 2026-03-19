@@ -61,7 +61,17 @@ That matters for Argo because some effects are clunky or brittle in-browser but 
 
 ### Multi-Format
 
-- Smart reframing for `9:16` and `1:1`
+- ~~Smart reframing for `9:16` and `1:1`~~ → **Viewport-native recording** is the better path. Instead of post-processing a 16:9 recording (blur-fill or crop), re-record at the target viewport so CSS handles layout natively. Blur-fill shipped in v0.18.0 as a quick fallback, but content isn't readable at extreme aspect ratios. The real solution:
+  ```js
+  export: {
+    variants: [
+      { name: '16x9', video: { width: 1920, height: 1080 } },
+      { name: '9x16', video: { width: 1080, height: 1920 } },
+      { name: '1x1',  video: { width: 1080, height: 1080 } },
+    ]
+  }
+  ```
+  Pipeline runs TTS once, then records + exports per variant. Demo script stays identical.
 - Scene-safe title placement by aspect ratio
 - Alternate pacing/export presets by destination
 
@@ -289,8 +299,8 @@ That split keeps the product understandable:
 The best immediate next move is:
 
 1. **post-export camera moves**
-2. **blur-fill + smart reframing**
-3. **audio loudnorm + ducking**
+2. ~~**blur-fill + smart reframing**~~ **SHIPPED** (blur-fill) + viewport-native variants (next)
+3. ~~**audio loudnorm + ducking**~~ **SHIPPED** (loudnorm) + ducking (next)
 
 That sequence would improve both:
 

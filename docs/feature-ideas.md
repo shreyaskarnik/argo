@@ -13,7 +13,7 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 ## High-Leverage Product Features
 
 - ~~Camera language.~~ **SHIPPED** — `spotlight`, `focusRing`, `dimAround`, `zoomTo`, `resetCamera` helpers for directed demo recordings.
-- ~~Multi-format export.~~ **SHIPPED** — `export.formats: ['1:1', '9:16']` crops from 16:9 source. Overlay reflow deferred.
+- ~~Multi-format export.~~ **SHIPPED** — `export.formats: ['1:1', '9:16']` with blur-fill background. Next step: **viewport-native variants** — re-record at target viewport (`1080x1920` for 9:16) so CSS handles layout. TTS runs once, record+export per variant. `export.variants: [{ name: '9x16', video: { width: 1080, height: 1920 } }]`.
 - Resumable pipeline. Cache per-step artifacts so changing one voice line or one scene does not force a full rerun.
 - ~~Per-scene transitions.~~ **SHIPPED** — `fade-through-black`, `dissolve`, `wipe-left`, `wipe-right` via `export.transition` config. ffmpeg filter expressions generated at scene boundaries.
 - Theme packs for overlays. Provide reusable visual styles like `terminal`, `product-keynote`, `minimal-docs`, and `launch-trailer`.
