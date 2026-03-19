@@ -90,6 +90,9 @@ export { buildTransitionFilters } from './transitions.js';
 // Speed Ramp
 export { computeSegments, applySpeedRamp } from './speed-ramp.js';
 
+// Camera Moves
+export { buildCameraMoveFilter, shiftCameraMoves, scaleCameraMoves, type CameraMove } from './camera-move.js';
+
 // Progress
 export { runFfmpegWithProgress } from './progress.js';
 

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { generateClips } from './tts/generate.js';
 import { record } from './record.js';
@@ -9,6 +9,7 @@ import { generateSrt, generateVtt } from './subtitles.js';
 import { generateChapterMetadata } from './chapters.js';
 import { buildSceneReport, formatSceneReport } from './report.js';
 import { applySpeedRampToTimeline } from './speed-ramp.js';
+import { shiftCameraMoves, scaleCameraMoves, type CameraMove } from './camera-move.js';
 import type { ArgoConfig } from './config.js';
 import { getVideoDurationMs } from './media.js';
 import {
@@ -136,6 +137,17 @@ export async function runPipeline(
     );
   }
 
+  // Read camera moves if recorded by zoomTo with narration option
+  let cameraMoves: CameraMove[] = [];
+  const cameraMovesPath = join(argoDir, '.timing.camera-moves.json');
+  try {
+    if (existsSync(cameraMovesPath)) {
+      cameraMoves = JSON.parse(readFileSync(cameraMovesPath, 'utf-8'));
+    }
+  } catch {
+    // Camera moves are optional — don't fail the pipeline
+  }
+
   // Use actual video duration for alignment
   const videoPath = join(argoDir, 'video.webm');
   const totalDurationMs = getVideoDurationMs(videoPath);
@@ -241,6 +253,13 @@ export async function runPipeline(
   };
   if (tailPadMs !== undefined) exportOptions.tailPadMs = tailPadMs;
   if (headTrimMs > 0) exportOptions.headTrimMs = headTrimMs;
+
+  // Apply camera moves — shift for head trim, scale for deviceScaleFactor
+  if (cameraMoves.length > 0) {
+    let moves = shiftCameraMoves(cameraMoves, headTrimMs);
+    moves = scaleCameraMoves(moves, config.video.deviceScaleFactor ?? 1);
+    exportOptions.cameraMoves = moves;
+  }
 
   const outputPath = await exportVideo(exportOptions);
 

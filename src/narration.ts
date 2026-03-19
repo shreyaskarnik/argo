@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { schedulePlacements, type Placement } from './tts/align.js';
+import type { CameraMove } from './camera-move.js';
 
 export interface SceneDurationOptions {
   leadInMs?: number;
@@ -16,6 +17,7 @@ export class NarrationTimeline {
   private startTime: number | null = null;
   private sceneDurations: Record<string, number> = {};
   private cachedPlacements: Placement[] | null = null;
+  private _cameraMoves: CameraMove[] = [];
 
   constructor(sceneDurations?: Record<string, number>) {
     if (sceneDurations) {
@@ -40,6 +42,22 @@ export class NarrationTimeline {
     this.cachedPlacements = null;
   }
 
+  /**
+   * Record a camera move (zoom/pan) to be applied as an ffmpeg post-export effect.
+   * Call this during recording with the target element's bounding box.
+   */
+  recordCameraMove(move: Omit<CameraMove, 'startMs'> & { startMs?: number }): void {
+    if (this.startTime === null) {
+      throw new Error('Cannot record camera move before start() has been called');
+    }
+    const startMs = move.startMs ?? (Date.now() - this.startTime);
+    this._cameraMoves.push({ ...move, startMs });
+  }
+
+  getCameraMoves(): CameraMove[] {
+    return [...this._cameraMoves];
+  }
+
   getTimings(): Record<string, number> {
     return Object.fromEntries(this.timings);
   }
@@ -47,6 +65,12 @@ export class NarrationTimeline {
   async flush(outputPath: string): Promise<void> {
     await mkdir(dirname(outputPath), { recursive: true });
     await writeFile(outputPath, JSON.stringify(this.getTimings(), null, 2), 'utf-8');
+
+    // Write camera moves to a sidecar file if any were recorded
+    if (this._cameraMoves.length > 0) {
+      const cameraMovesPath = outputPath.replace(/\.json$/, '') + '.camera-moves.json';
+      await writeFile(cameraMovesPath, JSON.stringify(this._cameraMoves, null, 2), 'utf-8');
+    }
   }
 
   private getBaseDuration(scene: string, options?: SceneDurationOptions): number {

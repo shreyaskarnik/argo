@@ -208,25 +208,10 @@ If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
 
 ## Hard
 
-- Post-export camera moves
-  - FFmpeg primitives: crop + scale + motion expressions
-  - Why hard: requires stable target coordinates and scene-aware interpolation.
-  - Suggested API:
-
-    ```json
-    {
-      "scene": "camera",
-      "post": [
-        {
-          "type": "camera-move",
-          "target": "#effect-focus-ring",
-          "move": "push-in",
-          "durationMs": 1400,
-          "scale": 1.18
-        }
-      ]
-    }
-    ```
+- ~~Post-export camera moves~~ **SHIPPED** — `zoomTo(page, target, { narration })` + `buildCameraMoveFilter()` in `src/camera-move.ts`
+  - FFmpeg primitives: crop + scale + animated `between(t,...)` expressions
+  - Coordinates captured at record time via `boundingBox()`, shifted for headTrim, scaled for deviceScaleFactor
+  - Applied in filter_complex after speed ramp, before transitions/downscale
 
 - Real segmented `xfade` scene composition
   - FFmpeg primitives: scene splitting, overlap planning, `xfade`, audio crossfades
@@ -313,7 +298,7 @@ That split keeps the product understandable:
 
 The best immediate next move is:
 
-1. **post-export camera moves**
+1. ~~**post-export camera moves**~~ **SHIPPED** — `zoomTo(page, target, { narration })` records camera move marks; pipeline applies ffmpeg `crop+scale` with animated time expressions
 2. ~~**blur-fill + smart reframing**~~ **SHIPPED** (blur-fill) + viewport-native variants (next)
 3. ~~**audio loudnorm + ducking**~~ **SHIPPED** (loudnorm) + ducking (next)
 

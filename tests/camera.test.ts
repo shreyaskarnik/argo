@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { spotlight, focusRing, dimAround, zoomTo, resetCamera } from '../src/camera.js';
+import { NarrationTimeline } from '../src/narration.js';
 import type { Page } from '@playwright/test';
 
 function createMockLocator(box: { x: number; y: number; width: number; height: number } | null = { x: 10, y: 20, width: 100, height: 50 }) {
@@ -325,6 +326,50 @@ describe('zoomTo', () => {
       expect(String(wrapper.style.transform)).toContain('scale(');
       expect(String(wrapper.style.transform)).toContain('translate(');
     });
+  });
+
+  it('records camera move via narration instead of DOM transforms when narration is provided', async () => {
+    const locator = createMockLocator({ x: 120, y: 180, width: 240, height: 120 });
+    const timeline = new NarrationTimeline();
+    timeline.start();
+    await zoomTo(page, locator, { narration: timeline, scale: 2.0, duration: 3000, fadeIn: 400, fadeOut: 400 });
+
+    // Should NOT call page.evaluate for DOM transform (only the mock page.evaluate is from the legacy path)
+    // With narration path, page.evaluate should not be called for DOM manipulation
+    expect(page.evaluate).not.toHaveBeenCalled();
+
+    const moves = timeline.getCameraMoves();
+    expect(moves).toHaveLength(1);
+    expect(moves[0].x).toBe(240); // 120 + 240/2
+    expect(moves[0].y).toBe(240); // 180 + 120/2
+    expect(moves[0].w).toBe(240);
+    expect(moves[0].h).toBe(120);
+    expect(moves[0].scale).toBe(2.0);
+    expect(moves[0].durationMs).toBe(400); // fadeIn
+    expect(moves[0].holdMs).toBe(2200); // duration - fadeIn - fadeOut
+  });
+
+  it('records camera move via narration with CSS selector by evaluating page', async () => {
+    (page.evaluate as any).mockResolvedValue({ left: 50, top: 100, right: 250, bottom: 200, width: 200, height: 100 });
+    const timeline = new NarrationTimeline();
+    timeline.start();
+    await zoomTo(page, '#target', { narration: timeline });
+
+    // Should call page.evaluate once to resolve the bounding box
+    expect(page.evaluate).toHaveBeenCalledTimes(1);
+
+    const moves = timeline.getCameraMoves();
+    expect(moves).toHaveLength(1);
+    expect(moves[0].x).toBe(150); // 50 + 200/2
+    expect(moves[0].y).toBe(150); // 100 + 100/2
+  });
+
+  it('waits when narration path has wait: true', async () => {
+    const locator = createMockLocator({ x: 10, y: 20, width: 100, height: 50 });
+    const timeline = new NarrationTimeline();
+    timeline.start();
+    await zoomTo(page, locator, { narration: timeline, wait: true, duration: 3000, fadeOut: 500 });
+    expect(page.waitForTimeout).toHaveBeenCalledWith(3500);
   });
 });
 

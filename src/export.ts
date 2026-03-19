@@ -6,6 +6,7 @@ import type { TransitionConfig } from './config.js';
 import { buildTransitionFilters } from './transitions.js';
 import { runFfmpegWithProgress } from './progress.js';
 import { buildSpeedRampFilter, type Segment } from './speed-ramp.js';
+import { buildCameraMoveFilter, type CameraMove } from './camera-move.js';
 
 export interface ExportOptions {
   demoName: string;
@@ -39,6 +40,8 @@ export interface ExportOptions {
   speedRampSegments?: Segment[];
   /** Apply EBU R128 loudness normalization to audio. */
   loudnorm?: boolean;
+  /** Post-export camera moves (zoom/pan) recorded during Playwright session. */
+  cameraMoves?: CameraMove[];
 }
 
 function formatSeconds(ms: number): string {
@@ -203,6 +206,20 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     filterParts.push(speedRampFilter.filterComplex);
     videoSource = speedRampFilter.outputLabels.video;
     audioSource = speedRampFilter.outputLabels.audio;
+  }
+
+  // Post-export camera moves (zoom/pan)
+  const cameraMoves = options.cameraMoves;
+  if (cameraMoves && cameraMoves.length > 0) {
+    // Camera moves use crop+scale on the video frame.
+    // Input dimensions: if deviceScaleFactor > 1, video is at scaled resolution.
+    const frameW = (outputWidth ?? 1920) * deviceScaleFactor;
+    const frameH = (outputHeight ?? 1080) * deviceScaleFactor;
+    const camFilter = buildCameraMoveFilter(cameraMoves, frameW, frameH, `[${videoSource}]`);
+    if (camFilter) {
+      filterParts.push(camFilter.filter);
+      videoSource = camFilter.outputLabel;
+    }
   }
 
   const vFilters: string[] = [];

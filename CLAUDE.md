@@ -56,9 +56,17 @@ Overlay cues use discriminated unions — each template type has its own TypeScr
 
 `showConfetti(page, opts?)` — non-blocking by default (fire-and-forget safe). Injects a canvas-based confetti animation via `page.evaluate()`. Two spread modes: `burst` (Raycast-style, center-top fan) and `rain` (full-width fall). `emoji: '🎃'` or `emoji: ['🎄', '⭐']` renders emoji characters instead of colored rectangles. Set `wait: true` to block until animation completes. Errors from page/context disposal are swallowed; all other errors surface as warnings.
 
-### Camera (`src/camera.ts`)
+### Camera (`src/camera.ts`) & Post-Export Camera Moves (`src/camera-move.ts`)
 
-Four directed recording effects: `spotlight`, `focusRing`, `dimAround`, `zoomTo`, plus `resetCamera`. All accept CSS selector strings or Playwright Locators (resolved via `boundingBox()` before `page.evaluate()`). When a Locator is passed to `dimAround`, it falls back to a spotlight-style clip-path dim. All non-blocking by default (fire-and-forget safe). `zoomTo` uses `transform-origin: 0 0` + `scale() translate()` on `documentElement` to zoom and reframe the viewport onto the target. Note: overlays active during zoom will scale with the page (they're children of `documentElement`). Error handling follows the same pattern as `showConfetti` (filter by disposal errors, warn on others).
+Four directed recording effects: `spotlight`, `focusRing`, `dimAround`, `zoomTo`, plus `resetCamera`. All accept CSS selector strings or Playwright Locators (resolved via `boundingBox()` before `page.evaluate()`). When a Locator is passed to `dimAround`, it falls back to a spotlight-style clip-path dim. All non-blocking by default (fire-and-forget safe).
+
+`zoomTo` has two modes:
+- **Post-export (recommended)**: Pass `narration` option — records bounding box + timing as a camera move mark. During export, ffmpeg applies `crop+scale` with animated time expressions (lanczos resampling). Frame-exact, overlay-safe, no DOM manipulation. Camera moves are written to `.timing.camera-moves.json` sidecar.
+- **Legacy browser-side**: Without `narration` option, falls back to CSS `transform-origin: 0 0` + `scale() translate()` on a wrapper div. Overlays scale with the page. Use only for VS Code preview / standalone Playwright runs.
+
+Camera move pipeline flow: `zoomTo(page, target, { narration })` → `NarrationTimeline.recordCameraMove()` → `.timing.camera-moves.json` → pipeline reads + shifts (headTrim) + scales (deviceScaleFactor) → `buildCameraMoveFilter()` → ffmpeg `crop+scale` in `filter_complex` (after speed ramp, before transitions/downscale).
+
+Error handling follows the same pattern as `showConfetti` (filter by disposal errors, warn on others).
 
 ### Cursor Highlight (`src/cursor.ts`)
 
@@ -177,7 +185,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - ~~`demoType` selector gotcha~~ — FIXED: `demoType(page, selectorOrLocator, text)` now accepts a CSS selector string or a Playwright Locator directly.
 - `deviceScaleFactor > 1` is broken with webkit — viewport renders at a fraction of the frame. Affects 2x and 3x equally. Stick to `deviceScaleFactor: 1` until fixed.
 - ~~`argo init` ESM warnings~~ — FIXED: now scaffolds `argo.config.mjs` with `defineConfig()`.
-- `zoomTo` transforms `documentElement` — overlays active during zoom will scale with the page. Avoid overlapping `withOverlay` and `zoomTo` on the same scene for best results.
+- ~~`zoomTo` transforms `documentElement`~~ — FIXED: post-export camera moves (`narration` option) use ffmpeg `crop+scale` — overlays are already burned into the video and unaffected. Legacy browser-side `zoomTo` (without `narration`) still has this issue.
 - OpenAI engine requests raw PCM (`response_format: 'pcm'`) and converts to Float32 directly — do not use `convertToWav` (ffmpeg pipe introduces 0xFFFFFFFF data size artifacts).
 - `convertToWav` (ffmpeg pipe to stdout) writes WAV with `0xFFFFFFFF` data size — `parseWavHeader` falls back to actual buffer length. All engines using `convertToWav` are affected.
 - Showcase demo video hosted via GitHub gist comment upload: https://gist.github.com/shreyaskarnik/6a0996942a96528a984010f36de76079

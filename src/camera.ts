@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import type { NarrationTimeline } from './narration.js';
 
 const CAMERA_ATTR = 'data-argo-camera';
 const OVERLAY_ID_PREFIX = 'argo-overlay-';
@@ -30,6 +31,14 @@ export interface DimAroundOptions extends CameraOptions {
 export interface ZoomToOptions extends CameraOptions {
   /** Zoom level — 1.5 means 150% magnification. Default: 1.5 */
   scale?: number;
+  /** Hold the zoomed view for this many ms before zooming back out. Default: 0. */
+  holdMs?: number;
+  /**
+   * When provided, records the zoom as a post-export camera move (ffmpeg crop+scale)
+   * instead of applying a browser-side CSS transform. This produces frame-exact,
+   * overlay-safe zoom effects. Pass the narration fixture instance.
+   */
+  narration?: NarrationTimeline;
 }
 
 export type SelectorOrLocator =
@@ -301,9 +310,46 @@ export async function zoomTo(
   const fadeOut = opts?.fadeOut ?? 400;
   const scale = opts?.scale ?? 1.5;
   const wait = opts?.wait ?? false;
+  const holdMs = opts?.holdMs ?? 0;
 
   const { selector, rect: preRect } = await resolveRect(page, selectorOrLocator);
 
+  // Post-export path: record camera move for ffmpeg processing
+  if (opts?.narration) {
+    // Resolve bounding box in video-pixel coordinates
+    let rect = preRect;
+    if (!rect && selector) {
+      try {
+        const box = await page.evaluate((sel: string) => {
+          const el = document.querySelector(sel);
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height };
+        }, selector);
+        rect = box;
+      } catch {
+        // Page may be closed
+      }
+    }
+    if (rect) {
+      opts.narration.recordCameraMove({
+        x: Math.round(rect.left + rect.width / 2),
+        y: Math.round(rect.top + rect.height / 2),
+        w: Math.round(rect.width),
+        h: Math.round(rect.height),
+        durationMs: fadeIn,
+        scale,
+        holdMs: holdMs > 0 ? holdMs : duration - fadeIn - fadeOut,
+      });
+    }
+    // Wait if requested so the demo script timing stays consistent
+    if (wait) {
+      await page.waitForTimeout(duration + fadeOut);
+    }
+    return;
+  }
+
+  // Legacy browser-side path (for VS Code preview / standalone Playwright runs)
   await runCameraEffect(page, ({
     selector,
     preRect,
