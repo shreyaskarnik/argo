@@ -237,6 +237,7 @@ export async function runPipeline(
     placements: finalPlacements,
     totalDurationMs: finalDurationMs,
     speedRampSegments: speedRampPlan.segments,
+    loudnorm: config.export.audio?.loudnorm,
   };
   if (tailPadMs !== undefined) exportOptions.tailPadMs = tailPadMs;
   if (headTrimMs > 0) exportOptions.headTrimMs = headTrimMs;

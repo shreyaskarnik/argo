@@ -180,6 +180,7 @@ export function createProgram(): Command {
         totalDurationMs,
         headTrimMs,
         speedRampSegments,
+        loudnorm: config.export.audio?.loudnorm,
       });
     });
 

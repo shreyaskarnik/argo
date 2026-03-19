@@ -44,6 +44,11 @@ export interface SpeedRampConfig {
   minGapMs?: number;
 }
 
+export interface AudioConfig {
+  /** Apply EBU R128 loudness normalization. Default: false. */
+  loudnorm?: boolean;
+}
+
 export interface ExportConfig {
   preset: string;
   crf: number;
@@ -53,6 +58,8 @@ export interface ExportConfig {
   transition?: TransitionConfig;
   /** Speed up gaps between scenes. */
   speedRamp?: SpeedRampConfig;
+  /** Audio post-processing options. */
+  audio?: AudioConfig;
 }
 
 export interface OverlayConfig {

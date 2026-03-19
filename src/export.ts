@@ -37,6 +37,8 @@ export interface ExportOptions {
   totalDurationMs?: number;
   /** Precomputed speed-ramp segments on the post-trim timeline. */
   speedRampSegments?: Segment[];
+  /** Apply EBU R128 loudness normalization to audio. */
+  loudnorm?: boolean;
 }
 
 function formatSeconds(ms: number): string {
@@ -263,6 +265,9 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     '-crf', String(crf),
   );
   if (hasAudio) {
+    if (options.loudnorm) {
+      args.push('-af', 'loudnorm=I=-16:TP=-1.5:LRA=11');
+    }
     args.push('-c:a', 'aac', '-b:a', '192k');
   }
 
@@ -327,27 +332,36 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     const suffix = format.replace(':', 'x');
     const formatPath = outputPath.replace(/\.mp4$/, `.${suffix}.mp4`);
 
-    // Compute crop dimensions from 16:9 source
-    const srcW = outputWidth ?? 1920;
+    // Compute target dimensions for the format
     const srcH = outputHeight ?? 1080;
-    let cropW: number, cropH: number;
+    let targetW: number, targetH: number;
 
     if (format === '1:1') {
-      // Square: crop to height × height, centered horizontally
-      cropW = srcH;
-      cropH = srcH;
+      targetW = srcH;
+      targetH = srcH;
     } else {
-      // 9:16 vertical: crop to (height × 9/16) × height, centered
-      cropW = Math.round(srcH * 9 / 16);
-      cropH = srcH;
+      // 9:16
+      targetW = Math.round(srcH * 9 / 16);
+      targetH = srcH;
     }
 
-    const cropX = Math.round((srcW - cropW) / 2);
-    const cropY = 0;
+    // Ensure even dimensions (required by libx264)
+    targetW = targetW % 2 === 0 ? targetW : targetW + 1;
+    targetH = targetH % 2 === 0 ? targetH : targetH + 1;
 
+    // Blur-fill: blurred version of the source fills the background,
+    // original scaled-to-fit is overlaid on top. Much better than hard crop.
+    const blurFilter = [
+      `split[bg][fg]`,
+      `[bg]scale=${targetW}:${targetH}:force_original_aspect_ratio=increase,crop=${targetW}:${targetH},boxblur=20:5[blurred]`,
+      `[fg]scale=${targetW}:${targetH}:force_original_aspect_ratio=decrease[scaled]`,
+      `[blurred][scaled]overlay=(W-w)/2:(H-h)/2`,
+    ].join(';');
+
+    console.log(`  Exporting ${format} (blur-fill) → ${formatPath}`);
     const formatArgs = [
       '-i', outputPath,
-      '-vf', `crop=${cropW}:${cropH}:${cropX}:${cropY}`,
+      '-filter_complex', blurFilter,
       '-c:v', 'libx264',
       '-preset', preset,
       '-crf', String(crf),
