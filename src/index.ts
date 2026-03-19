@@ -14,6 +14,8 @@ export {
   type TransitionType,
   type TransitionConfig,
   type SpeedRampConfig,
+  type VariantConfig,
+  type AudioConfig,
 } from './config.js';
 
 // Fixtures

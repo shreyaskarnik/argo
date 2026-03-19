@@ -49,6 +49,13 @@ export interface AudioConfig {
   loudnorm?: boolean;
 }
 
+export interface VariantConfig {
+  /** Variant name — used in output filename (e.g., 'vertical' → showcase.vertical.mp4). */
+  name: string;
+  /** Video dimensions for this variant. The demo script runs identically — only viewport changes. */
+  video: { width: number; height: number };
+}
+
 export interface ExportConfig {
   preset: string;
   crf: number;
@@ -60,6 +67,10 @@ export interface ExportConfig {
   speedRamp?: SpeedRampConfig;
   /** Audio post-processing options. */
   audio?: AudioConfig;
+  /** Viewport-native variants — re-record at different viewports for each format.
+   * TTS runs once, then pipeline records + exports per variant.
+   * Much better than blur-fill/crop for responsive content. */
+  variants?: VariantConfig[];
 }
 
 export interface OverlayConfig {

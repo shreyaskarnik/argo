@@ -17,6 +17,8 @@ export interface RecordOptions {
   autoBackground?: boolean;
   defaultPlacement?: string;
   headed?: boolean;
+  /** Override the .argo subdirectory name (for variants). Default: demoName. */
+  argoSubdir?: string;
 }
 
 export interface RecordResult {
@@ -87,7 +89,7 @@ export default defineConfig({
 }
 
 export async function record(demoName: string, options: RecordOptions): Promise<RecordResult> {
-  const argoDir = path.join('.argo', demoName);
+  const argoDir = path.join('.argo', options.argoSubdir ?? demoName);
   mkdirSync(argoDir, { recursive: true });
 
   const videoPath = path.join(argoDir, 'video.webm');

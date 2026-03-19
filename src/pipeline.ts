@@ -280,5 +280,116 @@ export async function runPipeline(
   writeFileSync(join(config.outputDir, `${demoName}.meta.json`), JSON.stringify(pipelineMeta, null, 2) + '\n', 'utf-8');
 
   console.log(`\n✓ That's a wrap! Video saved to: ${outputPath}`);
+
+  // Viewport-native variants — re-record at different viewports
+  const variants = config.export.variants;
+  if (variants && variants.length > 0) {
+    for (const variant of variants) {
+      console.log(`\n${'─'.repeat(50)}`);
+      console.log(`  Variant: ${variant.name} (${variant.video.width}×${variant.video.height})`);
+      console.log(`${'─'.repeat(50)}\n`);
+
+      const variantArgoDir = join('.argo', `${demoName}-${variant.name}`);
+      mkdirSync(variantArgoDir, { recursive: true });
+
+      // Copy scene durations (TTS is shared)
+      writeFileSync(
+        join(variantArgoDir, '.scene-durations.json'),
+        JSON.stringify(sceneDurations, null, 2),
+        'utf-8',
+      );
+
+      // Record at variant viewport
+      const variantSubdir = `${demoName}-${variant.name}`;
+      console.log('★ Rolling camera...');
+      const variantRecord = await record(demoName, {
+        demosDir: config.demosDir,
+        baseURL: config.baseURL,
+        video: { width: variant.video.width, height: variant.video.height },
+        browser: config.video.browser,
+        deviceScaleFactor: config.video.deviceScaleFactor,
+        isMobile: config.video.isMobile,
+        hasTouch: config.video.hasTouch,
+        contextOptions: config.video.contextOptions,
+        autoBackground: config.overlays.autoBackground,
+        defaultPlacement: config.overlays.defaultPlacement,
+        headed: pipelineOpts?.headed,
+        argoSubdir: variantSubdir,
+      });
+
+      // Align with shared TTS clips
+      const variantTiming: SceneTiming = JSON.parse(readFileSync(variantRecord.timingPath, 'utf-8'));
+      const variantVideoPath = join('.argo', variantSubdir, 'video.webm');
+      const variantDurationMs = getVideoDurationMs(variantVideoPath);
+      const variantHeadTrimMs = computeHeadTrimMs(variantTiming);
+
+      let variantPlacements: Array<{ scene: string; startMs: number; endMs: number }> = [];
+      let variantShiftedDurationMs = variantDurationMs;
+
+      if (!isSilent) {
+        console.log('★ Mixing the soundtrack...');
+        const clips: ClipInfo[] = clipResults.map((cr) => {
+          const wavBuf = readFileSync(cr.clipPath);
+          const header = parseWavHeader(wavBuf);
+          const sampleCount = header.dataSize / 4;
+          const samples = new Float32Array(sampleCount);
+          for (let i = 0; i < sampleCount && header.dataOffset + i * 4 + 3 < wavBuf.length; i++) {
+            samples[i] = wavBuf.readFloatLE(header.dataOffset + i * 4);
+          }
+          return { scene: cr.scene, durationMs: header.durationMs, samples };
+        });
+
+        const variantAligned = alignClips(variantTiming, clips, variantDurationMs);
+        const variantAlignedPath = join('.argo', variantSubdir, 'narration-aligned.wav');
+        writeFileSync(variantAlignedPath, createWavBuffer(variantAligned.samples, 24000));
+
+        variantPlacements = variantAligned.placements.map(p => ({
+          scene: p.scene,
+          startMs: Math.max(0, p.startMs - variantHeadTrimMs),
+          endMs: Math.max(0, p.endMs - variantHeadTrimMs),
+        }));
+        variantShiftedDurationMs = variantDurationMs - variantHeadTrimMs;
+      }
+
+      // Export variant
+      console.log('★ Cutting the final take...');
+      const variantChapterPath = join('.argo', variantSubdir, 'chapters.txt');
+      writeFileSync(variantChapterPath, generateChapterMetadata(variantPlacements, variantShiftedDurationMs), 'utf-8');
+
+      // Subtitles — read from manifest file directly for text field
+      const variantSceneTexts: Record<string, string> = {};
+      try {
+        const rawManifest: Array<{ scene?: string; text?: string }> = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+        for (const entry of rawManifest) {
+          if (entry.scene && entry.text) variantSceneTexts[entry.scene] = entry.text;
+        }
+      } catch { /* ignore */ }
+      mkdirSync(config.outputDir, { recursive: true });
+      try {
+        writeFileSync(join(config.outputDir, `${demoName}.${variant.name}.srt`), generateSrt(variantPlacements, variantSceneTexts), 'utf-8');
+        writeFileSync(join(config.outputDir, `${demoName}.${variant.name}.vtt`), generateVtt(variantPlacements, variantSceneTexts), 'utf-8');
+      } catch { /* subtitles are best-effort */ }
+
+      const variantOutputPath = await exportVideo({
+        demoName: variantSubdir,
+        argoDir: '.argo',
+        outputDir: config.outputDir,
+        preset: config.export.preset,
+        crf: config.export.crf,
+        fps: config.video.fps,
+        outputWidth: variant.video.width,
+        outputHeight: variant.video.height,
+        chapterMetadataPath: variantChapterPath,
+        transition: config.export.transition,
+        placements: variantPlacements,
+        totalDurationMs: variantShiftedDurationMs,
+        headTrimMs: variantHeadTrimMs > 0 ? variantHeadTrimMs : undefined,
+        loudnorm: config.export.audio?.loudnorm,
+      });
+
+      console.log(`✓ Variant saved to: ${variantOutputPath}`);
+    }
+  }
+
   return outputPath;
 }
