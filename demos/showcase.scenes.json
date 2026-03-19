@@ -29,7 +29,7 @@
   },
   {
     "scene": "voiceover",
-    "text": "Seven TTS engines. Start local with Kokoro, bring a HuggingFace model, switch to open AI or Eleven Labs and many more for the polished cut, or clone your own voice with MLX audio.",
+    "text": "Seven TTS engines. Start local with Kokoro, bring a HuggingFace model, switch to open-a-eye or Eleven Labs and many more for the polished cut, or clone your own voice with MLX audio.",
     "speed": 0.92,
     "overlay": {
       "type": "lower-third",
