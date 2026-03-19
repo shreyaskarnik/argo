@@ -379,9 +379,19 @@ export: {
 }
 ```
 
-- `1:1` — Square crop (centered) for Instagram/LinkedIn
-- `9:16` — Vertical crop (centered) for TikTok/Reels. Note: center-crops from 16:9, so wide text may be clipped. Works best when key content is centered.
+- `1:1` — Square with blur-fill background for Instagram/LinkedIn
+- `9:16` — Vertical with blur-fill background for TikTok/Reels
 - `gif` — Animated GIF with palette optimization for docs/READMEs
+
+### Audio Processing
+
+```js
+export: {
+  audio: { loudnorm: true }
+}
+```
+
+EBU R128 loudness normalization (-16 LUFS) — makes voiceover volume consistent across TTS engines and scenes.
 
 ### Batch Pipeline
 

@@ -84,7 +84,7 @@ If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
 
 ## Easy
 
-- Loudness normalization
+- ~~Loudness normalization~~ **SHIPPED** — `export.audio.loudnorm: true` applies EBU R128 (-16 LUFS)
   - FFmpeg primitives: `loudnorm`, `volume`, `acompressor`
   - Suggested API:
     ```js
@@ -108,7 +108,7 @@ If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
     }
     ```
 
-- Blur-fill / gradient-fill for alternate aspect ratios
+- ~~Blur-fill / gradient-fill for alternate aspect ratios~~ **SHIPPED** — `9:16` and `1:1` use blurred background + scaled-to-fit overlay
   - FFmpeg primitives: scale, blur, overlay
   - Suggested API:
     ```js

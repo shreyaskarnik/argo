@@ -208,13 +208,15 @@ export: {
   crf: 16,
   transition: { type: 'fade-through-black', durationMs: 2000 },  // scene transitions
   speedRamp: { gapSpeed: 2.0, minGapMs: 500 },                   // speed up gaps between scenes
+  audio: { loudnorm: true },                                      // EBU R128 loudness normalization
   formats: ['gif', '9:16', '1:1'],                                // additional export formats
 }
 ```
 
 - **Transitions:** `fade-through-black` | `dissolve` | `wipe-left` | `wipe-right` — applied at scene boundaries during export. `dissolve` is a quicker dip-to-black (not a true crossfade blend). Use `durationMs: 2000` or higher for transitions that are clearly visible with voiceover (500ms is too fast to notice). Content changes (page navigation, slide switches) should happen BEFORE `narration.mark()` so the transition fades between old and new content.
 - **Speed ramp:** Compresses inter-scene gaps (navigation, page loads) to keep demos tight. `gapSpeed: 2.0` = 2× speed for gaps. Only gaps > `minGapMs` (default 500ms) are affected.
-- **Formats:** `1:1` (square center-crop), `9:16` (vertical center-crop), `gif` (palette-optimized animated GIF for docs/READMEs). Note: `9:16` center-crops from 16:9 — works best when key content is centered. Wide text may be clipped.
+- **Formats:** `1:1` (square), `9:16` (vertical), `gif` (palette-optimized animated GIF). Both `1:1` and `9:16` use **blur-fill** — the source is scaled to fit, overlaid on a blurred version of itself. No more hard crop clipping.
+- **Audio:** `audio: { loudnorm: true }` applies EBU R128 loudness normalization (-16 LUFS). Makes voiceover consistent across engines and scenes.
 - **Progress bar:** Export shows encoding progress automatically when duration is known
 
 ### Preview Iteration Workflow

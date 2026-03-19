@@ -182,7 +182,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - Showcase demo video hosted via GitHub gist comment upload: https://gist.github.com/shreyaskarnik/6a0996942a96528a984010f36de76079
 - `tsc` build may silently fail if `tsconfig.json` is missing — verify it exists before trusting `npm run build` output
 - `dissolve` transition is a shorter dip-to-black, not a true crossfade blend. A real crossfade would require ffmpeg `xfade` with re-encoded segment pairs — impractical for continuous recordings.
-- `9:16` format export center-crops from 16:9 — wide text gets clipped. Works best when key content is centered.
+- ~~`9:16` format export center-crops from 16:9~~ — FIXED: now uses blur-fill (blurred background + scaled-to-fit foreground).
 - `speedRamp` + `transitions` cannot be used together — both generate filter_complex graphs with conflicting stream labels. Use one or the other.
 
 ## Security Invariants

@@ -16,7 +16,8 @@ export default defineConfig({
     crf: 16,
     transition: { type: 'fade-through-black', durationMs: 2000 },
     // speedRamp: { gapSpeed: 2.0, minGapMs: 600 },  // disabled for now — conflicts with transitions
-    formats: ['gif'],
+    formats: ['gif', '9:16'],
+    audio: { loudnorm: true },
   },
   overlays: {
     autoBackground: true,
