@@ -117,20 +117,28 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 - Mobile demos — `isMobile`, `hasTouch`, `contextOptions` passthrough to Playwright config
 - Auto-trim — trims video before first `narration.mark()`, persists `headTrimMs` in `.meta.json`
 - Preview light/dark mode — follows system `prefers-color-scheme`
-- `new-features` demo — showcases transitions, speed ramp, GIF, batch, dashboard, progress bar
+- `argo clip` — extract individual scene clips (MP4 or GIF) from exported videos using chapter markers
+- `argo release-prep` — generate markdown release notes with scene table, durations, and clip links
+- Audio loudness normalization — `loudnorm` option in export config
+- Blur-fill for cropped formats — `9:16` and `1:1` use blurred background instead of black bars
+- VS Code Playwright integration — `playwright.config.ts` + fixture auto-discovery for running demos from the editor
+- Plan-then-render pipeline — compute placements/chapters/subtitles before export for consistent timing
+- Shared timeline module — extracted `src/timeline.ts` for placement building, head-trim, duration computation
+- Canonical showcase demo — single 10-scene demo covering all Argo capabilities
 
 ## Suggested Priority
 
 Next up from what's remaining:
 
-1. Electron app recording (Playwright has native support, needs fixture integration)
-2. Theme packs for overlays (`terminal`, `product-keynote`, `minimal-docs`, `launch-trailer`)
-3. Timeline preview UI with overlay thumbnails on the `argo preview` timeline bar
-4. Resumable pipeline with per-step artifact caching
-4. Burned-in captions (render subtitles into the video frame for social platforms)
-5. Audio ducking and background music
-6. `argo diff` — compare two pipeline runs side-by-side
-7. i18n — locale variants of scenes manifests for multi-language renders
-8. `argo ci` — opinionated CI mode (lint → pipeline → assert bounds → upload artifact)
-9. Keyframed text mutations in overlays
-10. AI assist for demo polish (pacing, copy, overlay placement suggestions)
+1. Viewport-native variants — re-record at target viewport (`1080x1920` for 9:16) instead of crop+blur-fill
+2. Electron app recording (Playwright has native support, needs fixture integration)
+3. Theme packs for overlays (`terminal`, `product-keynote`, `minimal-docs`, `launch-trailer`)
+4. Timeline preview UI with overlay thumbnails on the `argo preview` timeline bar
+5. Resumable pipeline with per-step artifact caching
+6. Burned-in captions (render subtitles into the video frame for social platforms)
+7. Audio ducking and background music
+8. `argo diff` — compare two pipeline runs side-by-side
+9. i18n — locale variants of scenes manifests for multi-language renders
+10. `argo ci` — opinionated CI mode (lint → pipeline → assert bounds → upload artifact)
+11. Keyframed text mutations in overlays
+12. AI assist for demo polish (pacing, copy, overlay placement suggestions)
