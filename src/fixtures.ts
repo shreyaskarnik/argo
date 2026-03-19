@@ -1,7 +1,9 @@
 import { test as base, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { readFileSync, existsSync } from 'node:fs';
+import { basename } from 'node:path';
 import { NarrationTimeline } from './narration.js';
+import { resetManifestCache } from './overlays/manifest-loader.js';
 
 type TimelineFactory = (title: string) => NarrationTimeline;
 
@@ -53,19 +55,28 @@ export const test = base.extend<{ narration: NarrationTimeline }>({
   narration: async ({}, use, testInfo) => {
     // Auto-discover overlay manifest when running from VS Code or standalone
     // Playwright (without argo pipeline setting ARGO_OVERLAYS_PATH).
-    if (!process.env.ARGO_OVERLAYS_PATH) {
-      const demoName = testInfo.title;
+    // Uses the test file basename (e.g., showcase.demo.ts → showcase) rather
+    // than testInfo.title, since titles can be anything ("Showcase demo", etc.)
+    const pipelineOverlayPath = process.env.ARGO_OVERLAYS_PATH;
+    let autoDiscovered = false;
+
+    if (!pipelineOverlayPath) {
+      const fileBase = basename(testInfo.file).replace(/\.demo\.ts$/, '');
       const candidates = [
-        `demos/${demoName}.scenes.json`,
-        `${demoName}.scenes.json`,
+        `demos/${fileBase}.scenes.json`,
+        `${fileBase}.scenes.json`,
       ];
       for (const candidate of candidates) {
         if (existsSync(candidate)) {
           process.env.ARGO_OVERLAYS_PATH = candidate;
+          autoDiscovered = true;
           break;
         }
       }
     }
+
+    // Reset manifest cache so each test gets a fresh read
+    resetManifestCache();
 
     const durations = loadSceneDurations();
     const timeline = new NarrationTimeline(durations);
@@ -73,6 +84,12 @@ export const test = base.extend<{ narration: NarrationTimeline }>({
     try {
       await use(timeline);
     } finally {
+      // Restore original env to avoid leaking across tests in the same worker
+      if (autoDiscovered) {
+        delete process.env.ARGO_OVERLAYS_PATH;
+        resetManifestCache();
+      }
+
       const argoDir = process.env.ARGO_OUTPUT_DIR;
       const outputPath = argoDir
         ? `${argoDir}/.timing.json`
