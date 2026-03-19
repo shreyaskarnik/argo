@@ -120,19 +120,11 @@ Voiceover `text` is spoken only, never displayed — overlay text is what viewer
 | `CI/CD` | `C I C D` |
 | `.env` | `dot env` |
 
-### Kokoro Phoneme Overrides
+### Kokoro Pronunciation
 
-Kokoro supports IPA phoneme overrides wrapped in `/slashes/` — this bypasses the G2P (grapheme-to-phoneme) model entirely and gives exact pronunciation control:
+Argo's Kokoro engine uses `kokoro-js` with `phonemizer.js` (eSpeak NG) for G2P — **not** the Python `misaki` library. The `[word](/IPA/)` phoneme override syntax from the upstream Kokoro model does not work through this path. Use phonetic spelling patterns instead.
 
-```
-Kokoro=/kˈOkəɹO/
-```
-
-Use this for brand names, product names, or any word where phonetic spelling isn't precise enough. Much more reliable than spelling tricks for tricky words.
-
-### Patterns (Fallback)
-
-When phoneme overrides aren't practical, use these spelling tricks:
+### Patterns
 
 1. **Acronyms** — spell out with spaces: `CI/CD` → `C I C D`
 2. **Portmanteaus** — hyphenate syllables: `Kubernetes` → `koo-ber-net-eez`
@@ -143,7 +135,7 @@ When phoneme overrides aren't practical, use these spelling tricks:
 
 This is engine-specific — when switching engines, review all voiceover text:
 
-- **Kokoro** supports `/IPA phoneme/` overrides for exact control; also needs phonetic spelling for acronyms: `tee tee ess`, `A.I.`, `M.L.X.`
+- **Kokoro** uses eSpeak NG via phonemizer.js (no misaki IPA overrides); needs phonetic spelling for acronyms: `tee tee ess`, `A.I.`, `M.L.X.`
 - **OpenAI** handles most acronyms natively — just write `TTS`, `AI`, `MLX`
 - **Qwen3 (mlx-audio)** is similar to Kokoro — needs phonetic help
 - **Transformers** varies by model — test pronunciation and adjust
