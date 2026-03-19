@@ -121,14 +121,19 @@ test('showcase', async ({ page, narration }) => {
   await showOverlay(page, 'code', narration.durationFor('code', { maxMs: 7600 }));
 
   narration.mark('closing');
-  await page.locator('#cta').scrollIntoViewIfNeeded();
-  await page.waitForTimeout(500);
+  // Scroll CTA to center of viewport, not just into view
+  await page.evaluate(() => {
+    const cta = document.querySelector('#cta');
+    if (cta) cta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  await page.waitForTimeout(800);
   focusRing(page, '#theme-toggle', { color: '#f59e0b', duration: 1200 });
   await page.waitForTimeout(650);
   await page.click('#theme-toggle');
   await page.waitForTimeout(650);
   await showOverlay(page, 'closing', narration.durationFor('closing', { maxMs: 8200, leadOutMs: 700 }));
 
+  // Mic-drop stays on the CTA section — no scroll, just confetti
   narration.mark('mic-drop');
   await resetCamera(page);
   resetCursor(page);
