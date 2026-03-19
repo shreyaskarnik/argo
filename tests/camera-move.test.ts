@@ -32,12 +32,13 @@ describe('buildCameraMoveFilter', () => {
     expect(buildCameraMoveFilter([noZoom], 1920, 1080, '[0:v]')).toBeNull();
   });
 
-  it('builds a crop+scale filter for a single move', () => {
+  it('builds a zoompan filter for a single move', () => {
     const result = buildCameraMoveFilter([baseMove], 1920, 1080, '[0:v]');
     expect(result).not.toBeNull();
-    expect(result!.filter).toContain('crop=');
-    expect(result!.filter).toContain('scale=1920:1080:flags=lanczos');
-    expect(result!.filter).toContain('between(t');
+    expect(result!.filter).toContain('zoompan=');
+    expect(result!.filter).toContain('s=1920x1080');
+    expect(result!.filter).toContain('fps=30');
+    expect(result!.filter).toContain('between(in_time');
     expect(result!.outputLabel).toBe('camfinal');
   });
 
@@ -63,9 +64,7 @@ describe('buildCameraMoveFilter', () => {
     const noScale = { ...baseMove, scale: undefined };
     const result = buildCameraMoveFilter([noScale], 1920, 1080, '[0:v]');
     expect(result).not.toBeNull();
-    // crop dimensions should be based on 1920/1.5 and 1080/1.5
-    expect(result!.filter).toContain(String(Math.round(1920 / 1.5)));
-    expect(result!.filter).toContain(String(Math.round(1080 / 1.5)));
+    expect(result!.filter).toContain("*0.5000");
   });
 
   it('uses the provided input label', () => {
@@ -79,7 +78,22 @@ describe('buildCameraMoveFilter', () => {
     const result = buildCameraMoveFilter([noHold], 1920, 1080, '[0:v]');
     expect(result).not.toBeNull();
     // The filter should still be valid
-    expect(result!.filter).toContain('crop=');
+    expect(result!.filter).toContain('zoompan=');
+  });
+
+  it('renames the actual last generated label when trailing moves are skipped', () => {
+    const skippedLast = { ...baseMove, startMs: 5000, scale: 1.0 };
+    const result = buildCameraMoveFilter([baseMove, skippedLast], 1920, 1080, '[0:v]');
+    expect(result).not.toBeNull();
+    expect(result!.outputLabel).toBe('camfinal');
+    expect(result!.filter).toContain('[camfinal]');
+    expect(result!.filter).not.toContain('[cam1]');
+  });
+
+  it('uses the provided fps for zoompan output cadence', () => {
+    const result = buildCameraMoveFilter([baseMove], 1920, 1080, '[0:v]', 60);
+    expect(result).not.toBeNull();
+    expect(result!.filter).toContain('fps=60');
   });
 });
 

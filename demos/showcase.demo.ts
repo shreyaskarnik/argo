@@ -120,7 +120,7 @@ test('showcase', async ({ page, narration }) => {
   // Post-export zoom into the code block — ffmpeg crop+scale, overlay-safe
   zoomTo(page, '#demo-script-card', {
     narration,
-    scale: 1.2,
+    scale: 1.35,
     duration: narration.durationFor('code', { maxMs: 7600 }),
     fadeIn: 1000,
     fadeOut: 1000,

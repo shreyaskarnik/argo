@@ -7,6 +7,7 @@ import { buildTransitionFilters } from './transitions.js';
 import { runFfmpegWithProgress } from './progress.js';
 import { buildSpeedRampFilter, type Segment } from './speed-ramp.js';
 import { buildCameraMoveFilter, type CameraMove } from './camera-move.js';
+import { getVideoFrameRate } from './media.js';
 
 export interface ExportOptions {
   demoName: string;
@@ -267,10 +268,12 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
   if (cameraMoves && cameraMoves.length > 0) {
     const frameW = (outputWidth ?? 1920) * deviceScaleFactor;
     const frameH = (outputHeight ?? 1080) * deviceScaleFactor;
-    const camFilter = buildCameraMoveFilter(cameraMoves, frameW, frameH, `[${videoSource}]`);
+    const sourceFps = getVideoFrameRate(videoPath);
+    const camFilter = buildCameraMoveFilter(cameraMoves, frameW, frameH, `[${videoSource}]`, sourceFps);
     if (camFilter) {
       filterParts.push(camFilter.filter);
       videoSource = camFilter.outputLabel;
+      console.log(`  Camera move filter applied (input: ${frameW}x${frameH} @ ${sourceFps.toFixed(2)}fps, output: [${videoSource}])`);
     }
   }
 
