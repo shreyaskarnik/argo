@@ -216,7 +216,16 @@ export: {
   crf: 16,
   transition: { type: 'fade-through-black', durationMs: 2000 },  // scene transitions
   speedRamp: { gapSpeed: 2.0, minGapMs: 500 },                   // speed up gaps between scenes
-  audio: { loudnorm: true },                                      // EBU R128 loudness normalization
+  audio: {
+    loudnorm: true,                                                // EBU R128 loudness normalization
+    music: 'assets/bg-music.mp3',                                  // background music track
+    musicVolume: 0.15,                                             // music volume (0.0-1.0)
+  },
+  watermark: {                                                     // brand bug overlay
+    src: 'assets/logo.png',
+    position: 'bottom-right',
+    opacity: 0.16,
+  },
   formats: ['gif', '9:16', '1:1'],                                // additional export formats
   variants: [                                                       // viewport-native re-recording
     { name: 'vertical', video: { width: 1080, height: 1920 } },
@@ -230,7 +239,34 @@ export: {
 - **Formats:** `1:1` (square), `9:16` (vertical), `gif` (palette-optimized animated GIF). Both `1:1` and `9:16` use **blur-fill** — the source is scaled to fit, overlaid on a blurred version of itself. No more hard crop clipping.
 - **Audio:** `audio: { loudnorm: true }` applies EBU R128 loudness normalization (-16 LUFS). Makes voiceover consistent across engines and scenes.
 - **Variants:** Re-record at different viewports for pixel-perfect multi-format. TTS runs once, then pipeline records + exports per variant. Output: `videos/<demo>-<variant>.mp4`. Much better than blur-fill for responsive content.
+- **Background music:** `audio.music` loops a track under narration at `musicVolume`, with 2-second fade-out. Or generate music from a text prompt in preview (MusicGen + WebGPU).
+- **Watermark:** `watermark: { src, position, opacity, margin }` overlays a PNG at any corner. Applied as the last video filter.
 - **Progress bar:** Export shows encoding progress automatically when duration is known
+
+### Freeze-Frame Holds
+
+Hold a specific frame for dramatic effect — add `post` array to scene entries in `.scenes.json`:
+
+```json
+{
+  "scene": "cta",
+  "post": [{ "type": "freeze", "atMs": 1800, "durationMs": 1200 }]
+}
+```
+
+`atMs` is relative to scene start. Timeline (chapters, subtitles) adjusts for inserted duration. Applied before transitions.
+
+### AI Music Generation (Preview)
+
+Generate background music from text prompts directly in `argo preview`:
+
+1. Open the "Background Music" panel in the sidebar
+2. Type a prompt or click a preset (lofi chill, corporate upbeat, ambient minimal, cinematic epic, acoustic warm)
+3. Click "Generate Music" — MusicGen runs in-browser via WebGPU
+4. Audition the clip, then "Use as BGM" to save
+5. Click Export — music is mixed under narration automatically
+
+Model (~450MB q4) downloads on first use, cached in browser. No API keys needed.
 
 ### Post-Export Camera Moves
 
