@@ -1891,8 +1891,8 @@ const PREVIEW_HTML = `<!DOCTYPE html>
         </div>
         <div class="music-duration-row">
           <span>Duration</span>
-          <input type="range" id="music-duration" min="10" max="60" value="30" step="5">
-          <span class="music-dur-label" id="music-dur-label">30s</span>
+          <input type="range" id="music-duration" min="10" max="60" value="10" step="5">
+          <span class="music-dur-label" id="music-dur-label">10s</span>
         </div>
         <button class="music-generate-btn" id="music-generate-btn">Generate Music</button>
         <div class="music-progress" id="music-progress">
