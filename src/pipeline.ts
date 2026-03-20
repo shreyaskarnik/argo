@@ -91,7 +91,7 @@ export async function runPipeline(
   mkdirSync(argoDir, { recursive: true });
 
   // Step 1: Generate TTS clips
-  console.log('★ Brewing voiceover clips...');
+  console.log('🎙️  Brewing voiceover clips...');
   const clipResults = await generateClips({
     manifestPath: `${config.demosDir}/${demoName}.scenes.json`,
     demoName,
@@ -111,7 +111,7 @@ export async function runPipeline(
   writeFileSync(sceneDurationsPath, JSON.stringify(sceneDurations, null, 2), 'utf-8');
 
   // Step 2: Record browser demo
-  console.log('★ Rolling camera...');
+  console.log('🎬 Rolling camera...');
   const { timingPath } = await record(demoName, {
     demosDir: config.demosDir,
     baseURL: config.baseURL,
@@ -161,7 +161,7 @@ export async function runPipeline(
   const headTrimMs = computeHeadTrimMs(timing);
 
   if (!isSilent) {
-    console.log('★ Mixing the soundtrack...');
+    console.log('🎧 Mixing the soundtrack...');
 
     // Load WAV clips into memory
     const clips: ClipInfo[] = clipResults.map((cr) => {
@@ -231,7 +231,7 @@ export async function runPipeline(
   writeFileSync(chapterMetadataPath, chapterMetadata, 'utf-8');
 
   // Step 4: Export final video
-  console.log('★ Cutting the final take...');
+  console.log('🎞️  Cutting the final take...');
   const exportOptions: Parameters<typeof exportVideo>[0] = {
     demoName,
     argoDir: '.argo',
@@ -298,14 +298,14 @@ export async function runPipeline(
   };
   writeFileSync(join(config.outputDir, `${demoName}.meta.json`), JSON.stringify(pipelineMeta, null, 2) + '\n', 'utf-8');
 
-  console.log(`\n✓ That's a wrap! Video saved to: ${outputPath}`);
+  console.log(`\n🚀 That's a wrap! Video saved to: ${outputPath}`);
 
   // Viewport-native variants — re-record at different viewports
   const variants = config.export.variants;
   if (variants && variants.length > 0) {
     for (const variant of variants) {
       console.log(`\n${'─'.repeat(50)}`);
-      console.log(`  Variant: ${variant.name} (${variant.video.width}×${variant.video.height})`);
+      console.log(`  📐 Variant: ${variant.name} (${variant.video.width}×${variant.video.height})`);
       console.log(`${'─'.repeat(50)}\n`);
 
       const variantArgoDir = join('.argo', `${demoName}-${variant.name}`);
@@ -320,7 +320,7 @@ export async function runPipeline(
 
       // Record at variant viewport
       const variantSubdir = `${demoName}-${variant.name}`;
-      console.log('★ Rolling camera...');
+      console.log('🎬 Rolling camera...');
       const variantRecord = await record(demoName, {
         demosDir: config.demosDir,
         baseURL: config.baseURL,
@@ -346,7 +346,7 @@ export async function runPipeline(
       let variantShiftedDurationMs = variantDurationMs;
 
       if (!isSilent) {
-        console.log('★ Mixing the soundtrack...');
+        console.log('🎧 Mixing the soundtrack...');
         const clips: ClipInfo[] = clipResults.map((cr) => {
           const wavBuf = readFileSync(cr.clipPath);
           const header = parseWavHeader(wavBuf);
@@ -371,7 +371,7 @@ export async function runPipeline(
       }
 
       // Export variant
-      console.log('★ Cutting the final take...');
+      console.log('🎞️  Cutting the final take...');
       const variantChapterPath = join('.argo', variantSubdir, 'chapters.txt');
       writeFileSync(variantChapterPath, generateChapterMetadata(variantPlacements, variantShiftedDurationMs), 'utf-8');
 
@@ -421,7 +421,7 @@ export async function runPipeline(
         cameraMoves: variantCameraMoves.length > 0 ? variantCameraMoves : undefined,
       });
 
-      console.log(`✓ Variant saved to: ${variantOutputPath}`);
+      console.log(`🚀 Variant saved to: ${variantOutputPath}`);
     }
   }
 

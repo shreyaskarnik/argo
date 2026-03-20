@@ -135,7 +135,7 @@ export async function record(demoName: string, options: RecordOptions): Promise<
             const { scene } = JSON.parse(line);
             if (scene && !seenScenes.has(scene)) {
               seenScenes.add(scene);
-              console.log(`    → ${scene}`);
+              console.log(`    🎯 ${scene}`);
             }
           }
         } catch { /* best-effort */ }
