@@ -706,6 +706,8 @@ let tokenizer = null;
 let model = null;
 
 async function loadModel() {
+  const hasWebGPU = typeof navigator !== 'undefined' && !!navigator.gpu;
+  self.postMessage({ type: 'progress', message: 'WebGPU: ' + (hasWebGPU ? 'available' : 'NOT available (using WASM)') });
   self.postMessage({ type: 'progress', message: 'Loading MusicGen tokenizer...' });
   tokenizer = await AutoTokenizer.from_pretrained('Xenova/musicgen-small');
   self.postMessage({ type: 'progress', message: 'Loading model weights (~1.8GB first time)...' });
@@ -720,18 +722,20 @@ self.onmessage = async (e) => {
   if (e.data.type === 'generate') {
     try {
       if (!model) await loadModel();
-      self.postMessage({ type: 'progress', message: 'Generating audio from prompt...' });
       const inputs = tokenizer(e.data.prompt);
       const max_length = Math.min(
         Math.max(Math.floor(e.data.durationSec * 50), 1) + 4,
         model.generation_config.max_length ?? 1500,
       );
+      self.postMessage({ type: 'progress', message: 'Generating ' + e.data.durationSec + 's (' + max_length + ' tokens)...' });
+      const t0 = performance.now();
       const output = await model.generate({
         ...inputs,
         max_length,
         guidance_scale: e.data.guidanceScale || 3,
         temperature: e.data.temperature || 1.0,
       });
+      self.postMessage({ type: 'progress', message: 'Generated in ' + ((performance.now() - t0) / 1000).toFixed(1) + 's' });
       const audioData = output.data instanceof Float32Array ? output.data : new Float32Array(output.data);
       self.postMessage({ type: 'complete', audioData, sampleRate: 32000 }, [audioData.buffer]);
     } catch (err) {
