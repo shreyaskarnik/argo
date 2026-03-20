@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdirSync, readdirSync, copyFileSync, existsSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, copyFileSync, existsSync, rmSync, writeFileSync, readFileSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { startAssetServer, type AssetServer } from './asset-server.js';
 import { loadOverlayManifest, hasImageAssets } from './overlays/manifest.js';
@@ -118,13 +118,35 @@ export async function record(demoName: string, options: RecordOptions): Promise<
     console.warn(`Warning: could not parse overlay manifest: ${(err as Error).message}`);
   }
 
+  // Progress file for live scene status during recording
+  const progressPath = path.join(argoDir, '.scene-progress.jsonl');
+  if (existsSync(progressPath)) unlinkSync(progressPath);
+
   try {
     return await new Promise<RecordResult>((resolve, reject) => {
+      // Poll the progress file to print scene names as they're recorded
+      const seenScenes = new Set<string>();
+      const progressPoll = setInterval(() => {
+        try {
+          if (!existsSync(progressPath)) return;
+          const lines = readFileSync(progressPath, 'utf-8').trim().split('\n');
+          for (const line of lines) {
+            if (!line) continue;
+            const { scene } = JSON.parse(line);
+            if (scene && !seenScenes.has(scene)) {
+              seenScenes.add(scene);
+              console.log(`    → ${scene}`);
+            }
+          }
+        } catch { /* best-effort */ }
+      }, 500);
+
       execFile('npx', ['playwright', 'test', '--config', recordConfigPath, '--grep', demoName, '--project', 'demos'], {
         env: {
           ...process.env,
           ARGO_DEMO_NAME: demoName,
           ARGO_OUTPUT_DIR: argoDir,
+          ARGO_PROGRESS_PATH: progressPath,
           BASE_URL: options.baseURL,
           ARGO_ASSET_URL: assetServer?.url ?? '',
           ARGO_AUTO_BACKGROUND: options.autoBackground ? '1' : '',
@@ -133,6 +155,7 @@ export async function record(demoName: string, options: RecordOptions): Promise<
           ARGO_OVERLAYS_PATH: path.resolve(path.join(options.demosDir, `${demoName}.scenes.json`)),
         },
       }, (error, stdout, stderr) => {
+        clearInterval(progressPoll);
         // When DEBUG env vars are set (e.g., DEBUG=pw:api), forward Playwright's
         // debug output to stderr so users can see it even on success.
         if (process.env.DEBUG && stderr) {

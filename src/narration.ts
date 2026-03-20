@@ -1,3 +1,4 @@
+import { appendFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { schedulePlacements, type Placement } from './tts/align.js';
@@ -38,8 +39,19 @@ export class NarrationTimeline {
     if (this.timings.has(scene)) {
       throw new Error(`Duplicate scene name: "${scene}"`);
     }
-    this.timings.set(scene, Date.now() - this.startTime);
+    const ms = Date.now() - this.startTime;
+    this.timings.set(scene, ms);
     this.cachedPlacements = null;
+
+    // Append to JSONL progress file for live scene status in the parent process
+    const progressPath = process.env.ARGO_PROGRESS_PATH;
+    if (progressPath) {
+      try {
+        appendFileSync(progressPath, JSON.stringify({ scene, ms }) + '\n');
+      } catch {
+        // Best-effort — don't fail recording over progress reporting
+      }
+    }
   }
 
   /**
