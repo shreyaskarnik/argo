@@ -711,6 +711,7 @@ async function loadModel() {
   self.postMessage({ type: 'progress', message: 'Loading model weights (~1.8GB first time)...' });
   model = await MusicgenForConditionalGeneration.from_pretrained('Xenova/musicgen-small', {
     dtype: { text_encoder: 'q8', decoder_model_merged: 'q8', encodec_decode: 'fp32' },
+    device: 'webgpu',
   });
   self.postMessage({ type: 'progress', message: 'Model loaded.' });
 }
