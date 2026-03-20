@@ -97,9 +97,10 @@ test('showcase', async ({ page, narration }) => {
   await page.waitForTimeout(400);
   await withOverlay(page, 'export', async () => {
     const totalMs = narration.durationFor('export', { maxMs: 9800 }) - 400;
-    const beat = Math.floor(totalMs / 6);
+    const beat = Math.floor(totalMs / 7);
     await focusRing(page, '#export-transitions', { color: '#60a5fa', duration: beat, wait: true });
     await focusRing(page, '#export-audio', { color: '#22d3ee', duration: beat, wait: true });
+    await focusRing(page, '#export-musicgen', { color: '#e879f9', duration: beat, wait: true });
     await focusRing(page, '#export-watermark', { color: '#a78bfa', duration: beat, wait: true });
     await focusRing(page, '#export-freeze', { color: '#f59e0b', duration: beat, wait: true });
     await focusRing(page, '#export-metadata', { color: '#4ade80', duration: beat, wait: true });
