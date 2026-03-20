@@ -22,6 +22,7 @@ import { generateChapterMetadata } from './chapters.js';
 import { exportVideo, checkFfmpeg } from './export.js';
 import { applySpeedRampToTimeline } from './speed-ramp.js';
 import { shiftCameraMoves, scaleCameraMoves, type CameraMove } from './camera-move.js';
+import { resolveFreezes, adjustPlacementsForFreezes, totalFreezeDurationMs, type FreezeSpec } from './freeze.js';
 
 export interface PreviewExportConfig {
   preset?: string;
@@ -621,6 +622,30 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             writeFileSync(join(outputDir, `${demoName}.vtt`), generateVtt(finalPlacements, sceneTexts), 'utf-8');
           } catch { /* subtitles are best-effort */ }
 
+          // Resolve freeze-frame holds from scenes manifest
+          const previewFreezeSpecs: FreezeSpec[] = [];
+          for (const entry of scenes) {
+            if (!entry.scene || !Array.isArray(entry.post)) continue;
+            for (const effect of entry.post) {
+              if (effect.type === 'freeze' && typeof effect.atMs === 'number' && typeof effect.durationMs === 'number') {
+                previewFreezeSpecs.push({ scene: entry.scene, atMs: effect.atMs, durationMs: effect.durationMs });
+              }
+            }
+          }
+          const previewResolvedFreezes = resolveFreezes(previewFreezeSpecs, finalPlacements);
+          let freezeAdjustedPlacements = finalPlacements;
+          let freezeAdjustedDurationMs = finalDurationMs;
+          if (previewResolvedFreezes.length > 0) {
+            freezeAdjustedPlacements = adjustPlacementsForFreezes(finalPlacements, previewResolvedFreezes);
+            freezeAdjustedDurationMs += totalFreezeDurationMs(previewResolvedFreezes);
+            // Regenerate chapters/subtitles with freeze-adjusted timing
+            writeFileSync(chapterMetadataPath, generateChapterMetadata(freezeAdjustedPlacements, freezeAdjustedDurationMs), 'utf-8');
+            try {
+              writeFileSync(join(outputDir, `${demoName}.srt`), generateSrt(freezeAdjustedPlacements, sceneTexts), 'utf-8');
+              writeFileSync(join(outputDir, `${demoName}.vtt`), generateVtt(freezeAdjustedPlacements, sceneTexts), 'utf-8');
+            } catch { /* best-effort */ }
+          }
+
           // Read camera moves if recorded by zoomTo with narration option
           let cameraMoves: CameraMove[] | undefined;
           const cameraMovesPath = join(demoDir, '.timing.camera-moves.json');
@@ -648,8 +673,8 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             chapterMetadataPath,
             formats: ec?.formats,
             transition: ec?.transition,
-            placements: finalPlacements,
-            totalDurationMs: finalDurationMs,
+            placements: freezeAdjustedPlacements,
+            totalDurationMs: freezeAdjustedDurationMs,
             headTrimMs: headTrimMs > 0 ? headTrimMs : undefined,
             speedRampSegments,
             loudnorm: ec?.loudnorm,
@@ -657,6 +682,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             musicVolume: ec?.musicVolume,
             cameraMoves,
             watermark: ec?.watermark,
+            freezeSpecs: previewResolvedFreezes.length > 0 ? previewResolvedFreezes : undefined,
           });
 
           // Switch to serving the new MP4

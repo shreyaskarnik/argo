@@ -411,6 +411,13 @@ export async function runPipeline(
         variantShiftedDurationMs = variantDurationMs - variantHeadTrimMs;
       }
 
+      // Resolve freeze-frame holds for variant
+      const variantResolvedFreezes = resolveFreezes(freezeSpecs, variantPlacements);
+      if (variantResolvedFreezes.length > 0) {
+        variantPlacements = adjustPlacementsForFreezes(variantPlacements, variantResolvedFreezes);
+        variantShiftedDurationMs += totalFreezeDurationMs(variantResolvedFreezes);
+      }
+
       // Export variant
       console.log('🎞️  Cutting the final take...');
       const variantChapterPath = join('.argo', variantSubdir, 'chapters.txt');
@@ -463,6 +470,7 @@ export async function runPipeline(
         musicVolume: config.export.audio?.musicVolume,
         cameraMoves: variantCameraMoves.length > 0 ? variantCameraMoves : undefined,
         watermark: config.export.watermark,
+        freezeSpecs: variantResolvedFreezes.length > 0 ? variantResolvedFreezes : undefined,
       });
 
       console.log(`🚀 Variant saved to: ${variantOutputPath}`);

@@ -439,7 +439,12 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     args.push('-c:v:1', 'png', '-disposition:v:1', 'attached_pic');
     // Skip -shortest: the PNG has 0 duration and would truncate the whole output.
   } else if (hasAnyAudio) {
-    args.push('-shortest');
+    // Skip -shortest when freeze-frame holds extend the video beyond the audio.
+    // Freezes intentionally make video longer; -shortest would truncate back.
+    const hasFreezes = freezeSpecs && freezeSpecs.length > 0;
+    if (!hasFreezes) {
+      args.push('-shortest');
+    }
   }
 
   args.push('-y', outputPath);

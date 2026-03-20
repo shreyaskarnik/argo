@@ -25,6 +25,7 @@ import { generateChapterMetadata } from './chapters.js';
 import { generateSrt, generateVtt } from './subtitles.js';
 import { applySpeedRampToTimeline, type Segment } from './speed-ramp.js';
 import { shiftCameraMoves, scaleCameraMoves, type CameraMove } from './camera-move.js';
+import { resolveFreezes, adjustPlacementsForFreezes, totalFreezeDurationMs, type FreezeSpec } from './freeze.js';
 import type { Placement } from './tts/align.js';
 
 function validateDemoName(name: string): string {
@@ -119,6 +120,7 @@ export function createProgram(): Command {
       let totalDurationMs: number | undefined;
       let headTrimMs: number | undefined;
       let speedRampSegments: Segment[] | undefined;
+      let resolvedFreezes: import('./freeze.js').ResolvedFreeze[] = [];
 
       if (existsSync(timingPath) && existsSync(manifestPath)) {
         const timing = JSON.parse(readFileSync(timingPath, 'utf-8')) as Record<string, number>;
@@ -147,6 +149,22 @@ export function createProgram(): Command {
         totalDurationMs = speedRampPlan.totalDurationMs;
         speedRampSegments = speedRampPlan.segments;
         headTrimMs = computedHeadTrimMs > 0 ? computedHeadTrimMs : undefined;
+
+        // Resolve freeze-frame holds from manifest
+        const cliFreeze: FreezeSpec[] = [];
+        for (const entry of manifestEntries) {
+          if (!entry.scene || !Array.isArray((entry as any).post)) continue;
+          for (const effect of (entry as any).post) {
+            if (effect.type === 'freeze' && typeof effect.atMs === 'number' && typeof effect.durationMs === 'number') {
+              cliFreeze.push({ scene: entry.scene, atMs: effect.atMs, durationMs: effect.durationMs });
+            }
+          }
+        }
+        const resolvedFreezes = resolveFreezes(cliFreeze, placements);
+        if (resolvedFreezes.length > 0) {
+          placements = adjustPlacementsForFreezes(placements, resolvedFreezes);
+          totalDurationMs += totalFreezeDurationMs(resolvedFreezes);
+        }
 
         chapterMetadataPath = `${demoDir}/chapters.txt`;
         writeFileSync(chapterMetadataPath, generateChapterMetadata(placements, totalDurationMs), 'utf-8');
@@ -197,6 +215,7 @@ export function createProgram(): Command {
           return undefined;
         })(),
         watermark: config.export.watermark,
+        freezeSpecs: resolvedFreezes.length > 0 ? resolvedFreezes : undefined,
       });
     });
 
@@ -375,6 +394,7 @@ export function createProgram(): Command {
           loudnorm: config.export.audio?.loudnorm,
           musicPath: config.export.audio?.music,
           musicVolume: config.export.audio?.musicVolume,
+          watermark: config.export.watermark,
         },
       });
       console.log(`\nArgo Preview running at: ${url}`);
