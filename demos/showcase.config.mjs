@@ -18,6 +18,12 @@ export default defineConfig({
     // speedRamp: { gapSpeed: 2.0, minGapMs: 600 },  // disabled for now — conflicts with transitions
     formats: ['gif'],
     audio: { loudnorm: true },
+    watermark: {
+      src: 'assets/logo-watermark.png',
+      position: 'bottom-right',
+      opacity: 0.16,
+      margin: 26,
+    },
     // variants: [
     //   { name: 'vertical', video: { width: 1080, height: 1920 } },
     //   { name: 'square',   video: { width: 1080, height: 1080 } },

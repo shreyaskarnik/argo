@@ -96,13 +96,14 @@ test('showcase', async ({ page, narration }) => {
   await page.locator('#export-stack').scrollIntoViewIfNeeded();
   await page.waitForTimeout(400);
   await withOverlay(page, 'export', async () => {
-    const totalMs = narration.durationFor('export', { maxMs: 9000 }) - 400;
-    const beat = Math.floor(totalMs / 5);
-    await focusRing(page, '#export-config', { color: '#60a5fa', duration: beat, wait: true });
-    await focusRing(page, '#export-transitions', { color: '#22d3ee', duration: beat, wait: true });
-    await focusRing(page, '#export-speed-ramp', { color: '#a78bfa', duration: beat, wait: true });
-    await focusRing(page, '#export-formats', { color: '#4ade80', duration: beat, wait: true });
-    await focusRing(page, '#export-report', { color: '#f59e0b', duration: beat, wait: true });
+    const totalMs = narration.durationFor('export', { maxMs: 9800 }) - 400;
+    const beat = Math.floor(totalMs / 6);
+    await focusRing(page, '#export-transitions', { color: '#60a5fa', duration: beat, wait: true });
+    await focusRing(page, '#export-audio', { color: '#22d3ee', duration: beat, wait: true });
+    await focusRing(page, '#export-watermark', { color: '#a78bfa', duration: beat, wait: true });
+    await focusRing(page, '#export-freeze', { color: '#f59e0b', duration: beat, wait: true });
+    await focusRing(page, '#export-metadata', { color: '#4ade80', duration: beat, wait: true });
+    await focusRing(page, '#export-formats', { color: '#fb7185', duration: beat, wait: true });
   });
 
   narration.mark('ops');

@@ -1015,7 +1015,7 @@
           </div>
           <div class="preview-scene">
             <strong>export</strong>
-            <span>Confirm transitions, timing, and output feel right.</span>
+            <span>Confirm transitions, watermark, freeze frame, and output feel right.</span>
           </div>
           <div class="preview-chip-row" style="margin-top: 12px;">
             <span class="preview-chip" id="preview-regen">regen line</span>
@@ -1113,7 +1113,7 @@
       <p class="section-label">Export Stack</p>
       <h2 class="section-title">Argo export is more than just a video export.</h2>
       <p class="section-subtitle">
-        Smart and agile — transitions, gap compression, subtitles, chapters, reports, and multiple formats from the same timeline. One pipeline run, everything you need to ship.
+        This is where the finishing happens. Transitions, background music, watermarking, freeze-frame holds, subtitles, chapters, reports, and social formats all come from the same timeline.
       </p>
 
       <div class="feature-card" id="export-config" data-demo-target="export-config" style="margin-bottom: 20px;">
@@ -1121,7 +1121,8 @@
         <div class="snippet">
           <span class="k">export</span><span class="p">:</span> <span class="p">{</span><br />
           &nbsp;&nbsp;<span class="n">transition</span><span class="p">:</span> <span class="p">{</span> <span class="n">type</span><span class="p">:</span> <span class="s">'fade-through-black'</span><span class="p">,</span> <span class="n">durationMs</span><span class="p">:</span> <span class="n">2000</span> <span class="p">},</span><br />
-          &nbsp;&nbsp;<span class="n">speedRamp</span><span class="p">:</span> <span class="p">{</span> <span class="n">gapSpeed</span><span class="p">:</span> <span class="n">2.0</span><span class="p">,</span> <span class="n">minGapMs</span><span class="p">:</span> <span class="n">600</span> <span class="p">},</span><br />
+          &nbsp;&nbsp;<span class="n">audio</span><span class="p">:</span> <span class="p">{</span> <span class="n">music</span><span class="p">:</span> <span class="s">'assets/bg-music.mp3'</span><span class="p">,</span> <span class="n">musicVolume</span><span class="p">:</span> <span class="n">0.15</span> <span class="p">},</span><br />
+          &nbsp;&nbsp;<span class="n">watermark</span><span class="p">:</span> <span class="p">{</span> <span class="n">src</span><span class="p">:</span> <span class="s">'assets/logo-watermark.png'</span><span class="p">,</span> <span class="n">opacity</span><span class="p">:</span> <span class="n">0.16</span> <span class="p">},</span><br />
           &nbsp;&nbsp;<span class="n">formats</span><span class="p">:</span> <span class="p">[</span><span class="s">'gif'</span><span class="p">,</span> <span class="s">'1:1'</span><span class="p">,</span> <span class="s">'9:16'</span><span class="p">]</span><br />
           <span class="p">}</span>
         </div>
@@ -1133,25 +1134,25 @@
           <h3 class="feature-name">fade-through-black, dissolve, wipes</h3>
           <p class="feature-desc">Scene boundaries read like editorial choices instead of hard test cuts.</p>
         </div>
-        <div class="feature-card" id="export-speed-ramp" data-demo-target="export-speed-ramp">
-          <div class="feature-kicker">Speed ramp</div>
-          <h3 class="feature-name">Compress the boring gaps</h3>
-          <p class="feature-desc">Let the showcase breathe on important beats and move faster through setup or navigation dead time.</p>
+        <div class="feature-card" id="export-audio" data-demo-target="export-audio">
+          <div class="feature-kicker">Audio</div>
+          <h3 class="feature-name">Narration plus a music bed</h3>
+          <p class="feature-desc">Layer a low background track under voiceover, loop it to fill the cut, and normalize the final mix.</p>
         </div>
-        <div class="feature-card" id="export-subtitles" data-demo-target="export-subtitles">
-          <div class="feature-kicker">Subtitles</div>
-          <h3 class="feature-name">SRT + VTT</h3>
-          <p class="feature-desc">Shipped alongside the MP4 for docs, embeds, and accessibility-friendly delivery.</p>
+        <div class="feature-card" id="export-watermark" data-demo-target="export-watermark">
+          <div class="feature-kicker">Watermark</div>
+          <h3 class="feature-name">Brand every export</h3>
+          <p class="feature-desc">Stamp a subtle PNG logo into any corner without touching the product UI or the recording script.</p>
         </div>
-        <div class="feature-card" id="export-chapters" data-demo-target="export-chapters">
-          <div class="feature-kicker">Chapters</div>
-          <h3 class="feature-name">Skip between feature beats</h3>
-          <p class="feature-desc">Scene markers turn your demo into a structured asset instead of a single flat video blob.</p>
+        <div class="feature-card" id="export-freeze" data-demo-target="export-freeze">
+          <div class="feature-kicker">Freeze frame</div>
+          <h3 class="feature-name">Hold the hero moment</h3>
+          <p class="feature-desc">Insert a deliberate frame hold from the manifest when a launch beat or CTA deserves extra weight.</p>
         </div>
-        <div class="feature-card" id="export-report" data-demo-target="export-report">
-          <div class="feature-kicker">Scene report</div>
-          <h3 class="feature-name">Timing you can inspect</h3>
-          <p class="feature-desc">See real scene durations, trims, and export timings after every run.</p>
+        <div class="feature-card" id="export-metadata" data-demo-target="export-metadata">
+          <div class="feature-kicker">Delivery metadata</div>
+          <h3 class="feature-name">Subtitles, chapters, scene report</h3>
+          <p class="feature-desc">Ship the MP4 with structure: SRT and VTT files, embedded chapter markers, and a scene report you can inspect after every run.</p>
         </div>
         <div class="feature-card" id="export-formats" data-demo-target="export-formats">
           <div class="feature-kicker">Formats</div>
@@ -1159,9 +1160,9 @@
           <p class="feature-desc">One recording pass can serve the homepage, docs, internal updates, and social channels without making separate demos.</p>
         </div>
         <div class="feature-card" id="export-mobile" data-demo-target="export-mobile">
-          <div class="feature-kicker">Mobile</div>
-          <h3 class="feature-name"><span class="inline-code">isMobile</span> + <span class="inline-code">hasTouch</span></h3>
-          <p class="feature-desc">Record mobile viewports with touch emulation. Same demo script, different device config.</p>
+          <div class="feature-kicker">Viewport-native</div>
+          <h3 class="feature-name">Square and vertical rerenders</h3>
+          <p class="feature-desc">When you need a real `1:1` or `9:16` cut, Argo can rerender the same demo at that viewport instead of just blur-filling the sides.</p>
         </div>
       </div>
 
@@ -1176,9 +1177,11 @@
           <span>showcase.mp4</span>
         </div>
         <div class="pill-row" style="margin-top: 18px;">
+          <span class="pill">music bed</span>
+          <span class="pill">watermark</span>
+          <span class="pill">freeze frame</span>
           <span class="pill">subtitles</span>
           <span class="pill">chapters</span>
-          <span class="pill">scene report</span>
           <span class="pill">multi-format</span>
           <span class="pill">progress bar</span>
         </div>

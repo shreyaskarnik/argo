@@ -75,13 +75,13 @@
   },
   {
     "scene": "export",
-    "text": "Export does more than encode. Argo adds transitions between scenes, compresses dead time with speed ramp, writes subtitles and chapters, renders gif alongside the MP4, and records mobile viewports with touch emulation.",
+    "text": "Export is where the polish lands. Add transitions, mix a background music bed under narration, stamp a watermark, freeze a hero frame, and ship subtitles, chapters, reports, and social formats from the same timeline.",
     "speed": 0.92,
     "overlay": {
       "type": "headline-card",
       "kicker": "EXPORT",
       "title": "Smart export, not just encoding.",
-      "body": "Transitions, speed ramp, subtitles, chapters, GIF — one timeline.",
+      "body": "Transitions, music, watermark, freeze-frame, chapters, formats — one timeline.",
       "placement": "top-right",
       "motion": "slide-in",
       "autoBackground": true
@@ -135,6 +135,13 @@
       "placement": "top-left",
       "motion": "fade-in",
       "autoBackground": true
-    }
+    },
+    "post": [
+      {
+        "type": "freeze",
+        "atMs": 900,
+        "durationMs": 700
+      }
+    ]
   }
 ]
