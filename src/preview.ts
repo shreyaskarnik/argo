@@ -722,11 +722,13 @@ self.onmessage = async (e) => {
       if (!model) await loadModel();
       self.postMessage({ type: 'progress', message: 'Generating audio from prompt...' });
       const inputs = tokenizer(e.data.prompt);
-      const maxTokens = Math.ceil(e.data.durationSec * 50);
+      const max_length = Math.min(
+        Math.max(Math.floor(e.data.durationSec * 50), 1) + 4,
+        model.generation_config.max_length ?? 1500,
+      );
       const output = await model.generate({
         ...inputs,
-        max_new_tokens: maxTokens,
-        do_sample: true,
+        max_length,
         guidance_scale: e.data.guidanceScale || 3,
         temperature: e.data.temperature || 1.0,
       });
