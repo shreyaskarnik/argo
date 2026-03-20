@@ -125,14 +125,22 @@ describePreview('preview server', () => {
     expect(html).toContain('previewScene');
     expect(html).toContain('Scene scrub');
     expect(html).toContain('data-field="scene-scrub"');
+    expect(html).toContain('id="music-include"');
+    expect(html).toContain('id="music-volume"');
   });
 
   it('serves /api/data with timing, voiceover, overlays', async () => {
     const { argoDir, demosDir } = await scaffoldDemo(dir, 'test-demo');
+    await mkdir(join(argoDir, 'test-demo', 'music'), { recursive: true });
+    writeFileSync(join(argoDir, 'test-demo', 'music', 'bgm.wav'), Buffer.from('fake-bgm'));
     const server = await startPreviewServer({
       demoName: 'test-demo',
       argoDir,
       demosDir,
+      exportConfig: {
+        musicPath: 'assets/config-music.mp3',
+        musicVolume: 0.12,
+      },
     });
     close = server.close;
 
@@ -147,6 +155,12 @@ describePreview('preview server', () => {
     expect(data.sceneDurations).toEqual({ welcome: 1800, feature: 2400, closing: 1500 });
     expect(data.renderedOverlays).toHaveProperty('welcome');
     expect(data.renderedOverlays.welcome.html).toContain('Welcome');
+    expect(data.bgm).toEqual({
+      hasGenerated: true,
+      hasConfig: true,
+      include: true,
+      volume: 0.12,
+    });
   });
 
   it('serves /video using the preview video artifact', async () => {

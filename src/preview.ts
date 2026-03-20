@@ -81,6 +81,13 @@ interface PreviewData {
   renderedOverlays: Record<string, { html: string; styles: Record<string, string>; zone: Zone }>;
   /** Pipeline metadata from last recording (voices, resolution, engine). */
   pipelineMeta: Record<string, unknown> | null;
+  /** Preview-only background music state. */
+  bgm: {
+    hasGenerated: boolean;
+    hasConfig: boolean;
+    include: boolean;
+    volume: number;
+  };
 }
 
 const MIME_TYPES: Record<string, string> = {
@@ -210,7 +217,14 @@ function createSceneReportFromPlacements(
   };
 }
 
-function loadPreviewData(demoName: string, argoDir: string, demosDir: string, outputDir: string = 'videos'): PreviewData {
+function loadPreviewData(
+  demoName: string,
+  argoDir: string,
+  demosDir: string,
+  outputDir: string = 'videos',
+  exportConfig?: PreviewExportConfig,
+  activeMusicPath?: string,
+): PreviewData {
   const demoDir = join(argoDir, demoName);
 
   // Required files
@@ -268,8 +282,27 @@ function loadPreviewData(demoName: string, argoDir: string, demosDir: string, ou
 
   // Pipeline metadata (reuse meta loaded above for headTrimMs)
   const pipelineMeta = Object.keys(meta).length > 0 ? meta as Record<string, unknown> : null;
+  const hasGenerated = Boolean(activeMusicPath && existsSync(activeMusicPath));
+  const hasConfig = Boolean(exportConfig?.musicPath);
+  const bgm = {
+    hasGenerated,
+    hasConfig,
+    include: hasGenerated || hasConfig,
+    volume: exportConfig?.musicVolume ?? 0.15,
+  };
 
-  return { demoName, timing, voiceover, overlays, effects, sceneDurations, sceneReport, renderedOverlays, pipelineMeta };
+  return {
+    demoName,
+    timing,
+    voiceover,
+    overlays,
+    effects,
+    sceneDurations,
+    sceneReport,
+    renderedOverlays,
+    pipelineMeta,
+    bgm,
+  };
 }
 
 /** List WAV clip files available for a demo. */
@@ -427,7 +460,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
       // --- API routes ---
 
       if (url === '/api/data') {
-        const data = loadPreviewData(demoName, argoDir, demosDir, outputDir);
+        const data = loadPreviewData(demoName, argoDir, demosDir, outputDir, options.exportConfig, activeMusicPath);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(data));
         return;
@@ -492,7 +525,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
           writeFileSync(scenesPath, JSON.stringify(scenes, null, 2) + '\n', 'utf-8');
         }
         // Reload and re-render overlays
-        const data = loadPreviewData(demoName, argoDir, demosDir, outputDir);
+        const data = loadPreviewData(demoName, argoDir, demosDir, outputDir, options.exportConfig, activeMusicPath);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, changed, renderedOverlays: data.renderedOverlays }));
         return;
@@ -572,6 +605,10 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
         res.writeHead(200, { 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked' });
         try {
           checkFfmpeg();
+          const chunks: Buffer[] = [];
+          for await (const chunk of req) chunks.push(chunk as Buffer);
+          const bodyText = Buffer.concat(chunks).toString('utf-8').trim();
+          const body = bodyText ? JSON.parse(bodyText) as { includeBgm?: boolean; musicVolume?: number } : {};
 
           // Refresh aligned audio from current clips + timing
           const refreshed = refreshPreviewAudioArtifacts(demoName, argoDir, demosDir, options.ttsDefaults);
@@ -616,6 +653,11 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
           // Apply speed ramp to timeline if configured (must happen before
           // chapters/subtitles/export so all artifacts reflect ramped timing)
           const ec = options.exportConfig;
+          const includeBgm = body.includeBgm !== false;
+          const requestedMusicVolume = typeof body.musicVolume === 'number' && Number.isFinite(body.musicVolume)
+            ? Math.max(0, Math.min(1, body.musicVolume))
+            : (ec?.musicVolume ?? 0.15);
+          const exportMusicPath = includeBgm ? (activeMusicPath ?? ec?.musicPath) : undefined;
           const rampResult = applySpeedRampToTimeline(placements, shiftedDurationMs, ec?.speedRamp);
           const finalPlacements = rampResult.placements;
           const finalDurationMs = rampResult.totalDurationMs;
@@ -684,8 +726,8 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             headTrimMs: headTrimMs > 0 ? headTrimMs : undefined,
             speedRampSegments,
             loudnorm: ec?.loudnorm,
-            musicPath: activeMusicPath ?? ec?.musicPath,
-            musicVolume: ec?.musicVolume,
+            musicPath: exportMusicPath,
+            musicVolume: requestedMusicVolume,
             cameraMoves,
             watermark: ec?.watermark,
             freezeSpecs: previewResolvedFreezes.length > 0 ? previewResolvedFreezes : undefined,
@@ -710,37 +752,111 @@ import { AutoTokenizer, MusicgenForConditionalGeneration } from 'https://cdn.jsd
 
 let tokenizer = null;
 let model = null;
+let backend = null;
 
-async function loadModel() {
+const WEBGPU_DTYPE = {
+  text_encoder: 'fp32',
+  decoder_model_merged: 'fp32',
+  encodec_decode: 'fp32',
+};
+
+const WASM_DTYPE = {
+  text_encoder: 'q8',
+  decoder_model_merged: 'q8',
+  encodec_decode: 'fp32',
+};
+
+async function ensureTokenizer() {
+  if (tokenizer) return;
   self.postMessage({ type: 'progress', message: 'Loading MusicGen tokenizer...' });
   tokenizer = await AutoTokenizer.from_pretrained('Xenova/musicgen-small');
-  self.postMessage({ type: 'progress', message: 'Loading model weights (~1.8GB first time)...' });
+}
+
+async function loadModel(preferredBackend = 'webgpu') {
+  await ensureTokenizer();
+
+  if (preferredBackend === 'webgpu' && typeof navigator !== 'undefined' && 'gpu' in navigator) {
+    try {
+      self.postMessage({ type: 'progress', message: 'Loading model weights with WebGPU (~1.8GB first time)...' });
+      model = await MusicgenForConditionalGeneration.from_pretrained('Xenova/musicgen-small', {
+        dtype: WEBGPU_DTYPE,
+        device: 'webgpu',
+      });
+      backend = 'webgpu';
+      self.postMessage({ type: 'progress', message: 'Model loaded (WebGPU).' });
+      return;
+    } catch (err) {
+      self.postMessage({
+        type: 'progress',
+        message: 'WebGPU init failed, falling back to CPU/WASM...',
+      });
+      model = null;
+      backend = null;
+    }
+  }
+
+  self.postMessage({ type: 'progress', message: 'Loading model weights on CPU/WASM...' });
   model = await MusicgenForConditionalGeneration.from_pretrained('Xenova/musicgen-small', {
-    dtype: { text_encoder: 'q8', decoder_model_merged: 'q8', encodec_decode: 'fp32' },
-    device: 'webgpu',
+    dtype: WASM_DTYPE,
   });
-  self.postMessage({ type: 'progress', message: 'Model loaded.' });
+  backend = 'wasm';
+  self.postMessage({ type: 'progress', message: 'Model loaded (CPU/WASM).' });
+}
+
+function shouldRetryOnWasm(err) {
+  const msg = err?.message || String(err);
+  return backend === 'webgpu' && /(OrtRun|webgpu|TensorShape|Cannot reduce shape|ERROR_CODE:\\s*1)/i.test(msg);
+}
+
+async function generateAudio(prompt, durationSec, guidanceScale, temperature) {
+  if (!model) await loadModel();
+
+  const inputs = tokenizer(prompt);
+  const maxNewTokens = Math.ceil(durationSec * 50);
+
+  try {
+    return await model.generate({
+      ...inputs,
+      max_new_tokens: maxNewTokens,
+      do_sample: true,
+      guidance_scale: guidanceScale,
+      temperature,
+    });
+  } catch (err) {
+    if (!shouldRetryOnWasm(err)) throw err;
+
+    self.postMessage({
+      type: 'progress',
+      message: 'WebGPU generation failed, retrying on CPU/WASM...',
+    });
+    model = null;
+    await loadModel('wasm');
+    return await model.generate({
+      ...inputs,
+      max_new_tokens: maxNewTokens,
+      do_sample: true,
+      guidance_scale: guidanceScale,
+      temperature,
+    });
+  }
 }
 
 self.onmessage = async (e) => {
   if (e.data.type === 'generate') {
     try {
-      if (!model) await loadModel();
-      const inputs = tokenizer(e.data.prompt);
-      const max_length = Math.min(
-        Math.max(Math.floor(e.data.durationSec * 50), 1) + 4,
-        model.generation_config.max_length ?? 1500,
+      const durationSec = e.data.durationSec || 30;
+      const guidanceScale = e.data.guidanceScale || 3;
+      const temperature = e.data.temperature || 1.0;
+      self.postMessage({ type: 'progress', message: 'Generating ' + durationSec + 's of music...' });
+      const output = await generateAudio(
+        e.data.prompt,
+        durationSec,
+        guidanceScale,
+        temperature,
       );
-      self.postMessage({ type: 'progress', message: 'Generating ' + e.data.durationSec + 's of music...' });
-      const output = await model.generate({
-        ...inputs,
-        max_length,
-        do_sample: true,
-        guidance_scale: e.data.guidanceScale || 3,
-        temperature: e.data.temperature || 1.0,
-      });
       const audioData = output.data instanceof Float32Array ? output.data : new Float32Array(output.data);
-      self.postMessage({ type: 'complete', audioData, sampleRate: 32000 }, [audioData.buffer]);
+      const sampleRate = model?.config?.audio_encoder?.sampling_rate || 32000;
+      self.postMessage({ type: 'complete', audioData, sampleRate }, [audioData.buffer]);
     } catch (err) {
       self.postMessage({ type: 'error', message: err.message || String(err) });
     }
@@ -813,7 +929,7 @@ self.onmessage = async (e) => {
 
       // Root — serve the preview HTML
       if (url === '/' || url === '/index.html') {
-        const data = loadPreviewData(demoName, argoDir, demosDir, outputDir);
+        const data = loadPreviewData(demoName, argoDir, demosDir, outputDir, options.exportConfig, activeMusicPath);
         const html = getPreviewHtml(data);
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end(html);
@@ -1306,6 +1422,35 @@ const PREVIEW_HTML = `<!DOCTYPE html>
     flex: 1;
     accent-color: var(--accent);
   }
+  .music-option-row,
+  .music-volume-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .music-option-row {
+    justify-content: space-between;
+  }
+  .music-volume-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+  }
+  .music-volume-value {
+    min-width: 40px;
+    text-align: right;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+  }
+  .music-help {
+    margin-bottom: 10px;
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
   .music-duration-row .music-dur-label {
     min-width: 32px;
     text-align: right;
@@ -1755,6 +1900,16 @@ const PREVIEW_HTML = `<!DOCTYPE html>
           <div class="music-progress-text" id="music-progress-text"></div>
         </div>
         <audio class="music-audio-player" id="music-audio" controls></audio>
+        <div class="music-option-row">
+          <label for="music-include">Include in export</label>
+          <input type="checkbox" id="music-include">
+        </div>
+        <div class="music-volume-row">
+          <label for="music-volume">Music volume</label>
+          <input type="range" id="music-volume" min="0" max="0.30" value="0.15" step="0.01">
+          <span class="music-volume-value" id="music-volume-label">0.15</span>
+        </div>
+        <div class="music-help" id="music-help">Preview export mixes background music at a fixed low level. No re-record needed.</div>
         <button class="music-save-btn" id="music-save-btn">Use as BGM</button>
         <div class="music-status" id="music-status"></div>
       </div>
@@ -2959,7 +3114,16 @@ document.getElementById('btn-export').addEventListener('click', async () => {
   stopAudio();
   showPlayIcon();
   try {
-    const resp = await fetch('/api/export', { method: 'POST' });
+    const musicInclude = document.getElementById('music-include');
+    const musicVolume = document.getElementById('music-volume');
+    const resp = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        includeBgm: musicInclude ? musicInclude.checked : true,
+        musicVolume: musicVolume ? Number(musicVolume.value) : undefined,
+      }),
+    });
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
     overlay.classList.add('success');
@@ -3101,10 +3265,27 @@ if (DATA.pipelineMeta) {
   const musicProgressFill = document.getElementById('music-progress-fill');
   const musicProgressText = document.getElementById('music-progress-text');
   const musicAudio = document.getElementById('music-audio');
+  const musicInclude = document.getElementById('music-include');
+  const musicVolume = document.getElementById('music-volume');
+  const musicVolumeLabel = document.getElementById('music-volume-label');
+  const musicHelp = document.getElementById('music-help');
   const musicSaveBtn = document.getElementById('music-save-btn');
   const musicStatus = document.getElementById('music-status');
 
   let generatedWavBlob = null;
+  let hasGeneratedBgm = DATA.bgm?.hasGenerated ?? false;
+  const hasConfigBgm = DATA.bgm?.hasConfig ?? false;
+
+  function updateMusicVolumeLabel() {
+    musicVolumeLabel.textContent = Number(musicVolume.value).toFixed(2);
+  }
+
+  function updateMusicHelp() {
+    const source = hasGeneratedBgm ? 'generated BGM' : (hasConfigBgm ? 'config music' : 'no music source');
+    musicHelp.textContent = musicInclude.checked
+      ? 'Export will include ' + source + ' at a fixed mix level. No re-record needed.'
+      : 'Export will skip background music. No re-record needed.';
+  }
 
   // Toggle panel
   musicHeader.addEventListener('click', () => {
@@ -3122,6 +3303,13 @@ if (DATA.pipelineMeta) {
   musicDuration.addEventListener('input', () => {
     musicDurLabel.textContent = musicDuration.value + 's';
   });
+  musicInclude.checked = DATA.bgm?.include ?? false;
+  musicVolume.value = String(DATA.bgm?.volume ?? 0.15);
+  updateMusicVolumeLabel();
+  updateMusicHelp();
+  musicInclude.addEventListener('change', updateMusicHelp);
+  musicVolume.addEventListener('input', updateMusicVolumeLabel);
+  musicVolume.addEventListener('change', updateMusicHelp);
 
   // WAV encoder (Float32, mono)
   function encodeWavFloat32(samples, sampleRate) {
@@ -3238,6 +3426,9 @@ if (DATA.pipelineMeta) {
       });
       const result = await resp.json();
       if (result.ok) {
+        hasGeneratedBgm = true;
+        musicInclude.checked = true;
+        updateMusicHelp();
         musicStatus.textContent = 'Saved to ' + result.path;
       } else {
         musicStatus.textContent = 'Save failed.';
