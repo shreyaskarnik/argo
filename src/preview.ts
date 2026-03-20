@@ -414,6 +414,12 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
   }
   let videoMime = videoPath.endsWith('.mp4') ? 'video/mp4' : 'video/webm';
 
+  // Track BGM saved from the music generator panel
+  let activeMusicPath: string | undefined;
+  // Check if a previously saved BGM exists
+  const savedBgmPath = join(demoDir, 'music', 'bgm.wav');
+  if (existsSync(savedBgmPath)) activeMusicPath = savedBgmPath;
+
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const url = req.url ?? '/';
 
@@ -678,7 +684,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             headTrimMs: headTrimMs > 0 ? headTrimMs : undefined,
             speedRampSegments,
             loudnorm: ec?.loudnorm,
-            musicPath: ec?.musicPath,
+            musicPath: ec?.musicPath ?? activeMusicPath,
             musicVolume: ec?.musicVolume,
             cameraMoves,
             watermark: ec?.watermark,
@@ -749,19 +755,19 @@ self.onmessage = async (e) => {
         return;
       }
 
-      // Save generated background music WAV
+      // Save generated background music WAV — overwrites previous to avoid orphans
       if (url === '/api/save-music' && req.method === 'POST') {
         const chunks: Buffer[] = [];
         for await (const chunk of req) chunks.push(chunk as Buffer);
         const wavData = Buffer.concat(chunks);
         const musicDir = join(demoDir, 'music');
         mkdirSync(musicDir, { recursive: true });
-        const timestamp = Date.now();
-        const fileName = `generated-${timestamp}.wav`;
-        const filePath = join(musicDir, fileName);
+        const filePath = join(musicDir, 'bgm.wav');
         writeFileSync(filePath, wavData);
+        // Track the active music path so /api/export uses it
+        activeMusicPath = filePath;
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, path: join('.argo', demoName, 'music', fileName) }));
+        res.end(JSON.stringify({ ok: true, path: filePath }));
         return;
       }
 
