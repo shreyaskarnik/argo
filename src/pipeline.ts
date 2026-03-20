@@ -18,6 +18,7 @@ import {
 } from './freeze.js';
 import type { ArgoConfig } from './config.js';
 import { getVideoDurationMs } from './media.js';
+import { generateMusicCached } from './music/musicgen.js';
 import {
   buildPlacementsFromTimingAndDurations,
   buildSceneTexts,
@@ -115,6 +116,21 @@ export async function runPipeline(
   }
   const sceneDurationsPath = join(argoDir, '.scene-durations.json');
   writeFileSync(sceneDurationsPath, JSON.stringify(sceneDurations, null, 2), 'utf-8');
+
+  // Step 1b: Generate AI background music (if configured and no explicit music file)
+  let generatedMusicPath: string | undefined;
+  const audioConfig = config.export.audio;
+  if (audioConfig?.musicPrompt && !audioConfig.music) {
+    console.log('🎵 Generating background music...');
+    console.log(`  ▸ "${audioConfig.musicPrompt}" (${audioConfig.musicDuration ?? 30}s)`);
+    const musicPath = await generateMusicCached(argoDir, {
+      prompt: audioConfig.musicPrompt,
+      durationSec: audioConfig.musicDuration,
+    });
+    if (musicPath) {
+      generatedMusicPath = musicPath;
+    }
+  }
 
   // Step 2: Record browser demo
   console.log('🎬 Rolling camera...');
@@ -285,7 +301,7 @@ export async function runPipeline(
     totalDurationMs: finalDurationMs,
     speedRampSegments: speedRampPlan.segments,
     loudnorm: config.export.audio?.loudnorm,
-    musicPath: config.export.audio?.music,
+    musicPath: config.export.audio?.music ?? generatedMusicPath,
     musicVolume: config.export.audio?.musicVolume,
     watermark: config.export.watermark,
   };
@@ -466,7 +482,7 @@ export async function runPipeline(
         totalDurationMs: variantShiftedDurationMs,
         headTrimMs: variantHeadTrimMs > 0 ? variantHeadTrimMs : undefined,
         loudnorm: config.export.audio?.loudnorm,
-        musicPath: config.export.audio?.music,
+        musicPath: config.export.audio?.music ?? generatedMusicPath,
         musicVolume: config.export.audio?.musicVolume,
         cameraMoves: variantCameraMoves.length > 0 ? variantCameraMoves : undefined,
         watermark: config.export.watermark,

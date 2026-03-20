@@ -51,6 +51,10 @@ export interface AudioConfig {
   music?: string;
   /** Music volume level (0.0 to 1.0). Default: 0.15. Mixed at a constant level under narration. */
   musicVolume?: number;
+  /** Text prompt for AI-generated background music (uses MusicGen). Ignored if `music` is set. */
+  musicPrompt?: string;
+  /** Duration in seconds for AI-generated music. Default: 30. Loops to fill video length. */
+  musicDuration?: number;
 }
 
 export interface WatermarkConfig {

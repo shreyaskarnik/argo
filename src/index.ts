@@ -16,6 +16,7 @@ export {
   type SpeedRampConfig,
   type VariantConfig,
   type AudioConfig,
+  type WatermarkConfig,
 } from './config.js';
 
 // Fixtures
@@ -117,3 +118,6 @@ export { releasePrep, type ReleasePrepOptions } from './release-prep.js';
 
 // Init
 export { init } from './init.js';
+
+// Music Generation
+export { generateMusic, generateMusicCached, type MusicGenOptions } from './music/musicgen.js';

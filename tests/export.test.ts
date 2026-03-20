@@ -392,4 +392,128 @@ describe('exportVideo', () => {
     // loudnorm input should be the amixed output
     expect(fc).toContain('[amixed]loudnorm');
   });
+
+  // ---------- watermark ----------
+
+  it('adds watermark overlay with default position (bottom-right) and opacity', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      watermark: { src: 'assets/logo.png' },
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const a = args as string[];
+    // Watermark image should be an input
+    expect(a).toContain('assets/logo.png');
+    // Should have filter_complex with overlay
+    expect(a).toContain('-filter_complex');
+    const fcIdx = a.indexOf('-filter_complex');
+    const fc = a[fcIdx + 1];
+    // Default opacity 0.7 → colorchannelmixer
+    expect(fc).toContain('colorchannelmixer=aa=0.7');
+    // Default position bottom-right with margin 20
+    expect(fc).toContain('overlay=x=W-w-20:y=H-h-20:format=auto');
+  });
+
+  it('places watermark at top-left with custom margin', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      watermark: { src: 'assets/logo.png', position: 'top-left', margin: 10 },
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const a = args as string[];
+    const fcIdx = a.indexOf('-filter_complex');
+    const fc = a[fcIdx + 1];
+    expect(fc).toContain('overlay=x=10:y=10:format=auto');
+  });
+
+  it('places watermark at top-right', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      watermark: { src: 'assets/logo.png', position: 'top-right', margin: 30 },
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const a = args as string[];
+    const fcIdx = a.indexOf('-filter_complex');
+    const fc = a[fcIdx + 1];
+    expect(fc).toContain('overlay=x=W-w-30:y=30:format=auto');
+  });
+
+  it('places watermark at bottom-left', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      watermark: { src: 'assets/logo.png', position: 'bottom-left' },
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const a = args as string[];
+    const fcIdx = a.indexOf('-filter_complex');
+    const fc = a[fcIdx + 1];
+    expect(fc).toContain('overlay=x=20:y=H-h-20:format=auto');
+  });
+
+  it('skips colorchannelmixer when opacity is 1.0', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      watermark: { src: 'assets/logo.png', opacity: 1.0 },
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const a = args as string[];
+    const fcIdx = a.indexOf('-filter_complex');
+    const fc = a[fcIdx + 1];
+    expect(fc).not.toContain('colorchannelmixer');
+    expect(fc).toContain('overlay=');
+  });
+
+  it('skips watermark when src does not exist on disk', async () => {
+    mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
+    mockedExistsSync.mockImplementation((p) => {
+      if (String(p) === 'assets/missing-logo.png') return false;
+      return true;
+    });
+    mockedSpawnSync.mockReturnValue({ status: 0 } as any);
+
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      watermark: { src: 'assets/missing-logo.png' },
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const a = args as string[];
+    expect(a).not.toContain('assets/missing-logo.png');
+    // No filter_complex for watermark
+    expect(a).not.toContain('-filter_complex');
+  });
+
+  it('watermark input index accounts for other inputs (audio, chapters, thumbnail)', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      chapterMetadataPath: '.argo/demo/chapters.txt',
+      thumbnailPath: 'assets/thumb.png',
+      watermark: { src: 'assets/logo.png', opacity: 1.0 },
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const a = args as string[];
+    // Inputs: 0=video, 1=audio, 2=chapters, 3=thumbnail, 4=watermark
+    const inputPaths = a.reduce<string[]>((acc, x, i) => {
+      if (x === '-i' && i + 1 < a.length) acc.push(a[i + 1]);
+      return acc;
+    }, []);
+    expect(inputPaths).toContain('assets/logo.png');
+    expect(inputPaths.indexOf('assets/logo.png')).toBe(4); // 5th input (index 4)
+    // filter_complex should reference correct watermark input
+    const fcIdx = a.indexOf('-filter_complex');
+    const fc = a[fcIdx + 1];
+    expect(fc).toContain('[4:v]');
+  });
 });
