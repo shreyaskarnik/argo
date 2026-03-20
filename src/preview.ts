@@ -10,7 +10,7 @@
 
 import { execFile } from 'node:child_process';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { readFileSync, existsSync, readdirSync, writeFileSync, statSync, createReadStream, unlinkSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, writeFileSync, statSync, createReadStream, unlinkSync, mkdirSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { renderTemplate } from './overlays/templates.js';
 import { alignClips, schedulePlacements, type ClipInfo, type Placement, type SceneTiming } from './tts/align.js';
@@ -697,6 +697,22 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
         return;
       }
 
+      // Save generated background music WAV
+      if (url === '/api/save-music' && req.method === 'POST') {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(chunk as Buffer);
+        const wavData = Buffer.concat(chunks);
+        const musicDir = join(demoDir, 'music');
+        mkdirSync(musicDir, { recursive: true });
+        const timestamp = Date.now();
+        const fileName = `generated-${timestamp}.wav`;
+        const filePath = join(musicDir, fileName);
+        writeFileSync(filePath, wavData);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, path: join('.argo', demoName, 'music', fileName) }));
+        return;
+      }
+
       // --- Static file serving ---
 
       // Serve video with Range request support (required for seeking)
@@ -1156,6 +1172,150 @@ const PREVIEW_HTML = `<!DOCTYPE html>
   .sidebar-tab:hover { color: var(--text); }
   .sidebar-tab.active { color: var(--text); border-bottom-color: var(--accent); }
   .sidebar-panel { overflow-y: auto; flex: 1; }
+
+  /* Music panel */
+  .music-panel {
+    border-top: 1px solid var(--border);
+    padding: 0;
+  }
+  .music-panel-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .music-panel-header:hover { color: var(--text); }
+  .music-panel-header .expand-icon {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text-dim);
+    transition: transform var(--transition);
+  }
+  .music-panel.expanded .music-panel-header .expand-icon { transform: rotate(90deg); }
+  .music-panel-body {
+    display: none;
+    padding: 0 16px 16px;
+  }
+  .music-panel.expanded .music-panel-body { display: block; }
+  .music-prompt-input {
+    width: 100%;
+    padding: 8px 10px;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    outline: none;
+    resize: vertical;
+    min-height: 36px;
+    margin-bottom: 8px;
+  }
+  .music-prompt-input:focus { border-color: var(--accent); }
+  .music-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 10px;
+  }
+  .music-preset-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+    font-family: var(--sans);
+    color: var(--text-muted);
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
+  }
+  .music-preset-btn:hover { background: var(--accent-glow); color: var(--text); }
+  .music-duration-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .music-duration-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+  }
+  .music-duration-row .music-dur-label {
+    min-width: 32px;
+    text-align: right;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .music-generate-btn, .music-save-btn {
+    width: 100%;
+    padding: 8px 0;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: var(--sans);
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background var(--transition), opacity var(--transition);
+  }
+  .music-generate-btn {
+    background: var(--accent);
+    color: white;
+    margin-bottom: 8px;
+  }
+  .music-generate-btn:hover:not(:disabled) { background: var(--accent-hover); }
+  .music-generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .music-save-btn {
+    background: var(--success);
+    color: white;
+    display: none;
+  }
+  .music-save-btn:hover:not(:disabled) { opacity: 0.85; }
+  .music-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .music-progress {
+    margin-bottom: 8px;
+    display: none;
+  }
+  .music-progress-bar {
+    width: 100%;
+    height: 4px;
+    background: var(--surface3);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 4px;
+  }
+  .music-progress-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+  .music-progress-text {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text-muted);
+  }
+  .music-audio-player {
+    width: 100%;
+    margin-bottom: 8px;
+    display: none;
+    height: 36px;
+  }
+  .music-status {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text-muted);
+    margin-top: 4px;
+    min-height: 16px;
+  }
+
   .scene-card {
     padding: 14px 16px;
     border-bottom: 1px solid var(--border);
@@ -1512,6 +1672,35 @@ const PREVIEW_HTML = `<!DOCTYPE html>
   </div>
   <div class="sidebar-panel" id="panel-scenes">
     <div id="scene-list"></div>
+    <div class="music-panel" id="music-panel">
+      <div class="music-panel-header" id="music-panel-header">
+        Background Music
+        <span class="expand-icon">&#9654;</span>
+      </div>
+      <div class="music-panel-body">
+        <input type="text" class="music-prompt-input" id="music-prompt" placeholder="Describe the music style..." value="lofi chill ambient">
+        <div class="music-presets">
+          <button class="music-preset-btn" data-preset="lofi chill">lofi chill</button>
+          <button class="music-preset-btn" data-preset="corporate upbeat">corporate upbeat</button>
+          <button class="music-preset-btn" data-preset="ambient minimal">ambient minimal</button>
+          <button class="music-preset-btn" data-preset="cinematic epic">cinematic epic</button>
+          <button class="music-preset-btn" data-preset="acoustic warm">acoustic warm</button>
+        </div>
+        <div class="music-duration-row">
+          <span>Duration</span>
+          <input type="range" id="music-duration" min="10" max="60" value="30" step="5">
+          <span class="music-dur-label" id="music-dur-label">30s</span>
+        </div>
+        <button class="music-generate-btn" id="music-generate-btn">Generate Music</button>
+        <div class="music-progress" id="music-progress">
+          <div class="music-progress-bar"><div class="music-progress-fill" id="music-progress-fill"></div></div>
+          <div class="music-progress-text" id="music-progress-text"></div>
+        </div>
+        <audio class="music-audio-player" id="music-audio" controls></audio>
+        <button class="music-save-btn" id="music-save-btn">Use as BGM</button>
+        <div class="music-status" id="music-status"></div>
+      </div>
+    </div>
   </div>
   <div class="sidebar-panel" id="panel-metadata" style="display:none">
     <div id="metadata-content" style="padding:16px;font-family:var(--mono);font-size:12px;color:var(--text-muted);white-space:pre-wrap;word-break:break-word;"></div>
@@ -2841,6 +3030,221 @@ if (DATA.pipelineMeta) {
 } else {
   document.getElementById('metadata-content').textContent = 'No pipeline metadata found.\\n\\nRun argo pipeline to generate metadata.';
 }
+
+// ─── Background Music (MusicGen via Transformers.js) ───────────────────────
+(function initMusicPanel() {
+  const musicPanel = document.getElementById('music-panel');
+  const musicHeader = document.getElementById('music-panel-header');
+  const musicPrompt = document.getElementById('music-prompt');
+  const musicDuration = document.getElementById('music-duration');
+  const musicDurLabel = document.getElementById('music-dur-label');
+  const musicGenerateBtn = document.getElementById('music-generate-btn');
+  const musicProgress = document.getElementById('music-progress');
+  const musicProgressFill = document.getElementById('music-progress-fill');
+  const musicProgressText = document.getElementById('music-progress-text');
+  const musicAudio = document.getElementById('music-audio');
+  const musicSaveBtn = document.getElementById('music-save-btn');
+  const musicStatus = document.getElementById('music-status');
+
+  let musicWorker = null;
+  let generatedWavBlob = null;
+
+  // Toggle panel
+  musicHeader.addEventListener('click', () => {
+    musicPanel.classList.toggle('expanded');
+  });
+
+  // Preset buttons
+  document.querySelectorAll('.music-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      musicPrompt.value = btn.dataset.preset;
+    });
+  });
+
+  // Duration slider
+  musicDuration.addEventListener('input', () => {
+    musicDurLabel.textContent = musicDuration.value + 's';
+  });
+
+  // WAV encoder (Float32, mono)
+  function encodeWavFloat32(samples, sampleRate) {
+    const numSamples = samples.length;
+    const byteRate = sampleRate * 4; // Float32 = 4 bytes
+    const blockAlign = 4;
+    const dataSize = numSamples * 4;
+    const buffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buffer);
+    // RIFF header
+    view.setUint32(0, 0x52494646, false); // "RIFF"
+    view.setUint32(4, 36 + dataSize, true);
+    view.setUint32(8, 0x57415645, false); // "WAVE"
+    // fmt chunk
+    view.setUint32(12, 0x666d7420, false); // "fmt "
+    view.setUint32(16, 16, true); // chunk size
+    view.setUint16(20, 3, true); // format = IEEE Float
+    view.setUint16(22, 1, true); // channels = 1
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, 32, true); // bits per sample
+    // data chunk
+    view.setUint32(36, 0x64617461, false); // "data"
+    view.setUint32(40, dataSize, true);
+    const floatView = new Float32Array(buffer, 44);
+    floatView.set(samples);
+    return new Blob([buffer], { type: 'audio/wav' });
+  }
+
+  // Create web worker (inline blob with ESM)
+  function createMusicWorker() {
+    const workerCode = [
+      'import { AutoTokenizer, MusicgenForConditionalGeneration } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3";',
+      '',
+      'let tokenizer = null;',
+      'let model = null;',
+      '',
+      'async function loadModel() {',
+      '  self.postMessage({ type: "progress", message: "Loading MusicGen model (~1.8GB, first time takes a while)..." });',
+      '  tokenizer = await AutoTokenizer.from_pretrained("Xenova/musicgen-small");',
+      '  self.postMessage({ type: "progress", message: "Tokenizer loaded. Loading model weights..." });',
+      '  model = await MusicgenForConditionalGeneration.from_pretrained("Xenova/musicgen-small", {',
+      '    dtype: { text_encoder: "q8", decoder_model_merged: "q8", encodec_decode: "fp32" },',
+      '  });',
+      '  self.postMessage({ type: "progress", message: "Model loaded." });',
+      '}',
+      '',
+      'self.onmessage = async (e) => {',
+      '  if (e.data.type === "generate") {',
+      '    try {',
+      '      if (!model) await loadModel();',
+      '      self.postMessage({ type: "progress", message: "Generating audio from prompt..." });',
+      '      const inputs = tokenizer(e.data.prompt);',
+      '      const maxTokens = Math.ceil(e.data.durationSec * 50);',
+      '      const output = await model.generate({',
+      '        ...inputs,',
+      '        max_new_tokens: maxTokens,',
+      '        do_sample: true,',
+      '        guidance_scale: e.data.guidanceScale || 3,',
+      '        temperature: e.data.temperature || 1.0,',
+      '      });',
+      '      const audioData = output.data instanceof Float32Array ? output.data : new Float32Array(output.data);',
+      '      self.postMessage({ type: "complete", audioData: audioData, sampleRate: 32000 }, [audioData.buffer]);',
+      '    } catch (err) {',
+      '      self.postMessage({ type: "error", message: err.message || String(err) });',
+      '    }',
+      '  }',
+      '};',
+    ].join('\\n');
+
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    const worker = new Worker(url, { type: 'module' });
+    URL.revokeObjectURL(url);
+    return worker;
+  }
+
+  function showProgress(msg) {
+    musicProgress.style.display = 'block';
+    musicProgressText.textContent = msg;
+  }
+
+  function setProgressBar(pct) {
+    musicProgressFill.style.width = Math.min(100, Math.max(0, pct)) + '%';
+  }
+
+  // Generate button
+  musicGenerateBtn.addEventListener('click', () => {
+    const prompt = musicPrompt.value.trim();
+    if (!prompt) {
+      musicStatus.textContent = 'Please enter a music prompt.';
+      return;
+    }
+    const durationSec = parseInt(musicDuration.value, 10);
+
+    musicGenerateBtn.disabled = true;
+    musicSaveBtn.style.display = 'none';
+    musicAudio.style.display = 'none';
+    generatedWavBlob = null;
+    showProgress('Initializing...');
+    setProgressBar(10);
+    musicStatus.textContent = '';
+
+    if (!musicWorker) {
+      musicWorker = createMusicWorker();
+      musicWorker.onmessage = handleWorkerMessage;
+      musicWorker.onerror = (err) => {
+        musicGenerateBtn.disabled = false;
+        musicProgress.style.display = 'none';
+        musicStatus.textContent = 'Worker error: ' + (err.message || 'Unknown error');
+      };
+    }
+
+    musicWorker.postMessage({
+      type: 'generate',
+      prompt: prompt,
+      durationSec: durationSec,
+      guidanceScale: 3,
+      temperature: 1.0,
+    });
+  });
+
+  function handleWorkerMessage(e) {
+    const msg = e.data;
+    if (msg.type === 'progress') {
+      showProgress(msg.message);
+      // Estimate progress based on message content
+      if (msg.message.includes('Tokenizer')) setProgressBar(25);
+      else if (msg.message.includes('Model loaded')) setProgressBar(50);
+      else if (msg.message.includes('Generating')) setProgressBar(60);
+      else setProgressBar(15);
+    } else if (msg.type === 'complete') {
+      setProgressBar(100);
+      showProgress('Generation complete.');
+      musicGenerateBtn.disabled = false;
+
+      // Encode to WAV and create audio preview
+      generatedWavBlob = encodeWavFloat32(msg.audioData, msg.sampleRate);
+      const audioUrl = URL.createObjectURL(generatedWavBlob);
+      musicAudio.src = audioUrl;
+      musicAudio.style.display = 'block';
+      musicSaveBtn.style.display = 'block';
+      musicStatus.textContent = 'Audio ready. Press play to audition, or save as background music.';
+
+      setTimeout(() => {
+        musicProgress.style.display = 'none';
+        setProgressBar(0);
+      }, 2000);
+    } else if (msg.type === 'error') {
+      musicGenerateBtn.disabled = false;
+      musicProgress.style.display = 'none';
+      musicStatus.textContent = 'Generation failed: ' + msg.message;
+    }
+  }
+
+  // Save button
+  musicSaveBtn.addEventListener('click', async () => {
+    if (!generatedWavBlob) return;
+    musicSaveBtn.disabled = true;
+    musicStatus.textContent = 'Saving...';
+    try {
+      const resp = await fetch('/api/save-music', {
+        method: 'POST',
+        headers: { 'Content-Type': 'audio/wav' },
+        body: generatedWavBlob,
+      });
+      const result = await resp.json();
+      if (result.ok) {
+        musicStatus.textContent = 'Saved to ' + result.path;
+      } else {
+        musicStatus.textContent = 'Save failed.';
+      }
+    } catch (err) {
+      musicStatus.textContent = 'Save error: ' + err.message;
+    } finally {
+      musicSaveBtn.disabled = false;
+    }
+  });
+})();
 
 // ─── Init ──────────────────────────────────────────────────────────────────
 renderSceneList();
