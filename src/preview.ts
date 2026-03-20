@@ -777,7 +777,7 @@ async function loadModel(preferredBackend = 'webgpu') {
 
   if (preferredBackend === 'webgpu' && typeof navigator !== 'undefined' && 'gpu' in navigator) {
     try {
-      self.postMessage({ type: 'progress', message: 'Loading model weights with WebGPU (~1.8GB first time)...' });
+      self.postMessage({ type: 'progress', message: 'Loading model weights (~450MB first time)...' });
       model = await MusicgenForConditionalGeneration.from_pretrained('Xenova/musicgen-small', {
         dtype: WEBGPU_DTYPE,
         device: 'webgpu',
