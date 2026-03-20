@@ -45,9 +45,10 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 
 ## Production Quality
 
-- Audio ducking and background music. Mix in a background track with automatic volume ducking under voiceover clips.
+- ~~Audio ducking and background music.~~ **SHIPPED** (constant-volume mixing). True sidechain ducking is future work.
+- AI-generated background music. Use `Xenova/musicgen-small` (Transformers.js) to generate background music from a text prompt — fully local, no API keys. Config: `export.audio.musicPrompt: 'lofi chill ambient with soft piano'`. Pipeline generates a ~30s clip, content-addressed cached, looped via `-stream_loop -1`. Model is ~1.8GB (first run downloads). Reference: [MusicGen Web](https://huggingface.co/spaces/Xenova/musicgen-web).
 - ~~Cursor smoothing and highlighting.~~ **SHIPPED** — `cursorHighlight(page)` with pulse animation and click ripple effects.
-- Watermark and branding strip. Config-driven persistent logo or "DEMO" watermark overlay for draft vs. final renders.
+- ~~Watermark and branding strip.~~ **SHIPPED** — `export.watermark: { src, position, opacity, margin }` overlays PNG at any corner.
 - ~~Chapter markers.~~ **SHIPPED** — MP4 chapter metadata embedded from scene marks via ffmpeg.
 - Burned-in captions. Render voiceover text as styled subtitles directly into the video frame, not just `.srt` sidecar files. Many social platforms ignore external subtitle tracks.
 
@@ -127,6 +128,10 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 - Canonical showcase demo — single 10-scene demo covering all Argo capabilities
 - Post-export camera moves — `zoomTo(page, target, { narration })` records zoom marks, applied as ffmpeg `zoompan` during export. Overlay-safe, frame-exact.
 - Viewport-native variants — `export.variants` re-records at different viewports (TTS shared). Pixel-perfect multi-format without blur-fill artifacts.
+- Background music mixing — `export.audio.music` with constant-volume mixing, loop, fade-out
+- Freeze-frame holds — `post: [{ type: 'freeze', atMs, durationMs }]` in scenes manifest
+- Watermark overlay — `export.watermark: { src, position, opacity, margin }`
+- Live recording progress — per-scene status via JSONL progress file
 
 ## Suggested Priority
 
