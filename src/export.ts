@@ -403,6 +403,7 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
 
   args.push(
     '-c:v', 'libx264',
+    '-pix_fmt', 'yuv420p',
     '-preset', preset,
     '-crf', String(crf),
   );
@@ -510,6 +511,7 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
       '-i', outputPath,
       '-filter_complex', blurFilter,
       '-c:v', 'libx264',
+      '-pix_fmt', 'yuv420p',
       '-preset', preset,
       '-crf', String(crf),
       '-c:a', 'copy',
