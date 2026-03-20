@@ -149,7 +149,7 @@
 
     section {
       position: relative;
-      padding: 120px 72px;
+      padding: 80px 72px;
     }
 
     section::before {
@@ -181,18 +181,18 @@
     }
 
     .section-title {
-      font-size: 3.25rem;
-      line-height: 1.06;
+      font-size: 2.6rem;
+      line-height: 1.1;
       letter-spacing: -0.04em;
-      margin-bottom: 18px;
+      margin-bottom: 14px;
       max-width: 920px;
     }
 
     .section-subtitle {
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       color: var(--text-muted);
       max-width: 760px;
-      margin-bottom: 64px;
+      margin-bottom: 36px;
     }
 
     #hero {
@@ -397,14 +397,18 @@
     .features-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 20px;
+      gap: 16px;
+    }
+
+    .features-grid.cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .feature-card {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 22px;
-      padding: 30px;
+      border-radius: 18px;
+      padding: 22px;
       position: relative;
       overflow: hidden;
     }
@@ -432,11 +436,11 @@
 
     .feature-kicker {
       font-family: var(--font-mono);
-      font-size: 0.72rem;
+      font-size: 0.68rem;
       color: var(--accent);
       letter-spacing: 0.16em;
       text-transform: uppercase;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
 
     .feature-name {
@@ -1073,7 +1077,7 @@
         Camera helpers keep your demo watchable. Every feature gets a focused beat instead of a full-page scroll-and-pray.
       </p>
 
-      <div class="features-grid">
+      <div class="features-grid cols-3">
         <div class="feature-card" id="effect-spotlight" data-demo-target="effect-spotlight">
           <div class="feature-kicker">Effect</div>
           <h3 class="feature-name"><span class="inline-code">spotlight()</span></h3>
@@ -1128,7 +1132,7 @@
         </div>
       </div>
 
-      <div class="features-grid">
+      <div class="features-grid cols-3">
         <div class="feature-card" id="export-transitions" data-demo-target="export-transitions">
           <div class="feature-kicker">Transitions</div>
           <h3 class="feature-name">fade-through-black, dissolve, wipes</h3>
@@ -1142,7 +1146,7 @@
         <div class="feature-card" id="export-musicgen" data-demo-target="export-musicgen">
           <div class="feature-kicker">AI Music</div>
           <h3 class="feature-name">Generate BGM from a prompt</h3>
-          <p class="feature-desc">Type "lofi chill ambient" in preview, MusicGen generates a track in-browser via WebGPU, audition it, use it. No API keys, no uploads.</p>
+          <p class="feature-desc">Type a prompt in preview, MusicGen generates a track in-browser via WebGPU. No API keys.</p>
         </div>
         <div class="feature-card" id="export-watermark" data-demo-target="export-watermark">
           <div class="feature-kicker">Watermark</div>
@@ -1157,17 +1161,17 @@
         <div class="feature-card" id="export-metadata" data-demo-target="export-metadata">
           <div class="feature-kicker">Delivery metadata</div>
           <h3 class="feature-name">Subtitles, chapters, scene report</h3>
-          <p class="feature-desc">Ship the MP4 with structure: SRT and VTT files, embedded chapter markers, and a scene report you can inspect after every run.</p>
+          <p class="feature-desc">SRT, VTT subtitles, embedded chapters, and a scene report after every run.</p>
         </div>
         <div class="feature-card" id="export-formats" data-demo-target="export-formats">
           <div class="feature-kicker">Formats</div>
           <h3 class="feature-name"><span class="inline-code">16:9</span>, <span class="inline-code">1:1</span>, <span class="inline-code">9:16</span>, <span class="inline-code">GIF</span></h3>
-          <p class="feature-desc">One recording pass can serve the homepage, docs, internal updates, and social channels without making separate demos.</p>
+          <p class="feature-desc">One recording serves homepage, docs, and social channels.</p>
         </div>
         <div class="feature-card" id="export-mobile" data-demo-target="export-mobile">
           <div class="feature-kicker">Viewport-native</div>
           <h3 class="feature-name">Square and vertical rerenders</h3>
-          <p class="feature-desc">When you need a real `1:1` or `9:16` cut, Argo can rerender the same demo at that viewport instead of just blur-filling the sides.</p>
+          <p class="feature-desc">Re-record at 1:1 or 9:16 viewports instead of blur-filling the sides.</p>
         </div>
       </div>
 
