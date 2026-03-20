@@ -53,6 +53,17 @@ export interface AudioConfig {
   musicVolume?: number;
 }
 
+export interface WatermarkConfig {
+  /** Path to the watermark image (PNG with transparency recommended). */
+  src: string;
+  /** Corner placement. Default: 'bottom-right'. */
+  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  /** Opacity (0.0 to 1.0). Default: 0.7. */
+  opacity?: number;
+  /** Margin from edges in pixels. Default: 20. */
+  margin?: number;
+}
+
 export interface VariantConfig {
   /** Variant name — used in output filename (e.g., 'vertical' → showcase.vertical.mp4). */
   name: string;
@@ -75,6 +86,8 @@ export interface ExportConfig {
    * TTS runs once, then pipeline records + exports per variant.
    * Much better than blur-fill/crop for responsive content. */
   variants?: VariantConfig[];
+  /** Overlay a watermark/brand bug image on the exported video. */
+  watermark?: WatermarkConfig;
 }
 
 export interface OverlayConfig {

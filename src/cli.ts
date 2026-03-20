@@ -196,6 +196,7 @@ export function createProgram(): Command {
           } catch { /* optional */ }
           return undefined;
         })(),
+        watermark: config.export.watermark,
       });
     });
 
@@ -340,6 +341,7 @@ export function createProgram(): Command {
             loudnorm: config.export.audio?.loudnorm,
             musicPath: config.export.audio?.music,
             musicVolume: config.export.audio?.musicVolume,
+            watermark: config.export.watermark,
           },
         });
         console.log(`\nArgo Dashboard running at: ${url}`);

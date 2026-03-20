@@ -2,11 +2,12 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Placement } from './tts/align.js';
-import type { TransitionConfig } from './config.js';
+import type { TransitionConfig, WatermarkConfig } from './config.js';
 import { buildTransitionFilters } from './transitions.js';
 import { runFfmpegWithProgress } from './progress.js';
 import { buildSpeedRampFilter, type Segment } from './speed-ramp.js';
 import { buildCameraMoveFilter, type CameraMove } from './camera-move.js';
+import { buildFreezeFilter, type ResolvedFreeze } from './freeze.js';
 import { getVideoFrameRate } from './media.js';
 
 export interface ExportOptions {
@@ -47,6 +48,10 @@ export interface ExportOptions {
   musicVolume?: number;
   /** Post-export camera moves (zoom/pan) recorded during Playwright session. */
   cameraMoves?: CameraMove[];
+  /** Resolved freeze-frame holds — applied BEFORE transitions (they change the timeline). */
+  freezeSpecs?: ResolvedFreeze[];
+  /** Watermark/brand bug overlay config. */
+  watermark?: WatermarkConfig;
 }
 
 function formatSeconds(ms: number): string {
@@ -228,6 +233,20 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     audioSource = speedRampFilter.outputLabels.audio;
   }
 
+  // Freeze-frame holds — applied BEFORE transitions (they shift the timeline)
+  const freezeSpecs = options.freezeSpecs;
+  if (freezeSpecs && freezeSpecs.length > 0) {
+    const freezeResult = buildFreezeFilter(
+      freezeSpecs,
+      options.totalDurationMs ?? 0,
+      videoSource,
+    );
+    if (freezeResult) {
+      filterParts.push(freezeResult.filter);
+      videoSource = freezeResult.outputLabel;
+    }
+  }
+
   const vFilters: string[] = [];
   if (tailPadMs && tailPadMs > 0) {
     vFilters.push(`tpad=stop_mode=clone:stop_duration=${formatSeconds(tailPadMs)}`);
@@ -292,6 +311,44 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     if (camFilter) {
       filterParts.push(camFilter.filter);
       videoSource = camFilter.outputLabel;
+    }
+  }
+
+  // Watermark overlay — applied AFTER all other video filters (last in chain)
+  const watermark = options.watermark;
+  if (watermark && watermark.src) {
+    if (!existsSync(watermark.src)) {
+      console.warn(
+        `Warning: watermark image "${watermark.src}" does not exist. ` +
+        `The video will be exported without a watermark.`
+      );
+    } else {
+      const wmInputIdx = nextInput++;
+      args.push('-i', watermark.src);
+
+      const wmPosition = watermark.position ?? 'bottom-right';
+      const wmMargin = watermark.margin ?? 20;
+      const wmOpacity = watermark.opacity ?? 0.7;
+
+      // Position expressions for ffmpeg overlay filter
+      const positionMap: Record<string, string> = {
+        'top-left': `x=${wmMargin}:y=${wmMargin}`,
+        'top-right': `x=W-w-${wmMargin}:y=${wmMargin}`,
+        'bottom-left': `x=${wmMargin}:y=H-h-${wmMargin}`,
+        'bottom-right': `x=W-w-${wmMargin}:y=H-h-${wmMargin}`,
+      };
+      const posExpr = positionMap[wmPosition];
+
+      // Build watermark filter chain
+      const wmRef = `${wmInputIdx}:v`;
+      const needsOpacity = wmOpacity < 1.0;
+
+      if (needsOpacity) {
+        filterParts.push(`[${wmRef}]colorchannelmixer=aa=${wmOpacity}[wm]`);
+      }
+      const wmLabel = needsOpacity ? 'wm' : wmRef;
+      filterParts.push(`[${videoSource}][${wmLabel}]overlay=${posExpr}:format=auto[outwm]`);
+      videoSource = 'outwm';
     }
   }
 

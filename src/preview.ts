@@ -37,6 +37,7 @@ export interface PreviewExportConfig {
   loudnorm?: boolean;
   musicPath?: string;
   musicVolume?: number;
+  watermark?: import('./config.js').WatermarkConfig;
 }
 
 export interface PreviewOptions {
@@ -655,6 +656,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             musicPath: ec?.musicPath,
             musicVolume: ec?.musicVolume,
             cameraMoves,
+            watermark: ec?.watermark,
           });
 
           // Switch to serving the new MP4

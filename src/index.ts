@@ -90,6 +90,16 @@ export { buildTransitionFilters } from './transitions.js';
 // Speed Ramp
 export { computeSegments, applySpeedRamp } from './speed-ramp.js';
 
+// Freeze
+export {
+  buildFreezeFilter,
+  resolveFreezes,
+  adjustPlacementsForFreezes,
+  totalFreezeDurationMs,
+  type FreezeSpec,
+  type ResolvedFreeze,
+} from './freeze.js';
+
 // Camera Moves
 export { buildCameraMoveFilter, shiftCameraMoves, scaleCameraMoves, type CameraMove } from './camera-move.js';
 

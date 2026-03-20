@@ -10,6 +10,12 @@ import { generateChapterMetadata } from './chapters.js';
 import { buildSceneReport, formatSceneReport } from './report.js';
 import { applySpeedRampToTimeline } from './speed-ramp.js';
 import { shiftCameraMoves, scaleCameraMoves, type CameraMove } from './camera-move.js';
+import {
+  resolveFreezes,
+  adjustPlacementsForFreezes,
+  totalFreezeDurationMs,
+  type FreezeSpec,
+} from './freeze.js';
 import type { ArgoConfig } from './config.js';
 import { getVideoDurationMs } from './media.js';
 import {
@@ -205,14 +211,43 @@ export async function runPipeline(
     shiftedDurationMs,
     config.export.speedRamp,
   );
-  const finalPlacements = speedRampPlan.placements;
-  const finalDurationMs = speedRampPlan.totalDurationMs;
+
+  // Read freeze-frame holds from scenes manifest `post` arrays
+  const manifestPath = `${config.demosDir}/${demoName}.scenes.json`;
+  const freezeSpecs: FreezeSpec[] = [];
+  try {
+    const rawManifest: Array<{ scene?: string; post?: Array<{ type?: string; atMs?: number; durationMs?: number }> }> =
+      JSON.parse(readFileSync(manifestPath, 'utf-8'));
+    for (const entry of rawManifest) {
+      if (!entry.scene || !Array.isArray(entry.post)) continue;
+      for (const effect of entry.post) {
+        if (
+          effect.type === 'freeze' &&
+          typeof effect.atMs === 'number' &&
+          typeof effect.durationMs === 'number'
+        ) {
+          freezeSpecs.push({
+            scene: entry.scene,
+            atMs: effect.atMs,
+            durationMs: effect.durationMs,
+          });
+        }
+      }
+    }
+  } catch {
+    // Manifest read errors are handled elsewhere — freezes are best-effort
+  }
+
+  // Resolve freeze specs to absolute timeline positions and adjust placements
+  const resolvedFreezes = resolveFreezes(freezeSpecs, speedRampPlan.placements);
+  const finalPlacements = adjustPlacementsForFreezes(speedRampPlan.placements, resolvedFreezes);
+  const freezeAddedMs = totalFreezeDurationMs(resolvedFreezes);
+  const finalDurationMs = speedRampPlan.totalDurationMs + freezeAddedMs;
 
   // Ensure output directory exists before writing subtitles
   mkdirSync(config.outputDir, { recursive: true });
 
   // Build scene text map for subtitles
-  const manifestPath = `${config.demosDir}/${demoName}.scenes.json`;
   try {
     const sceneTexts = buildSceneTexts(readScenesManifest(manifestPath));
 
@@ -252,7 +287,11 @@ export async function runPipeline(
     loudnorm: config.export.audio?.loudnorm,
     musicPath: config.export.audio?.music,
     musicVolume: config.export.audio?.musicVolume,
+    watermark: config.export.watermark,
   };
+  if (resolvedFreezes.length > 0) {
+    exportOptions.freezeSpecs = resolvedFreezes;
+  }
   if (tailPadMs !== undefined) exportOptions.tailPadMs = tailPadMs;
   if (headTrimMs > 0) exportOptions.headTrimMs = headTrimMs;
 
@@ -423,6 +462,7 @@ export async function runPipeline(
         musicPath: config.export.audio?.music,
         musicVolume: config.export.audio?.musicVolume,
         cameraMoves: variantCameraMoves.length > 0 ? variantCameraMoves : undefined,
+        watermark: config.export.watermark,
       });
 
       console.log(`🚀 Variant saved to: ${variantOutputPath}`);
