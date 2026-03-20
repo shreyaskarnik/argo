@@ -90,6 +90,9 @@ export default defineConfig({
   export: {
     preset: 'slow',            // slower = smaller file, higher quality
     crf: 16,                   // 16-28 range (lower = higher quality)
+    // transition: { type: 'fade-through-black', durationMs: 2000 },
+    // audio: { loudnorm: true, music: 'assets/bg.mp3', musicVolume: 0.15 },
+    // watermark: { src: 'assets/logo.png', position: 'bottom-right', opacity: 0.16 },
   },
   overlays: {
     autoBackground: true,      // auto-detect dark/light page for overlay contrast
