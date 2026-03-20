@@ -79,18 +79,26 @@ That matters for Argo because some effects are clunky or brittle in-browser but 
 
 ## Priority Order
 
-If Argo only does a few FFmpeg-native upgrades next, these are the best bets:
+### Already shipped
 
 1. ~~**Post-export camera moves**~~ **SHIPPED** — `zoompan` filter with `in_time` expressions
-   - Why: browser `zoomTo()` is the clearest current example of something better done after capture.
-2. **Better transitions**
-   - Why: transitions affect the whole polish level and are already part of the product story.
-3. **Blur-fill + smarter reframing**
-   - Why: multi-format export is already shipped, but current center-crop is blunt.
-4. **Audio ducking + loudnorm**
-   - Why: immediately improves perceived production quality.
-5. **Freeze-frame hold + title-card beats**
-   - Why: strong editorial payoff without requiring a full compositor.
+2. ~~**Loudness normalization**~~ **SHIPPED** — `loudnorm` EBU R128
+3. ~~**Blur-fill + viewport variants**~~ **SHIPPED** — blur-fill fallback + viewport-native re-recording
+4. ~~**Scene transitions**~~ **SHIPPED** — fade-through-black, dissolve, wipe-left/right (split+trim+fade+concat)
+
+### Validated next priorities
+
+1. **Background music + ducking** — cleanest next win. ffmpeg `sidechaincompress` ducks music under narration. Narration track and export pipeline already exist. Immediately improves perceived production quality.
+2. **Freeze-frame holds + title-card beats** — `tpad` for clean hold/freeze behavior. Fits Argo's scene model well. Strong editorial tool for launches, CTAs, section changes.
+3. **Real `xfade` scene composition** — unlocks more transitions than dip/wipe, but harder timeline problem (both inputs must match fps, resolution, pixel format, timebase). Worth doing after audio ducking and freeze beats.
+4. **Watermark / brand bug / device frame / simple PiP** — natural overlay features. Makes outputs campaign-ready without changing the authoring model.
+5. **Spotlight blur / vignette** — post-export `boxblur` + `vignette` for final polish, especially for short social exports.
+
+### Lower priority for now
+
+- **drawtext-heavy features** (kinetic text, chapter bars) — powerful but depends on ffmpeg font library availability, adds environment variability
+- **tmix / tblend** (motion blur, stutter) — punchy promo moments but not core to the product wedge yet
+- **Color grading / LUTs** — useful later, less important than editorial structure and audio polish for screen demos
 
 ## Effort Breakdown
 
@@ -297,15 +305,6 @@ That split keeps the product understandable:
 
 ## Recommendation
 
-The best immediate next move is:
+See "Validated next priorities" in the Priority Order section above.
 
-1. ~~**post-export camera moves**~~ **SHIPPED** — `zoomTo(page, target, { narration })` records camera move marks; pipeline applies ffmpeg `crop+scale` with animated time expressions
-2. ~~**blur-fill + smart reframing**~~ **SHIPPED** (blur-fill) + viewport-native variants (next)
-3. ~~**audio loudnorm + ducking**~~ **SHIPPED** (loudnorm) + ducking (next)
-
-That sequence would improve both:
-
-- Argo’s weakest current polish edges
-- Argo’s most visible output quality in showcase videos
-
-It also avoids trying to turn browser-time effects into something they are not.
+Sources: [ffmpeg filters docs](https://ffmpeg.org/ffmpeg-filters.html) — zoompan, xfade, loudnorm, sidechaincompress, tpad, overlay, boxblur, vignette, drawtext, tmix, tblend.
