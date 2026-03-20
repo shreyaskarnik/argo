@@ -68,6 +68,22 @@ Camera move pipeline flow: `zoomTo(page, target, { narration })` → `NarrationT
 
 Error handling follows the same pattern as `showConfetti` (filter by disposal errors, warn on others).
 
+### Freeze-Frame Holds (`src/freeze.ts`)
+
+Per-scene freeze-frame holds via `post: [{ type: 'freeze', atMs, durationMs }]` in the scenes manifest. `resolveFreezes()` converts scene-relative offsets to absolute timeline positions. `buildFreezeFilter()` generates ffmpeg trim+tpad+concat to split, hold, and reassemble. `adjustPlacementsForFreezes()` shifts downstream placements/chapters/subtitles. Applied BEFORE transitions (freezes change the timeline). CRITICAL: `-shortest` must be skipped when freezes are present — video is intentionally longer than audio.
+
+### Background Music (`src/export.ts`)
+
+`export.audio.music` mixes a background track under narration. Music loops via `-stream_loop -1`, mixed at constant `musicVolume` (default 0.15) via `amix`, 2-second fade-out at the end. Music mixing goes inside `filter_complex` when other filters are active. Loudnorm is applied after mixing.
+
+### Watermark (`src/export.ts`)
+
+`export.watermark: { src, position, opacity, margin }` overlays a PNG at any corner via ffmpeg `overlay` filter with `colorchannelmixer` for opacity. Applied as the LAST video filter in the chain (after transitions, camera moves, downscale).
+
+### AI Music Generation (`src/music/musicgen.ts` + preview UI)
+
+MusicGen (Xenova/musicgen-small) generates background music from text prompts. Runs in the **browser** preview UI via Web Worker + WebGPU (NOT in the Node.js pipeline). The preview server serves `/musicgen-worker.js` as a same-origin module worker (blob URL workers can't cross-origin import from CDN). Generated WAV is saved to `.argo/<demo>/music/bgm.wav` and picked up by the export pipeline via `audio.music`. CRITICAL: must use `device: 'webgpu'` — WASM fallback is orders of magnitude slower. Use `q4` dtype to reduce model size (~450MB vs 1.8GB fp32).
+
 ### Cursor Highlight (`src/cursor.ts`)
 
 `cursorHighlight(page, opts?)` — persistent cursor highlight that follows the mouse pointer during recording. Injects a styled ring via `page.evaluate()` with optional pulse animation and click ripple effects. Stays active until `resetCursor(page)` is called. Error handling follows the same pattern as `showConfetti` (filter by disposal errors, warn on others). Options: `color` (default `#3b82f6`), `radius` (default 20px), `pulse` (default true), `clickRipple` (default true), `opacity` (default 0.5).
@@ -93,6 +109,9 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - Demo names are validated at the CLI boundary: only `[a-zA-Z0-9][a-zA-Z0-9_-]*` allowed. This prevents path traversal — maintain this validation if adding new commands that accept demo names.
 - `tts generate` derives demoName via `basename()` from the manifest path (strips `.scenes.json` suffix) — do not use `/`-only regex (breaks on Windows paths)
 - Pipeline writes `<demo>.meta.json` alongside the video with TTS engine, voices, resolution, and export settings for provenance tracking
+- Live per-scene recording progress via JSONL sidecar: `narration.mark()` appends to `ARGO_PROGRESS_PATH`, `record()` polls and prints scene names
+- `post` array in scenes manifest supports `{ type: 'freeze', atMs, durationMs }` for freeze-frame holds — resolved to absolute positions, adjusts placements/chapters/subtitles
+- All export features (freeze, camera moves, music, watermark, loudnorm) must be wired through ALL export paths: pipeline, CLI `argo export`, preview Export, and viewport variants — missing any path causes silent divergence
 
 ## Demo Authoring
 
@@ -196,6 +215,9 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - ffmpeg `crop` filter does NOT evaluate `w`/`h` per-frame — only `x`/`y` are dynamic. Use `zoompan` for animated zoom effects. This was the root cause of the camera move no-op bug.
 - `-af` and `-filter_complex` cannot coexist on the same stream — when transitions produce a `filter_complex`, `loudnorm` must be appended inside the graph, not as `-af`.
 - npm version tags: if a tag was already published to npm, you must bump to a new version (can't re-publish the same version even after deleting the tag).
+- `-shortest` must be skipped when freeze-frame holds extend the video beyond the audio duration.
+- Blob URL Web Workers with `type: 'module'` cannot cross-origin import from CDN — serve the worker script from the same origin instead.
+- MusicGen WebGPU dtype: use `q4` (not `fp32`) to avoid ~15GB Chrome RAM usage. `q4` weights are ~450MB total.
 
 ## Security Invariants
 
