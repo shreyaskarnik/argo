@@ -684,7 +684,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             headTrimMs: headTrimMs > 0 ? headTrimMs : undefined,
             speedRampSegments,
             loudnorm: ec?.loudnorm,
-            musicPath: ec?.musicPath ?? activeMusicPath,
+            musicPath: activeMusicPath ?? ec?.musicPath,
             musicVolume: ec?.musicVolume,
             cameraMoves,
             watermark: ec?.watermark,
@@ -706,7 +706,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
       // Serve the MusicGen Web Worker script (same-origin so ESM imports work)
       if (url === '/musicgen-worker.js') {
         const workerScript = `
-import { AutoTokenizer, MusicgenForConditionalGeneration } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3';
+import { AutoTokenizer, MusicgenForConditionalGeneration } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.0.0-next.7';
 
 let tokenizer = null;
 let model = null;
