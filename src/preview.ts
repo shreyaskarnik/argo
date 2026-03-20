@@ -729,6 +729,7 @@ self.onmessage = async (e) => {
       const output = await model.generate({
         ...inputs,
         max_length,
+        do_sample: true,
         guidance_scale: e.data.guidanceScale || 3,
         temperature: e.data.temperature || 1.0,
       });
@@ -742,7 +743,7 @@ self.onmessage = async (e) => {
 `;
         res.writeHead(200, {
           'Content-Type': 'application/javascript',
-          'Cache-Control': 'no-cache',
+          'Cache-Control': 'no-store',
         });
         res.end(workerScript);
         return;
