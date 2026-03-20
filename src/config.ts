@@ -44,9 +44,20 @@ export interface SpeedRampConfig {
   minGapMs?: number;
 }
 
+export interface DuckingConfig {
+  /** Music volume when narration is NOT playing (0.0 to 1.0). Default: 0.15 */
+  musicVolume?: number;
+  /** Music volume when narration IS playing (0.0 to 1.0). Default: 0.05 */
+  duckVolume?: number;
+}
+
 export interface AudioConfig {
   /** Apply EBU R128 loudness normalization. Default: false. */
   loudnorm?: boolean;
+  /** Path to a background music file (MP3, WAV, etc.) to mix under narration. */
+  music?: string;
+  /** Ducking settings for background music. */
+  ducking?: DuckingConfig;
 }
 
 export interface VariantConfig {

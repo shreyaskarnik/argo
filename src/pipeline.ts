@@ -250,6 +250,9 @@ export async function runPipeline(
     totalDurationMs: finalDurationMs,
     speedRampSegments: speedRampPlan.segments,
     loudnorm: config.export.audio?.loudnorm,
+    musicPath: config.export.audio?.music,
+    musicVolume: config.export.audio?.ducking?.musicVolume,
+    duckVolume: config.export.audio?.ducking?.duckVolume,
   };
   if (tailPadMs !== undefined) exportOptions.tailPadMs = tailPadMs;
   if (headTrimMs > 0) exportOptions.headTrimMs = headTrimMs;
@@ -418,6 +421,9 @@ export async function runPipeline(
         totalDurationMs: variantShiftedDurationMs,
         headTrimMs: variantHeadTrimMs > 0 ? variantHeadTrimMs : undefined,
         loudnorm: config.export.audio?.loudnorm,
+        musicPath: config.export.audio?.music,
+        musicVolume: config.export.audio?.ducking?.musicVolume,
+        duckVolume: config.export.audio?.ducking?.duckVolume,
         cameraMoves: variantCameraMoves.length > 0 ? variantCameraMoves : undefined,
       });
 

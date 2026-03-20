@@ -41,6 +41,12 @@ export interface ExportOptions {
   speedRampSegments?: Segment[];
   /** Apply EBU R128 loudness normalization to audio. */
   loudnorm?: boolean;
+  /** Path to a background music file to mix under narration. */
+  musicPath?: string;
+  /** Music volume when narration is NOT playing (0.0 to 1.0). Default: 0.15 */
+  musicVolume?: number;
+  /** Music volume when narration IS playing (0.0 to 1.0). Default: 0.05 */
+  duckVolume?: number;
   /** Post-export camera moves (zoom/pan) recorded during Playwright session. */
   cameraMoves?: CameraMove[];
 }
@@ -195,6 +201,21 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     args.push('-i', thumbnailPath);
   }
 
+  // Background music input
+  const musicPath = options.musicPath;
+  const hasMusic = musicPath && existsSync(musicPath);
+  let musicInputIdx = -1;
+  if (musicPath && !existsSync(musicPath)) {
+    console.warn(
+      `Warning: configured music path "${musicPath}" does not exist. ` +
+      `The video will be exported without background music.`
+    );
+  }
+  if (hasMusic) {
+    musicInputIdx = nextInput++;
+    args.push('-stream_loop', '-1', '-i', musicPath);
+  }
+
   // Build video filter chain
   const filterParts: string[] = [];
   let videoSource = '0:v';
@@ -276,9 +297,42 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     }
   }
 
+  // Background music mixing — applied before loudnorm so normalization covers the mix
+  if (hasMusic) {
+    const musicVol = options.musicVolume ?? 0.15;
+    const musicRef = `${musicInputIdx}:a`;
+
+    if (hasAudio && audioSource) {
+      // Mix music under narration: lower music volume, combine with amix
+      // afade on the music gives a 2s fade-out at the end (duration estimated from total)
+      const fadeFilter = totalDurationMs && totalDurationMs > 2000
+        ? `,afade=t=out:st=${formatSeconds(totalDurationMs - 2000)}:d=2`
+        : '';
+      filterParts.push(
+        `[${musicRef}]volume=${musicVol}${fadeFilter}[bgm]`,
+      );
+      filterParts.push(
+        `[${audioSource}][bgm]amix=inputs=2:duration=first:dropout_transition=2[amixed]`,
+      );
+      audioSource = 'amixed';
+    } else {
+      // No narration — use music as sole audio track
+      const fadeFilter = totalDurationMs && totalDurationMs > 2000
+        ? `,afade=t=out:st=${formatSeconds(totalDurationMs - 2000)}:d=2`
+        : '';
+      filterParts.push(
+        `[${musicRef}]volume=${musicVol}${fadeFilter}[bgm]`,
+      );
+      audioSource = 'bgm';
+    }
+  }
+
+  // Track whether we have any audio output (narration, music, or both)
+  const hasAnyAudio = hasAudio || hasMusic;
+
   // Audio loudnorm — must be added before filter_complex is finalized
   let useLoudnormSimple = false;
-  if (hasAudio && options.loudnorm) {
+  if (hasAnyAudio && audioSource && options.loudnorm) {
     if (filterParts.length > 0) {
       // Append loudnorm inside the filter_complex audio chain
       filterParts.push(`[${audioSource}]loudnorm=I=-16:TP=-1.5:LRA=11[anorm]`);
@@ -297,7 +351,7 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     '-preset', preset,
     '-crf', String(crf),
   );
-  if (hasAudio) {
+  if (hasAnyAudio) {
     if (useLoudnormSimple) {
       args.push('-af', 'loudnorm=I=-16:TP=-1.5:LRA=11');
     }
@@ -317,19 +371,19 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
 
   if (usesExplicitMaps) {
     args.push('-map', mapRef(videoSource));
-    if (hasAudio && audioSource) args.push('-map', mapRef(audioSource));
+    if (hasAnyAudio && audioSource) args.push('-map', mapRef(audioSource));
   }
 
   if (hasThumbnail) {
     if (!usesExplicitMaps) {
       args.push('-map', '0:v');
-      if (hasAudio) args.push('-map', '1:a');
+      if (hasAnyAudio) args.push('-map', '1:a');
     }
     args.push('-map', `${thumbInputIdx}:v`);
     // Encode thumbnail stream as PNG attached picture
     args.push('-c:v:1', 'png', '-disposition:v:1', 'attached_pic');
     // Skip -shortest: the PNG has 0 duration and would truncate the whole output.
-  } else if (hasAudio) {
+  } else if (hasAnyAudio) {
     args.push('-shortest');
   }
 

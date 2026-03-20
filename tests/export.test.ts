@@ -10,8 +10,13 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
 }));
 
+vi.mock('../src/progress.js', () => ({
+  runFfmpegWithProgress: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
+import { runFfmpegWithProgress } from '../src/progress.js';
 import { checkFfmpeg, exportVideo } from '../src/export.js';
 
 const mockedExecFileSync = vi.mocked(execFileSync);
@@ -263,5 +268,128 @@ describe('exportVideo', () => {
     expect(a).toContain('[outa]');
     expect(a).toContain('3:v');
     expect(a).toContain('-disposition:v:1');
+  });
+
+  // ---------- background music ----------
+
+  const mockedRunFfmpegWithProgress = vi.mocked(runFfmpegWithProgress);
+
+  it('adds music input with loop and volume filter when musicPath is set', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      musicPath: 'assets/bg-music.mp3',
+      totalDurationMs: 10000,
+    });
+
+    // totalDurationMs triggers the progress path
+    const a = mockedRunFfmpegWithProgress.mock.calls[0][0] as string[];
+    // Music input should be looped
+    expect(a).toContain('-stream_loop');
+    expect(a).toContain('-1');
+    expect(a).toContain('assets/bg-music.mp3');
+    // filter_complex should contain volume and amix
+    expect(a).toContain('-filter_complex');
+    const fcIdx = a.indexOf('-filter_complex');
+    const fc = a[fcIdx + 1];
+    expect(fc).toContain('volume=0.15');
+    expect(fc).toContain('amix=inputs=2:duration=first');
+    // Should have audio codec
+    expect(a).toContain('-c:a');
+    expect(a).toContain('aac');
+  });
+
+  it('uses custom musicVolume when specified', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      musicPath: 'assets/bg-music.mp3',
+      musicVolume: 0.3,
+      totalDurationMs: 10000,
+    });
+
+    const a = mockedRunFfmpegWithProgress.mock.calls[0][0] as string[];
+    const fcIdx = a.indexOf('-filter_complex');
+    const fc = a[fcIdx + 1];
+    expect(fc).toContain('volume=0.3');
+  });
+
+  it('adds fade-out on music in last 2 seconds', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      musicPath: 'assets/bg-music.mp3',
+      totalDurationMs: 10000,
+    });
+
+    const a = mockedRunFfmpegWithProgress.mock.calls[0][0] as string[];
+    const fcIdx = a.indexOf('-filter_complex');
+    const fc = a[fcIdx + 1];
+    expect(fc).toContain('afade=t=out:st=8:d=2');
+  });
+
+  it('uses music as sole audio in silent mode (no narration)', async () => {
+    mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
+    mockedExistsSync.mockImplementation((p) => {
+      if (String(p).endsWith('narration-aligned.wav')) return false;
+      return true;
+    });
+    mockedSpawnSync.mockReturnValue({ status: 0 } as any);
+
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      musicPath: 'assets/bg-music.mp3',
+      totalDurationMs: 5000,
+    });
+
+    const a = mockedRunFfmpegWithProgress.mock.calls[0][0] as string[];
+    // Should have music input
+    expect(a).toContain('assets/bg-music.mp3');
+    // Should have audio codec (music provides audio)
+    expect(a).toContain('-c:a');
+    expect(a).toContain('aac');
+    // filter_complex should have volume but NOT amix (no narration to mix with)
+    const fcIdx = a.indexOf('-filter_complex');
+    const fc = a[fcIdx + 1];
+    expect(fc).toContain('volume=0.15');
+    expect(fc).not.toContain('amix');
+  });
+
+  it('skips music when musicPath does not exist on disk', async () => {
+    mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
+    mockedExistsSync.mockImplementation((p) => {
+      if (String(p) === 'assets/missing-music.mp3') return false;
+      return true;
+    });
+    mockedSpawnSync.mockReturnValue({ status: 0 } as any);
+
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      musicPath: 'assets/missing-music.mp3',
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const a = args as string[];
+    expect(a).not.toContain('assets/missing-music.mp3');
+    expect(a).not.toContain('-stream_loop');
+  });
+
+  it('applies loudnorm after music mixing', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      musicPath: 'assets/bg-music.mp3',
+      loudnorm: true,
+      totalDurationMs: 10000,
+    });
+
+    const a = mockedRunFfmpegWithProgress.mock.calls[0][0] as string[];
+    const fcIdx = a.indexOf('-filter_complex');
+    const fc = a[fcIdx + 1];
+    // loudnorm should come after amix
+    expect(fc).toContain('amix');
+    expect(fc).toContain('loudnorm');
+    // loudnorm input should be the amixed output
+    expect(fc).toContain('[amixed]loudnorm');
   });
 });

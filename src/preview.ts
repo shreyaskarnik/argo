@@ -35,6 +35,9 @@ export interface PreviewExportConfig {
   transition?: import('./config.js').TransitionConfig;
   speedRamp?: import('./config.js').SpeedRampConfig;
   loudnorm?: boolean;
+  musicPath?: string;
+  musicVolume?: number;
+  duckVolume?: number;
 }
 
 export interface PreviewOptions {
@@ -650,6 +653,9 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             headTrimMs: headTrimMs > 0 ? headTrimMs : undefined,
             speedRampSegments,
             loudnorm: ec?.loudnorm,
+            musicPath: ec?.musicPath,
+            musicVolume: ec?.musicVolume,
+            duckVolume: ec?.duckVolume,
             cameraMoves,
           });
 

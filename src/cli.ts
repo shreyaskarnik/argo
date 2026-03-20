@@ -182,6 +182,9 @@ export function createProgram(): Command {
         headTrimMs,
         speedRampSegments,
         loudnorm: config.export.audio?.loudnorm,
+        musicPath: config.export.audio?.music,
+        musicVolume: config.export.audio?.ducking?.musicVolume,
+        duckVolume: config.export.audio?.ducking?.duckVolume,
         cameraMoves: (() => {
           const cameraMovesPath = `${demoDir}/.timing.camera-moves.json`;
           try {
@@ -336,6 +339,9 @@ export function createProgram(): Command {
             transition: config.export.transition,
             speedRamp: config.export.speedRamp,
             loudnorm: config.export.audio?.loudnorm,
+            musicPath: config.export.audio?.music,
+            musicVolume: config.export.audio?.ducking?.musicVolume,
+            duckVolume: config.export.audio?.ducking?.duckVolume,
           },
         });
         console.log(`\nArgo Dashboard running at: ${url}`);
@@ -367,6 +373,9 @@ export function createProgram(): Command {
           transition: config.export.transition,
           speedRamp: config.export.speedRamp,
           loudnorm: config.export.audio?.loudnorm,
+          musicPath: config.export.audio?.music,
+          musicVolume: config.export.audio?.ducking?.musicVolume,
+          duckVolume: config.export.audio?.ducking?.duckVolume,
         },
       });
       console.log(`\nArgo Preview running at: ${url}`);
