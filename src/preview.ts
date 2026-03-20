@@ -37,7 +37,6 @@ export interface PreviewExportConfig {
   loudnorm?: boolean;
   musicPath?: string;
   musicVolume?: number;
-  duckVolume?: number;
 }
 
 export interface PreviewOptions {
@@ -655,7 +654,6 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             loudnorm: ec?.loudnorm,
             musicPath: ec?.musicPath,
             musicVolume: ec?.musicVolume,
-            duckVolume: ec?.duckVolume,
             cameraMoves,
           });
 

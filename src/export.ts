@@ -43,10 +43,8 @@ export interface ExportOptions {
   loudnorm?: boolean;
   /** Path to a background music file to mix under narration. */
   musicPath?: string;
-  /** Music volume when narration is NOT playing (0.0 to 1.0). Default: 0.15 */
+  /** Music volume level (0.0 to 1.0). Default: 0.15. Mixed at a constant level. */
   musicVolume?: number;
-  /** Music volume when narration IS playing (0.0 to 1.0). Default: 0.05 */
-  duckVolume?: number;
   /** Post-export camera moves (zoom/pan) recorded during Playwright session. */
   cameraMoves?: CameraMove[];
 }

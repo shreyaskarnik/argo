@@ -386,11 +386,16 @@ export: {
 
 ```js
 export: {
-  audio: { loudnorm: true }
+  audio: {
+    loudnorm: true,                   // EBU R128 normalization (-16 LUFS)
+    music: 'assets/bg-music.mp3',     // background music track
+    musicVolume: 0.15,                // music volume (0.0-1.0, default 0.15)
+  }
 }
 ```
 
-EBU R128 loudness normalization (-16 LUFS) — makes voiceover volume consistent across TTS engines and scenes.
+- **Loudnorm** — EBU R128 loudness normalization. Makes voiceover volume consistent across TTS engines and scenes.
+- **Background music** — loops to fill the video, mixed at a constant low volume under narration, 2-second fade-out at the end. Works with silent demos too (music becomes the sole audio track).
 
 ### Post-Export Camera Moves
 
