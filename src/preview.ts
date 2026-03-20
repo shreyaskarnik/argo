@@ -3046,7 +3046,6 @@ if (DATA.pipelineMeta) {
   const musicSaveBtn = document.getElementById('music-save-btn');
   const musicStatus = document.getElementById('music-status');
 
-  let musicWorker = null;
   let generatedWavBlob = null;
 
   // Toggle panel
@@ -3095,52 +3094,43 @@ if (DATA.pipelineMeta) {
     return new Blob([buffer], { type: 'audio/wav' });
   }
 
-  // Create web worker (inline blob with ESM)
-  function createMusicWorker() {
-    const workerCode = [
-      'import { AutoTokenizer, MusicgenForConditionalGeneration } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3";',
-      '',
-      'let tokenizer = null;',
-      'let model = null;',
-      '',
-      'async function loadModel() {',
-      '  self.postMessage({ type: "progress", message: "Loading MusicGen model (~1.8GB, first time takes a while)..." });',
-      '  tokenizer = await AutoTokenizer.from_pretrained("Xenova/musicgen-small");',
-      '  self.postMessage({ type: "progress", message: "Tokenizer loaded. Loading model weights..." });',
-      '  model = await MusicgenForConditionalGeneration.from_pretrained("Xenova/musicgen-small", {',
-      '    dtype: { text_encoder: "q8", decoder_model_merged: "q8", encodec_decode: "fp32" },',
-      '  });',
-      '  self.postMessage({ type: "progress", message: "Model loaded." });',
-      '}',
-      '',
-      'self.onmessage = async (e) => {',
-      '  if (e.data.type === "generate") {',
-      '    try {',
-      '      if (!model) await loadModel();',
-      '      self.postMessage({ type: "progress", message: "Generating audio from prompt..." });',
-      '      const inputs = tokenizer(e.data.prompt);',
-      '      const maxTokens = Math.ceil(e.data.durationSec * 50);',
-      '      const output = await model.generate({',
-      '        ...inputs,',
-      '        max_new_tokens: maxTokens,',
-      '        do_sample: true,',
-      '        guidance_scale: e.data.guidanceScale || 3,',
-      '        temperature: e.data.temperature || 1.0,',
-      '      });',
-      '      const audioData = output.data instanceof Float32Array ? output.data : new Float32Array(output.data);',
-      '      self.postMessage({ type: "complete", audioData: audioData, sampleRate: 32000 }, [audioData.buffer]);',
-      '    } catch (err) {',
-      '      self.postMessage({ type: "error", message: err.message || String(err) });',
-      '    }',
-      '  }',
-      '};',
-    ].join('\\n');
+  // Load Transformers.js on-demand via dynamic import from CDN
+  let _transformers = null;
+  let _musicTokenizer = null;
+  let _musicModel = null;
 
-    const blob = new Blob([workerCode], { type: 'application/javascript' });
-    const url = URL.createObjectURL(blob);
-    const worker = new Worker(url, { type: 'module' });
-    URL.revokeObjectURL(url);
-    return worker;
+  async function loadTransformers() {
+    if (_transformers) return _transformers;
+    _transformers = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3');
+    return _transformers;
+  }
+
+  async function loadMusicModel(onProgress) {
+    if (_musicModel && _musicTokenizer) return;
+    const tf = await loadTransformers();
+    onProgress('Loading MusicGen tokenizer...');
+    _musicTokenizer = await tf.AutoTokenizer.from_pretrained('Xenova/musicgen-small');
+    onProgress('Loading MusicGen model (~1.8GB, first time takes a while)...');
+    _musicModel = await tf.MusicgenForConditionalGeneration.from_pretrained('Xenova/musicgen-small', {
+      dtype: { text_encoder: 'q8', decoder_model_merged: 'q8', encodec_decode: 'fp32' },
+    });
+    onProgress('Model loaded.');
+  }
+
+  async function generateMusicFromPrompt(prompt, durationSec, onProgress) {
+    await loadMusicModel(onProgress);
+    onProgress('Generating audio from prompt...');
+    const inputs = _musicTokenizer(prompt);
+    const maxTokens = Math.ceil(durationSec * 50);
+    const output = await _musicModel.generate({
+      ...inputs,
+      max_new_tokens: maxTokens,
+      do_sample: true,
+      guidance_scale: 3,
+      temperature: 1.0,
+    });
+    const audioData = output.data instanceof Float32Array ? output.data : new Float32Array(output.data);
+    return { audioData, sampleRate: 32000 };
   }
 
   function showProgress(msg) {
@@ -3169,57 +3159,27 @@ if (DATA.pipelineMeta) {
     setProgressBar(10);
     musicStatus.textContent = '';
 
-    if (!musicWorker) {
-      musicWorker = createMusicWorker();
-      musicWorker.onmessage = handleWorkerMessage;
-      musicWorker.onerror = (err) => {
-        musicGenerateBtn.disabled = false;
-        musicProgress.style.display = 'none';
-        musicStatus.textContent = 'Worker error: ' + (err.message || 'Unknown error');
-      };
-    }
-
-    musicWorker.postMessage({
-      type: 'generate',
-      prompt: prompt,
-      durationSec: durationSec,
-      guidanceScale: 3,
-      temperature: 1.0,
-    });
-  });
-
-  function handleWorkerMessage(e) {
-    const msg = e.data;
-    if (msg.type === 'progress') {
-      showProgress(msg.message);
-      // Estimate progress based on message content
-      if (msg.message.includes('Tokenizer')) setProgressBar(25);
-      else if (msg.message.includes('Model loaded')) setProgressBar(50);
-      else if (msg.message.includes('Generating')) setProgressBar(60);
-      else setProgressBar(15);
-    } else if (msg.type === 'complete') {
+    generateMusicFromPrompt(prompt, durationSec, (msg) => {
+      showProgress(msg);
+      if (msg.includes('tokenizer')) setProgressBar(20);
+      else if (msg.includes('Model loaded')) setProgressBar(40);
+      else if (msg.includes('Generating')) setProgressBar(60);
+    }).then(({ audioData, sampleRate }) => {
       setProgressBar(100);
-      showProgress('Generation complete.');
-      musicGenerateBtn.disabled = false;
-
-      // Encode to WAV and create audio preview
-      generatedWavBlob = encodeWavFloat32(msg.audioData, msg.sampleRate);
-      const audioUrl = URL.createObjectURL(generatedWavBlob);
-      musicAudio.src = audioUrl;
+      showProgress('Done!');
+      generatedWavBlob = encodeWavFloat32(audioData, sampleRate);
+      const url = URL.createObjectURL(generatedWavBlob);
+      musicAudio.src = url;
       musicAudio.style.display = 'block';
-      musicSaveBtn.style.display = 'block';
-      musicStatus.textContent = 'Audio ready. Press play to audition, or save as background music.';
-
-      setTimeout(() => {
-        musicProgress.style.display = 'none';
-        setProgressBar(0);
-      }, 2000);
-    } else if (msg.type === 'error') {
+      musicSaveBtn.style.display = 'inline-block';
+      musicGenerateBtn.disabled = false;
+      setTimeout(() => { musicProgress.style.display = 'none'; }, 1500);
+    }).catch((err) => {
       musicGenerateBtn.disabled = false;
       musicProgress.style.display = 'none';
-      musicStatus.textContent = 'Generation failed: ' + msg.message;
-    }
-  }
+      musicStatus.textContent = 'Error: ' + (err.message || String(err));
+    });
+  });
 
   // Save button
   musicSaveBtn.addEventListener('click', async () => {
