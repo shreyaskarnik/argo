@@ -890,34 +890,30 @@
         <div class="feature-card" id="authoring-manifest" data-demo-target="authoring-manifest">
           <div class="feature-kicker">Unified Manifest</div>
           <h3 class="feature-name">One <span class="inline-code">.scenes.json</span> file</h3>
-          <p class="feature-desc">Voiceover text, per-scene voice and speed, and overlay definitions live together so scene beats stay easy to reason about.</p>
+          <p class="feature-desc">Voiceover, voice, speed, and overlays in one file per scene.</p>
           <div class="snippet">
-            <span class="p">[</span><br />
-            &nbsp;&nbsp;<span class="p">{</span> <span class="n">"scene"</span><span class="p">:</span> <span class="s">"preview"</span><span class="p">,</span><br />
-            &nbsp;&nbsp;&nbsp;&nbsp;<span class="n">"text"</span><span class="p">:</span> <span class="s">"Edit the final cut without re-recording."</span><span class="p">,</span><br />
-            &nbsp;&nbsp;&nbsp;&nbsp;<span class="n">"overlay"</span><span class="p">:</span> <span class="p">{</span> <span class="n">"type"</span><span class="p">:</span> <span class="s">"headline-card"</span> <span class="p">}</span> <span class="p">}</span><br />
-            <span class="p">]</span>
+            <span class="p">{</span> <span class="n">"scene"</span><span class="p">:</span> <span class="s">"preview"</span><span class="p">,</span> <span class="n">"text"</span><span class="p">:</span> <span class="s">"Edit without re-recording."</span> <span class="p">}</span>
           </div>
         </div>
 
         <div class="feature-card" id="authoring-overlays" data-demo-target="authoring-overlays">
           <div class="feature-kicker">Overlays</div>
           <h3 class="feature-name">Headline cards, callouts, lower-thirds, image cards</h3>
-          <p class="feature-desc">Typed overlays make the demo editorial instead of raw. Keep the story visible without having to bake text into the app.</p>
+          <p class="feature-desc">Typed overlays keep the story visible without baking text into the app.</p>
           <span class="feature-tag">showOverlay() / withOverlay()</span>
         </div>
 
         <div class="feature-card" id="authoring-silent" data-demo-target="authoring-silent">
           <div class="feature-kicker">Silent Mode</div>
           <h3 class="feature-name">Omit <span class="inline-code">text</span> when you just want motion</h3>
-          <p class="feature-desc">Not every demo beat needs narration. Silent scenes and fully silent videos still export cleanly with the same timeline structure.</p>
+          <p class="feature-desc">Silent scenes and fully silent videos export cleanly with the same structure.</p>
           <span class="feature-tag">text: omitted</span>
         </div>
 
         <div class="feature-card" id="authoring-duration" data-demo-target="authoring-duration">
           <div class="feature-kicker">Timing Helpers</div>
           <h3 class="feature-name">Scene pacing from clip lengths</h3>
-          <p class="feature-desc"><span class="inline-code">narration.durationFor()</span> turns TTS duration into sane scene holds, so your demo stays aligned as copy changes.</p>
+          <p class="feature-desc"><span class="inline-code">durationFor()</span> syncs scene holds to TTS clip lengths automatically.</p>
           <span class="feature-tag">narration.durationFor('preview')</span>
         </div>
       </div>
@@ -945,7 +941,7 @@
         </div>
       </div>
 
-      <div class="features-grid">
+      <div class="features-grid cols-3">
         <div class="feature-card" id="engine-kokoro" data-demo-target="engine-kokoro">
           <div class="feature-kicker">Local default</div>
           <h3 class="feature-name">Kokoro</h3>
@@ -1210,7 +1206,7 @@
         <div class="feature-card" id="ops-batch" data-demo-target="ops-batch">
           <div class="feature-kicker">Batch</div>
           <h3 class="feature-name"><span class="inline-code">argo pipeline --all</span></h3>
-          <p class="feature-desc">Run every demo in the configured demos directory and fail the batch when any important path breaks.</p>
+          <p class="feature-desc">Run every demo and fail the batch when any path breaks.</p>
         </div>
         <div class="feature-card" id="ops-dashboard" data-demo-target="ops-dashboard">
           <div class="feature-kicker">Dashboard</div>
@@ -1220,12 +1216,12 @@
         <div class="feature-card" id="ops-validate" data-demo-target="ops-validate">
           <div class="feature-kicker">Validation</div>
           <h3 class="feature-name">Catch bad scene wiring before a render</h3>
-          <p class="feature-desc">Validate scene names, imports, and manifest structure before you spend time generating narration or recording.</p>
+          <p class="feature-desc">Check scene names and manifest structure before spending time on a render.</p>
         </div>
         <div class="feature-card" id="ops-doctor" data-demo-target="ops-doctor">
           <div class="feature-kicker">Doctor</div>
           <h3 class="feature-name">Check the environment</h3>
-          <p class="feature-desc">ffmpeg, Playwright browsers, config, and the other failure modes that usually burn time right before a render.</p>
+          <p class="feature-desc">ffmpeg, Playwright browsers, config — catch failures before they burn time.</p>
         </div>
       </div>
     </div>
