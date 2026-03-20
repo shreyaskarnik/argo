@@ -160,7 +160,7 @@ export function createProgram(): Command {
             }
           }
         }
-        const resolvedFreezes = resolveFreezes(cliFreeze, placements);
+        resolvedFreezes = resolveFreezes(cliFreeze, placements);
         if (resolvedFreezes.length > 0) {
           placements = adjustPlacementsForFreezes(placements, resolvedFreezes);
           totalDurationMs += totalFreezeDurationMs(resolvedFreezes);
