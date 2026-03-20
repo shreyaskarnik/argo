@@ -397,6 +397,35 @@ export: {
 - **Loudnorm** — EBU R128 loudness normalization. Makes voiceover volume consistent across TTS engines and scenes.
 - **Background music** — loops to fill the video, mixed at a constant low volume under narration, 2-second fade-out at the end. Works with silent demos too (music becomes the sole audio track).
 
+### Freeze-Frame Holds
+
+Pause the video at a key moment — great for CTAs, section transitions, or letting text breathe:
+
+```json
+{
+  "scene": "cta",
+  "text": "Sign up now.",
+  "post": [{ "type": "freeze", "atMs": 1800, "durationMs": 1200 }]
+}
+```
+
+`atMs` is relative to the scene start. The freeze extends the total video duration — chapters, subtitles, and the scene report auto-adjust.
+
+### Watermark
+
+Overlay a logo or brand bug on the exported video:
+
+```js
+export: {
+  watermark: {
+    src: 'assets/logo.png',
+    position: 'bottom-right',   // top-left | top-right | bottom-left | bottom-right
+    opacity: 0.7,               // 0.0 - 1.0 (default 0.7)
+    margin: 20,                 // pixels from edge (default 20)
+  }
+}
+```
+
 ### Post-Export Camera Moves
 
 Zoom into specific elements with frame-exact ffmpeg `zoompan` — overlays stay unaffected:

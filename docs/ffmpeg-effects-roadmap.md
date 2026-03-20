@@ -85,14 +85,16 @@ That matters for Argo because some effects are clunky or brittle in-browser but 
 2. ~~**Loudness normalization**~~ **SHIPPED** — `loudnorm` EBU R128
 3. ~~**Blur-fill + viewport variants**~~ **SHIPPED** — blur-fill fallback + viewport-native re-recording
 4. ~~**Scene transitions**~~ **SHIPPED** — fade-through-black, dissolve, wipe-left/right (split+trim+fade+concat)
+5. ~~**Background music**~~ **SHIPPED** — `export.audio.music` with constant-volume mixing, loop, 2s fade-out. Works solo or mixed under narration via `amix`.
+6. ~~**Freeze-frame holds**~~ **SHIPPED** — per-scene `post: [{ type: "freeze", atMs, durationMs }]` in manifest. Uses `tpad` + timeline adjustment so chapters/subtitles stay in sync.
+7. ~~**Watermark / brand bug**~~ **SHIPPED** — `export.watermark: { src, position, opacity, margin }`. Four corner positions, alpha blending via `colorchannelmixer`, applied as final overlay filter.
+8. ~~**yuv420p pixel format**~~ **SHIPPED** — ensures universal playback compatibility
 
 ### Validated next priorities
 
-1. **Background music + ducking** — cleanest next win. ffmpeg `sidechaincompress` ducks music under narration. Narration track and export pipeline already exist. Immediately improves perceived production quality.
-2. **Freeze-frame holds + title-card beats** — `tpad` for clean hold/freeze behavior. Fits Argo's scene model well. Strong editorial tool for launches, CTAs, section changes.
-3. **Real `xfade` scene composition** — unlocks more transitions than dip/wipe, but harder timeline problem (both inputs must match fps, resolution, pixel format, timebase). Worth doing after audio ducking and freeze beats.
-4. **Watermark / brand bug / device frame / simple PiP** — natural overlay features. Makes outputs campaign-ready without changing the authoring model.
-5. **Spotlight blur / vignette** — post-export `boxblur` + `vignette` for final polish, especially for short social exports.
+1. **Real `xfade` scene composition** — unlocks more transitions than dip/wipe, but harder timeline problem (both inputs must match fps, resolution, pixel format, timebase). Worth doing after audio ducking and freeze beats.
+2. **Spotlight blur / vignette** — post-export `boxblur` + `vignette` for final polish, especially for short social exports.
+3. **AI-generated background music** — MusicGen via Transformers.js in preview (browser-side WebGPU). Already shipped in preview UI; pipeline integration next.
 
 ### Lower priority for now
 
@@ -117,15 +119,15 @@ That matters for Argo because some effects are clunky or brittle in-browser but 
     }
     ```
 
-- Background music ducking
-  - FFmpeg primitives: sidechain compression
-  - Suggested API:
+- ~~Background music~~ **SHIPPED** — `export.audio.music` with constant-volume mixing (no sidechain ducking — simpler and cleaner for narration-heavy demos)
+  - FFmpeg primitives: `stream_loop`, `volume`, `afade`, `amix`
+  - API:
 
     ```js
     export: {
       audio: {
         music: 'assets/bed.mp3',
-        ducking: { thresholdDb: -24, ratio: 6 }
+        musicVolume: 0.15,    // constant volume, default 0.15
       }
     }
     ```
@@ -143,25 +145,26 @@ That matters for Argo because some effects are clunky or brittle in-browser but 
     }
     ```
 
-- Watermark / brand bug
-  - FFmpeg primitives: overlay
-  - Suggested API:
+- ~~Watermark / brand bug~~ **SHIPPED** — `export.watermark` with position, opacity, margin
+  - FFmpeg primitives: `overlay`, `colorchannelmixer` (alpha)
+  - API:
 
     ```js
     export: {
       watermark: {
         src: 'assets/bug.png',
-        position: 'bottom-right',
-        opacity: 0.8
+        position: 'bottom-right',  // top-left | top-right | bottom-left | bottom-right
+        opacity: 0.7,
+        margin: 20,
       }
     }
     ```
 
 ## Medium
 
-- Freeze-frame hold
+- ~~Freeze-frame hold~~ **SHIPPED** — per-scene `post` array in manifest
   - FFmpeg primitives: trim, `tpad`, concat
-  - Suggested API:
+  - API:
 
     ```json
     {
@@ -169,6 +172,7 @@ That matters for Argo because some effects are clunky or brittle in-browser but 
       "post": [{ "type": "freeze", "atMs": 1800, "durationMs": 1200 }]
     }
     ```
+  - Timeline-first: freeze extends total duration, chapters/subtitles auto-adjust
 
 - Title cards / bumpers
   - FFmpeg primitives: color source, drawtext, overlay, concat
@@ -265,45 +269,54 @@ That matters for Argo because some effects are clunky or brittle in-browser but 
     }
     ```
 
-## Recommended API Shape
+## Shipped API Shape
 
-Argo should probably expose FFmpeg-native polish in two layers:
+Argo exposes FFmpeg-native polish in two layers (both implemented):
 
 ### Global Export Config
 
-For effects that apply to the whole video or output format:
+Effects that apply to the whole video:
 
 ```js
 export: {
   transition: { type: 'fade-through-black', durationMs: 2000 },
   speedRamp: { gapSpeed: 2.0, minGapMs: 600 },
-  formats: [{ type: '9:16', fill: 'blur', framing: 'smart' }],
-  audio: { loudnorm: true, music: 'assets/bed.mp3' },
-  watermark: { src: 'assets/bug.png', position: 'bottom-right' }
+  formats: ['9:16', '1:1', 'gif'],
+  audio: { loudnorm: true, music: 'assets/bed.mp3', musicVolume: 0.15 },
+  watermark: { src: 'assets/bug.png', position: 'bottom-right', opacity: 0.7 },
+  variants: [{ name: 'vertical', video: { width: 1080, height: 1920 } }],
 }
 ```
 
 ### Per-Scene Post Effects
 
-For scene-specific editorial shaping:
+Scene-specific editorial shaping via manifest `post` array:
 
 ```json
 {
   "scene": "preview",
   "text": "Edit without re-recording.",
   "post": [
-    { "type": "freeze", "atMs": 1700, "durationMs": 1000 },
-    { "type": "camera-move", "target": "#preview-export", "move": "push-in", "durationMs": 1200 }
+    { "type": "freeze", "atMs": 1700, "durationMs": 1000 }
   ]
 }
+```
+
+### Script-Side Camera Moves
+
+Zoom/pan via `zoomTo` with `narration` option (recorded during Playwright, applied by ffmpeg):
+
+```typescript
+zoomTo(page, '#revenue-chart', { narration, scale: 1.35, holdMs: 3000 });
 ```
 
 That split keeps the product understandable:
 
 - global config for export-wide polish
 - scene-level `post` effects for editorial beats
+- script-side `zoomTo({ narration })` for camera moves tied to element positions
 
-## Recommendation
+## What's Next
 
 See "Validated next priorities" in the Priority Order section above.
 

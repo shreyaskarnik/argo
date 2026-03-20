@@ -66,6 +66,7 @@ describe('exportVideo', () => {
       '-i', '.argo/my-demo/video.webm',
       '-i', '.argo/my-demo/narration-aligned.wav',
       '-c:v', 'libx264',
+      '-pix_fmt', 'yuv420p',
       '-preset', 'slow',
       '-crf', '16',
       '-c:a', 'aac',
