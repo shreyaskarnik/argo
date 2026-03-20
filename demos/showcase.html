@@ -390,8 +390,8 @@
     .steps-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
-      margin-bottom: 24px;
+      gap: 16px;
+      margin-bottom: 16px;
     }
 
     .features-grid {
@@ -885,7 +885,7 @@
         </div>
       </div>
 
-      <div class="features-grid">
+      <div class="features-grid" style="grid-template-columns: repeat(4, minmax(0, 1fr));">
         <div class="feature-card" id="authoring-manifest" data-demo-target="authoring-manifest">
           <div class="feature-kicker">Unified Manifest</div>
           <h3 class="feature-name">One <span class="inline-code">.scenes.json</span> file</h3>
