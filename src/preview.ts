@@ -755,8 +755,8 @@ let model = null;
 let backend = null;
 
 const WEBGPU_DTYPE = {
-  text_encoder: 'fp32',
-  decoder_model_merged: 'fp32',
+  text_encoder: 'q4',
+  decoder_model_merged: 'q4',
   encodec_decode: 'fp32',
 };
 
