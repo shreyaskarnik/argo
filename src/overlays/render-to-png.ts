@@ -320,8 +320,15 @@ export async function buildOverlayPngsForImport(options: {
   if (overlayInputs.length === 0) return undefined;
 
   // Detect theme per-overlay from the video at each overlay's time range
+  // Try the original-extension video first (imported videos), fall back to .webm
   const { detectVideoTheme } = await import('../media.js');
-  const videoPath = join(argoDir, demoName, 'video.webm');
+  const demoDir = join(argoDir, demoName);
+  const videoExts = ['.mp4', '.mov', '.mkv', '.avi', '.webm'];
+  let videoPath = join(demoDir, 'video.webm');
+  for (const ext of videoExts) {
+    const candidate = join(demoDir, `video${ext}`);
+    if (existsSync(candidate)) { videoPath = candidate; break; }
+  }
   const themeMap: Record<string, BackgroundTheme> = {};
   for (const input of overlayInputs) {
     themeMap[input.scene] = detectVideoTheme(videoPath, input.startMs, input.endMs);
