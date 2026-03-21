@@ -217,7 +217,6 @@ npx argo preview <name>                     # Interactive replay viewer (iterate
 npx argo preview                            # Multi-demo dashboard (lists all demos with status)
 npx argo clip <name> <scene>                # Extract a scene as MP4 clip
 npx argo clip <name> <scene> --format gif   # Extract as GIF (for release notes, docs)
-npx argo import video.mp4 --demo myapp       # Import external video (QuickTime, OBS, ffmpeg)
 npx argo init                               # Scaffold example demo + config
 npx argo init --from tests/spec.ts          # Convert existing Playwright test
 ```
@@ -322,24 +321,6 @@ Argo demos are standard Playwright tests — they show up in VS Code's Playwrigh
 ### Preview Iteration Workflow
 
 Run `argo pipeline` once, then `argo preview` to iterate on voiceover and overlays without re-recording. Preview provides editable text/voice/speed per scene, per-scene TTS regeneration, overlay editing, and a Save button that persists to manifests. Only re-run `pipeline` when the demo script changes.
-
-### Imported Videos (Desktop Apps, Screen Recordings)
-
-For videos not recorded by Playwright (QuickTime, OBS, ffmpeg, any screen recorder):
-
-```bash
-argo import recording.mp4 --demo myapp    # import into Argo
-argo preview myapp                        # open preview to add scenes
-```
-
-In preview:
-1. Scrub the video to scene boundaries
-2. Click **"+ Add scene at current time"** to mark each scene
-3. Write voiceover text, pick overlay type, drag to snap position
-4. Click **Regen** per scene to generate TTS
-5. Click **Export** — overlays rendered to PNG and composited via ffmpeg
-
-This is "Argo as post-production" — no Playwright script needed. Supports MP4, MOV, WebM, MKV, AVI.
 
 ### `about:blank` + `setContent()` Pattern
 
