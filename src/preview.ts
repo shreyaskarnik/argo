@@ -24,6 +24,8 @@ import { applySpeedRampToTimeline } from './speed-ramp.js';
 import { shiftCameraMoves, scaleCameraMoves, type CameraMove } from './camera-move.js';
 import { resolveFreezes, adjustPlacementsForFreezes, totalFreezeDurationMs, type FreezeSpec } from './freeze.js';
 import { buildOverlayPngsForImport, type RenderedOverlayPng } from './overlays/render-to-png.js';
+import { detectVideoTheme } from './media.js';
+import type { BackgroundTheme } from './overlays/zones.js';
 
 export interface PreviewExportConfig {
   preset?: string;
@@ -80,6 +82,8 @@ interface PreviewData {
   sceneReport: PreviewSceneReport | null;
   /** Pre-rendered overlay HTML/CSS for each scene (keyed by scene name). */
   renderedOverlays: Record<string, { html: string; styles: Record<string, string>; zone: Zone }>;
+  /** Detected overlay theme per scene — 'dark' or 'light' (for UI display). */
+  overlayThemes: Record<string, BackgroundTheme>;
   /** Pipeline metadata from last recording (voices, resolution, engine). */
   pipelineMeta: Record<string, unknown> | null;
   /** Preview-only background music state. */
@@ -174,12 +178,16 @@ function updatePreviewOverlayEntry(target: Record<string, any>, overlay: Overlay
   return changed;
 }
 
-function buildRenderedOverlays(overlays: OverlayManifestEntry[]): PreviewData['renderedOverlays'] {
+function buildRenderedOverlays(
+  overlays: OverlayManifestEntry[],
+  themeMap?: Record<string, BackgroundTheme>,
+): PreviewData['renderedOverlays'] {
   const renderedOverlays: PreviewData['renderedOverlays'] = {};
   for (const entry of overlays) {
     const { scene, ...cue } = entry;
     const zone: Zone = cue.placement ?? 'bottom-center';
-    const { contentHtml, styles } = renderTemplate(cue, 'dark');
+    const theme = themeMap?.[scene] ?? 'dark';
+    const { contentHtml, styles } = renderTemplate(cue, theme);
     renderedOverlays[scene] = { html: contentHtml, styles, zone };
   }
   return renderedOverlays;
@@ -279,7 +287,25 @@ function loadPreviewData(
   const reportPath = join(demoDir, 'scene-report.json');
   const persistedReport = readJsonFile<{ totalDurationMs?: number; overflowMs?: number } | null>(reportPath, null);
   const sceneReport = buildPreviewSceneReport(timing, sceneDurations, persistedReport);
-  const renderedOverlays = buildRenderedOverlays(overlays);
+
+  // Detect per-scene overlay theme from the video content.
+  // Uses ffmpeg to sample frames at each overlay's scene timestamp.
+  const videoPath = existsSync(join(demoDir, 'video.webm'))
+    ? join(demoDir, 'video.webm') : null;
+  let overlayThemeMap: Record<string, BackgroundTheme> | undefined;
+  if (videoPath && overlays.length > 0) {
+    overlayThemeMap = {};
+    for (const ov of overlays) {
+      const sceneMs = timing[ov.scene] ?? 0;
+      // Use next scene start as end bound, or scene + 5s as fallback
+      const nextSceneMs = Object.values(timing)
+        .filter((ms) => ms > sceneMs)
+        .sort((a, b) => a - b)[0];
+      const endMs = nextSceneMs ?? sceneMs + 5000;
+      overlayThemeMap[ov.scene] = detectVideoTheme(videoPath, sceneMs, endMs);
+    }
+  }
+  const renderedOverlays = buildRenderedOverlays(overlays, overlayThemeMap);
 
   // Pipeline metadata (reuse meta loaded above for headTrimMs)
   const pipelineMeta = Object.keys(meta).length > 0 ? meta as Record<string, unknown> : null;
@@ -301,6 +327,7 @@ function loadPreviewData(
     sceneDurations,
     sceneReport,
     renderedOverlays,
+    overlayThemes: overlayThemeMap ?? {},
     pipelineMeta,
     bgm,
   };
@@ -509,7 +536,24 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
         const chunks: Buffer[] = [];
         for await (const chunk of req) chunks.push(chunk as Buffer);
         const body = JSON.parse(Buffer.concat(chunks).toString('utf-8')) as OverlayManifestEntry[];
-        const renderedOverlays = buildRenderedOverlays(body);
+
+        // Detect per-scene theme from the video for adaptive overlays
+        let liveThemeMap: Record<string, BackgroundTheme> | undefined;
+        if (existsSync(webmPath) && body.length > 0) {
+          const timingFile = join(demoDir, '.timing.json');
+          const liveTiming = existsSync(timingFile)
+            ? readJsonFile<Record<string, number>>(timingFile, {}) : {};
+          liveThemeMap = {};
+          for (const ov of body) {
+            const sceneMs = liveTiming[ov.scene] ?? 0;
+            const nextMs = Object.values(liveTiming)
+              .filter((ms) => ms > sceneMs)
+              .sort((a, b) => a - b)[0];
+            liveThemeMap[ov.scene] = detectVideoTheme(webmPath, sceneMs, nextMs ?? sceneMs + 5000);
+          }
+        }
+
+        const renderedOverlays = buildRenderedOverlays(body, liveThemeMap);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, renderedOverlays }));
         return;
@@ -2638,6 +2682,13 @@ function renderOverlayFields(s) {
             <option value="bottom-right" \${ov?.placement === 'bottom-right' ? 'selected' : ''}>bottom-right</option>
             <option value="center" \${ov?.placement === 'center' ? 'selected' : ''}>center</option>
           </select>
+        </div>
+        <div style="flex:0 0 auto; display:flex; align-items:flex-end; padding-bottom:2px;">
+          <span class="overlay-theme-badge" data-scene="\${esc(s.name)}" title="Auto-detected overlay theme"
+            style="font-size:11px; padding:2px 6px; border-radius:3px;
+              background:\${(DATA.overlayThemes[s.name] ?? 'dark') === 'light' ? '#fff' : '#333'};
+              color:\${(DATA.overlayThemes[s.name] ?? 'dark') === 'light' ? '#333' : '#ccc'};
+              border:1px solid #555;">\${DATA.overlayThemes[s.name] ?? 'dark'}</span>
         </div>\` : ''}
       </div>
       \${type ? \`<div class="field-group">
