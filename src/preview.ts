@@ -771,6 +771,15 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
           const bodyText = Buffer.concat(chunks).toString('utf-8').trim();
           const body = bodyText ? JSON.parse(bodyText) as { includeBgm?: boolean; musicVolume?: number } : {};
 
+          // Generate TTS clips for any scenes with text (auto-regen before export)
+          const manifestPath = join(demosDir, `${demoName}.scenes.json`);
+          try {
+            const regenerateTts = options.regenerateTts ?? ((args: { manifestPath: string }) => runPreviewTtsGenerate(args.manifestPath));
+            await regenerateTts({ manifestPath });
+          } catch (ttsErr) {
+            console.warn(`Warning: TTS generation failed, exporting without voiceover: ${(ttsErr as Error).message}`);
+          }
+
           // Refresh aligned audio from current clips + timing
           const refreshed = refreshPreviewAudioArtifacts(demoName, argoDir, demosDir, options.ttsDefaults);
 
