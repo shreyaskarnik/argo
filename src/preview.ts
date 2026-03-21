@@ -2453,9 +2453,13 @@ function updateOverlayVisibility(currentMs) {
     const el = overlayLayer.querySelector('[data-scene="' + s.name + '"]');
     if (!el) continue;
 
-    // Show overlay only during this scene's own duration (not bleeding into next scene)
+    // Show overlay during this scene's time range.
+    // For scenes without TTS (endMs === startMs), extend to the next scene's start or video end.
     const { startMs, endMs } = getSceneBounds(s);
-    const isActive = currentMs >= startMs && currentMs < endMs;
+    const sceneIdx = scenes.indexOf(s);
+    const nextStart = sceneIdx + 1 < scenes.length ? scenes[sceneIdx + 1].startMs : getPreviewDurationMs();
+    const effectiveEnd = endMs > startMs ? endMs : nextStart;
+    const isActive = currentMs >= startMs && currentMs < effectiveEnd;
     el.classList.toggle('visible', isActive);
   }
 }
