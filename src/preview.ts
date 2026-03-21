@@ -8,7 +8,7 @@
  * + overlay props inline with per-scene TTS regen.
  */
 
-import { execFile } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync, existsSync, readdirSync, writeFileSync, statSync, createReadStream, unlinkSync, mkdirSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
@@ -23,7 +23,7 @@ import { exportVideo, checkFfmpeg } from './export.js';
 import { applySpeedRampToTimeline } from './speed-ramp.js';
 import { shiftCameraMoves, scaleCameraMoves, type CameraMove } from './camera-move.js';
 import { resolveFreezes, adjustPlacementsForFreezes, totalFreezeDurationMs, type FreezeSpec } from './freeze.js';
-import { buildOverlayPngsForImport, type RenderedOverlayPng } from './overlays/render-to-png.js';
+import { buildOverlayPngsForImport, isImportedVideo, type RenderedOverlayPng } from './overlays/render-to-png.js';
 import { detectVideoTheme, getVideoDurationMs } from './media.js';
 import type { BackgroundTheme } from './overlays/zones.js';
 
@@ -111,6 +111,41 @@ const MIME_TYPES: Record<string, string> = {
 function readJsonFile<T>(filePath: string, fallback: T): T {
   if (!existsSync(filePath)) return fallback;
   return JSON.parse(readFileSync(filePath, 'utf-8')) as T;
+}
+
+function ensureSeekablePreviewProxy(rawVideoPath: string, proxyPath: string): string | null {
+  try {
+    const needsRender = !existsSync(proxyPath) || statSync(proxyPath).mtimeMs < statSync(rawVideoPath).mtimeMs;
+    if (!needsRender) return proxyPath;
+
+    checkFfmpeg();
+    const result = spawnSync('ffmpeg', [
+      '-i', rawVideoPath,
+      '-map', '0:v:0',
+      '-map', '0:a:0?',
+      '-c:v', 'libx264',
+      '-preset', 'veryfast',
+      '-crf', '23',
+      '-pix_fmt', 'yuv420p',
+      '-movflags', '+faststart',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-y', proxyPath,
+    ], {
+      stdio: 'pipe',
+    });
+
+    if (result.status !== 0) {
+      const stderr = result.stderr?.toString('utf-8').trim();
+      console.warn(`Warning: failed to create preview MP4 proxy for ${rawVideoPath}${stderr ? `: ${stderr}` : ''}`);
+      return null;
+    }
+
+    return proxyPath;
+  } catch (err) {
+    console.warn(`Warning: failed to prepare seekable preview video: ${(err as Error).message}`);
+    return null;
+  }
 }
 
 function setManifestField(target: Record<string, any>, key: string, value: any): boolean {
@@ -485,16 +520,28 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
   const port = options.port ?? 0; // 0 = auto-assign
   const demoName = options.demoName;
   const demoDir = join(argoDir, demoName);
+  const importedVideo = isImportedVideo(argoDir, demoName);
+
+  // Raw video path in .argo/<demo>/ — used for duration probing/theme detection and
+  // as the source for an optional seekable preview proxy.
+  let rawVideoPath: string | null = null;
+  for (const rawExt of ['.mp4', '.mov', '.mkv', '.avi', '.webm']) {
+    const candidate = join(demoDir, `video${rawExt}`);
+    if (existsSync(candidate)) { rawVideoPath = candidate; break; }
+  }
 
   // Prefer exported MP4 (has keyframes for seeking), then original-extension import, then raw WebM
   const exportedMp4 = join(outputDir, `${demoName}.mp4`);
+  const previewProxyMp4 = join(demoDir, 'preview.mp4');
   const mimeMap: Record<string, string> = {
-    '.mp4': 'video/mp4', '.mov': 'video/mp4', '.mkv': 'video/x-matroska',
+    '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.mkv': 'video/x-matroska',
     '.avi': 'video/x-msvideo', '.webm': 'video/webm',
   };
   let videoPath: string | null = null;
   if (existsSync(exportedMp4)) {
     videoPath = exportedMp4;
+  } else if (importedVideo && rawVideoPath) {
+    videoPath = ensureSeekablePreviewProxy(rawVideoPath, previewProxyMp4) ?? rawVideoPath;
   } else {
     // Find the original-extension video first (correct MIME), fall back to video.webm
     for (const ext of ['.mp4', '.mov', '.mkv', '.avi', '.webm']) {
@@ -509,13 +556,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
   }
   const ext = videoPath.slice(videoPath.lastIndexOf('.'));
   let videoMime = mimeMap[ext] ?? 'video/mp4';
-
-  // Raw video path in .argo/<demo>/ — used for duration probing and theme detection
-  let rawVideoPath: string = videoPath; // fallback to served video
-  for (const rawExt of ['.mp4', '.mov', '.mkv', '.avi', '.webm']) {
-    const candidate = join(demoDir, `video${rawExt}`);
-    if (existsSync(candidate)) { rawVideoPath = candidate; break; }
-  }
+  if (!rawVideoPath) rawVideoPath = videoPath; // fallback to served video
 
   // Track BGM saved from the music generator panel
   let activeMusicPath: string | undefined;
@@ -737,7 +778,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
           const timing = readJsonFile<Record<string, number>>(join(demoDir, '.timing.json'), {});
           const markTimes = Object.values(timing);
           let headTrimMs = 0;
-          if (markTimes.length > 0) {
+          if (!importedVideo && markTimes.length > 0) {
             const firstMarkMs = Math.min(...markTimes);
             headTrimMs = Math.max(0, firstMarkMs - 200);
             if (headTrimMs <= 500) headTrimMs = 0;
@@ -778,7 +819,8 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             ? Math.max(0, Math.min(1, body.musicVolume))
             : (ec?.musicVolume ?? 0.15);
           const exportMusicPath = includeBgm ? (activeMusicPath ?? ec?.musicPath) : undefined;
-          const rampResult = applySpeedRampToTimeline(placements, shiftedDurationMs, ec?.speedRamp);
+          const effectiveSpeedRamp = importedVideo ? undefined : ec?.speedRamp;
+          const rampResult = applySpeedRampToTimeline(placements, shiftedDurationMs, effectiveSpeedRamp);
           const finalPlacements = rampResult.placements;
           const finalDurationMs = rampResult.totalDurationMs;
           const speedRampSegments = rampResult.segments.length > 0 ? rampResult.segments : undefined;
@@ -2175,12 +2217,19 @@ const scenes = Object.entries(DATA.timing)
 
 let activeScene = null;
 
-// ─── Timeline ──────────────────────────────────────────────────────────────
-video.addEventListener('loadedmetadata', () => {
-  const totalMs = video.duration * 1000;
-  document.getElementById('time-total').textContent = formatTime(totalMs);
+function getPreviewDurationMs() {
+  const mediaDurationMs = Number.isFinite(video.duration) && video.duration > 0
+    ? video.duration * 1000
+    : 0;
+  return mediaDurationMs || DATA.videoDurationMs || DATA.sceneReport?.totalDurationMs || 0;
+}
 
-  // Render scene markers on timeline
+function renderTimelineMarkers() {
+  const totalMs = getPreviewDurationMs();
+  if (!totalMs) return;
+
+  timelineBar.querySelectorAll('.timeline-scene').forEach(node => node.remove());
+
   scenes.forEach((s, i) => {
     const pct = (s.startMs / totalMs) * 100;
     const nextStart = i + 1 < scenes.length ? scenes[i + 1].startMs : totalMs;
@@ -2191,7 +2240,6 @@ video.addEventListener('loadedmetadata', () => {
     marker.style.left = pct + '%';
     marker.style.width = Math.max(widthPct, 2) + '%';
     const hasOverlay = DATA.overlays.find(o => o.scene === s.name);
-    // s.name is already escaped via esc() — safe for innerHTML
     marker.innerHTML = esc(s.name) + (hasOverlay ? '<span class="has-overlay"></span>' : '');
     marker.dataset.scene = s.name;
     marker.addEventListener('click', (e) => {
@@ -2200,13 +2248,25 @@ video.addEventListener('loadedmetadata', () => {
     });
     timelineBar.appendChild(marker);
   });
+}
+
+// ─── Timeline ──────────────────────────────────────────────────────────────
+video.addEventListener('loadedmetadata', () => {
+  const totalMs = getPreviewDurationMs();
+  document.getElementById('time-total').textContent = formatTime(totalMs);
+  renderTimelineMarkers();
 
   // Create overlay DOM elements
   renderOverlayElements();
 });
 
+if (getPreviewDurationMs() > 0) {
+  document.getElementById('time-total').textContent = formatTime(getPreviewDurationMs());
+  renderTimelineMarkers();
+}
+
 video.addEventListener('timeupdate', () => {
-  const totalMs = video.duration * 1000;
+  const totalMs = getPreviewDurationMs();
   const currentMs = video.currentTime * 1000;
   if (scenePlaybackEndMs !== null && currentMs >= scenePlaybackEndMs) {
     const stopAt = scenePlaybackEndMs;
@@ -2241,7 +2301,9 @@ let isScrubbing = false;
 function scrubToX(clientX) {
   const rect = timelineBar.getBoundingClientRect();
   const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-  const seekTime = pct * video.duration;
+  const totalMs = getPreviewDurationMs();
+  if (!totalMs) return;
+  const seekTime = pct * (totalMs / 1000);
   scenePlaybackEndMs = null;
   void seekAbsoluteMs(seekTime * 1000);
 }
@@ -3130,7 +3192,7 @@ async function seekAbsoluteMs(absoluteMs) {
     return;
   }
 
-  const totalMs = video.duration * 1000;
+  const totalMs = getPreviewDurationMs();
   if (totalMs > 0) {
     const pct = (targetMs / totalMs) * 100;
     timelineProgress.style.width = pct + '%';
@@ -3535,14 +3597,12 @@ document.getElementById('btn-save').addEventListener('click', async () => {
 
 // Export button (re-align audio + export MP4, no re-recording)
 document.getElementById('btn-export').addEventListener('click', async () => {
-  if (isDirty && !confirm('You have unsaved changes. Save before exporting?')) return;
-  if (isDirty) {
-    await saveVoiceover();
-    await saveOverlays();
-    await saveEffects();
-    await saveTiming();
-    clearDirty();
-  }
+  // Always save before export to ensure timing marks + voiceover are persisted
+  await saveVoiceover();
+  await saveOverlays();
+  await saveEffects();
+  await saveTiming();
+  clearDirty();
   const overlay = document.getElementById('recording-overlay');
   const title = document.getElementById('recording-title');
   const subtitle = document.getElementById('recording-subtitle');
