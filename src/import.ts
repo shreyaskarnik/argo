@@ -7,6 +7,8 @@ const SUPPORTED_EXTENSIONS = new Set(['.mp4', '.mov', '.webm', '.mkv', '.avi']);
 export interface ImportOptions {
   videoPath: string;
   demo?: string;
+  /** Directory for scenes manifests. Default: 'demos'. */
+  demosDir?: string;
   cwd?: string;
   /** Overwrite existing scaffold files (.scenes.json, .timing.json). */
   force?: boolean;
@@ -86,8 +88,8 @@ export async function importVideo(options: ImportOptions): Promise<ImportResult>
   const durationMs = getVideoDurationMs(destVideoPath);
   const dimensions = getVideoDimensions(destVideoPath);
 
-  // 7. Create scaffold .scenes.json in demos/ directory
-  const demosDir = join(cwd, 'demos');
+  // 7. Create scaffold .scenes.json in demos directory
+  const demosDir = join(cwd, options.demosDir ?? 'demos');
   mkdirSync(demosDir, { recursive: true });
   const manifestPath = join(demosDir, `${demoName}.scenes.json`);
   if (force || !existsSync(manifestPath)) {

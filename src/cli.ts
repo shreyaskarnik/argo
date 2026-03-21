@@ -419,14 +419,17 @@ export function createProgram(): Command {
 
   program
     .command('import <video-file>')
-    .description('Import an external video recording into the Argo pipeline')
+    .description('Import an external video for post-production in argo preview')
     .option('--demo <name>', 'demo name (default: derived from video filename)')
     .option('--force', 'overwrite existing scaffold files (.scenes.json, .timing.json)')
     .action(async (videoFile: string, cmdOpts: { demo?: string; force?: boolean }) => {
       if (cmdOpts.demo) validateDemoName(cmdOpts.demo);
+      const configPath = program.opts().config;
+      const config = await loadConfig(process.cwd(), configPath);
       const result = await importVideo({
         videoPath: videoFile,
         demo: cmdOpts.demo,
+        demosDir: config.demosDir,
         cwd: process.cwd(),
         force: cmdOpts.force,
       });

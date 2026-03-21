@@ -24,7 +24,7 @@ import { applySpeedRampToTimeline } from './speed-ramp.js';
 import { shiftCameraMoves, scaleCameraMoves, type CameraMove } from './camera-move.js';
 import { resolveFreezes, adjustPlacementsForFreezes, totalFreezeDurationMs, type FreezeSpec } from './freeze.js';
 import { buildOverlayPngsForImport, type RenderedOverlayPng } from './overlays/render-to-png.js';
-import { detectVideoTheme } from './media.js';
+import { detectVideoTheme, getVideoDurationMs } from './media.js';
 import type { BackgroundTheme } from './overlays/zones.js';
 
 export interface PreviewExportConfig {
@@ -84,6 +84,8 @@ interface PreviewData {
   renderedOverlays: Record<string, { html: string; styles: Record<string, string>; zone: Zone }>;
   /** Detected overlay theme per scene — 'dark' or 'light' (for UI display). */
   overlayThemes: Record<string, BackgroundTheme>;
+  /** Actual video file duration in ms — used as floor for timeline. */
+  videoDurationMs: number;
   /** Pipeline metadata from last recording (voices, resolution, engine). */
   pipelineMeta: Record<string, unknown> | null;
   /** Preview-only background music state. */
@@ -323,6 +325,22 @@ function loadPreviewData(
     volume: exportConfig?.musicVolume ?? 0.15,
   };
 
+  // Get actual video duration as the timeline floor
+  let videoDurationMs = 0;
+  const videoExtsForDur = ['.mp4', '.mov', '.mkv', '.avi', '.webm'];
+  for (const ext of videoExtsForDur) {
+    const candidate = join(demoDir, `video${ext}`);
+    if (existsSync(candidate)) {
+      try { videoDurationMs = getVideoDurationMs(candidate); } catch { /* ignore */ }
+      break;
+    }
+  }
+  // Also check the exported MP4
+  const exportedMp4 = join(outputDir, `${demoName}.mp4`);
+  if (videoDurationMs === 0 && existsSync(exportedMp4)) {
+    try { videoDurationMs = getVideoDurationMs(exportedMp4); } catch { /* ignore */ }
+  }
+
   return {
     demoName,
     timing,
@@ -333,6 +351,7 @@ function loadPreviewData(
     sceneReport,
     renderedOverlays,
     overlayThemes: overlayThemeMap ?? {},
+    videoDurationMs,
     pipelineMeta,
     bgm,
   };

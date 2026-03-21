@@ -1,13 +1,20 @@
 [
   {
     "scene": "intro",
-    "text": "Hello from Sift!",
     "overlay": {
-      "type": "headline-card",
+      "type": "lower-third",
       "placement": "top-right",
-      "title": "Sift",
-      "body": "Chrome Extension",
-      "kicker": "Download Now"
+      "text": "Welcome to Sift"
+    },
+    "text": "Welcome to Sift!"
+  },
+  {
+    "scene": "scene-2",
+    "text": "Embeddings powered by embedding gemma",
+    "overlay": {
+      "type": "callout",
+      "placement": "top-right",
+      "text": "Powered by Embedding Gemma"
     }
   }
 ]
