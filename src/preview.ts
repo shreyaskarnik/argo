@@ -2214,13 +2214,39 @@ video.addEventListener('timeupdate', () => {
   }
 });
 
-// Click on timeline bar to seek
-timelineBar.addEventListener('click', (e) => {
+// Click and drag on timeline bar to scrub
+let isScrubbing = false;
+
+function scrubToX(clientX) {
   const rect = timelineBar.getBoundingClientRect();
-  const pct = (e.clientX - rect.left) / rect.width;
+  const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
   const seekTime = pct * video.duration;
   scenePlaybackEndMs = null;
-  void seekAbsoluteMs(seekTime * 1000);
+  video.currentTime = seekTime;
+  // Update UI immediately for responsive scrubbing
+  const ms = seekTime * 1000;
+  document.getElementById('time-current').textContent = formatTime(ms);
+  const progressPct = (seekTime / video.duration) * 100;
+  document.getElementById('timeline-progress').style.width = progressPct + '%';
+  document.getElementById('timeline-playhead').style.left = progressPct + '%';
+}
+
+timelineBar.addEventListener('mousedown', (e) => {
+  isScrubbing = true;
+  video.pause();
+  scrubToX(e.clientX);
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isScrubbing) return;
+  scrubToX(e.clientX);
+});
+
+document.addEventListener('mouseup', () => {
+  if (isScrubbing) {
+    isScrubbing = false;
+  }
 });
 
 // Play/pause icon toggling
