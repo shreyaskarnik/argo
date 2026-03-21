@@ -133,19 +133,48 @@ This is a lightweight roadmap note for future Argo work. It is intentionally pra
 - Watermark overlay — `export.watermark: { src, position, opacity, margin }`
 - Live recording progress — per-scene status via JSONL progress file
 
-## Suggested Priority
+## New Feature Ideas
 
-Next up from what's remaining:
+### Playwright / Recording
 
-1. Viewport-native variants — re-record at target viewport (`1080x1920` for 9:16) instead of crop+blur-fill
-2. Electron app recording (Playwright has native support, needs fixture integration)
-3. Theme packs for overlays (`terminal`, `product-keynote`, `minimal-docs`, `launch-trailer`)
-4. Timeline preview UI with overlay thumbnails on the `argo preview` timeline bar
-5. Resumable pipeline with per-step artifact caching
-6. Burned-in captions (render subtitles into the video frame for social platforms)
-7. Audio ducking and background music
-8. `argo diff` — compare two pipeline runs side-by-side
-9. i18n — locale variants of scenes manifests for multi-language renders
-10. `argo ci` — opinionated CI mode (lint → pipeline → assert bounds → upload artifact)
-11. Keyframed text mutations in overlays
-12. AI assist for demo polish (pacing, copy, overlay placement suggestions)
+- **Click-to-zoom**. Auto-detect click targets during recording and generate `zoomTo({ narration })` calls. The click target's bounding box is captured at the moment of `page.click()` — no manual `zoomTo` needed. Config: `video.autoZoomOnClick: true`.
+- **Mouse trail / gesture overlay**. Record actual mouse movement path during Playwright session and render as a smooth bezier trail during export (ffmpeg `drawbox` with time expressions or SVG burn-in). Shows viewers where the cursor went.
+- **A/B scene variants**. Record the same demo with different scenes.json manifests to produce variant videos (different copy, different overlays) from a single script. `argo pipeline demo --variant=launch` loads `demo.scenes.launch.json`.
+- **Accessibility audit overlay**. During recording, run `@axe-core/playwright` on each scene and inject a11y violation badges as overlay annotations. Turns demo videos into accessibility review artifacts.
+- **Network throttle presets**. Add `network: 'slow-3g'` to config — Playwright applies `page.route()` throttling so loading spinners and skeleton screens appear naturally in the recording.
+- **Scroll-triggered marks**. Auto-insert `narration.mark()` calls when the page scrolls past configurable thresholds. For long-page demos (landing pages, docs sites) where manual marks are tedious.
+
+### AI / LLM
+
+- **Auto-script from URL**. Give Argo a URL → it crawls the page, identifies key features, and generates a complete `.demo.ts` + `.scenes.json`. Uses an LLM to plan the demo narrative. `argo generate --url http://localhost:3000`.
+- **Voice emotion tags**. Add `emotion: 'excited' | 'calm' | 'serious'` per scene in manifest. Engines that support it (OpenAI `gpt-4o-mini-tts` via `instructions`, mlx-audio via prompt) adjust delivery. Others ignore gracefully.
+- **Auto-caption styling**. LLM analyzes voiceover text and suggests word-level emphasis (bold key terms, color brand names) for burned-in captions. Output is a styled SRT with inline formatting tags.
+- **Demo review agent**. After pipeline completes, an LLM reviews the scene report (durations, pacing, overflow) and suggests improvements: "Scene 3 is 8.2s — consider splitting", "Intro has no overlay — add a lower-third".
+- **Manifest generation from transcript**. Paste a transcript → LLM generates a `.scenes.json` with scene boundaries, overlay suggestions, and voice assignments. `argo manifest --from transcript.txt`.
+- **Smart silence detection**. Analyze the recorded audio to detect unintentional long silences (keyboard pauses, slow page loads) and auto-insert speed ramp segments. No manual `speedRamp` config needed.
+
+### FFmpeg / Export
+
+- **Burned-in animated captions**. Word-level subtitle burn-in with highlight animation (current word bolds/colors as it's spoken). Requires word-level timestamps from TTS engines that support it (OpenAI returns word timing, Kokoro could approximate via phoneme timing).
+- **Intro/outro bumper cards**. Auto-generate a title card (product name + tagline) and end card (CTA + URL) as video segments prepended/appended to the export. Config-driven, uses ffmpeg `drawtext` + `color` source. `export.intro: { title: 'Acme Inc', tagline: 'Ship faster' }`.
+- **Ken Burns for static scenes**. When a scene has no DOM changes (static page), auto-apply a slow drift/zoom (Ken Burns effect) to keep the video alive. Detect static frames via ffmpeg `mpdecimate` or scene change detection.
+- **Picture-in-picture webcam**. Overlay a webcam feed (or pre-recorded video) in a corner during specific scenes. `post: [{ type: 'pip', src: 'assets/webcam.mp4', position: 'bottom-right', width: 320 }]`.
+- **Animated progress bar**. Thin bar at top/bottom showing overall video progress + chapter markers. Config: `export.progressBar: { position: 'bottom', color: '#3b82f6', height: 4 }`. Uses ffmpeg `drawbox` with time expressions.
+- **Color grading presets**. Apply LUT-based color grades for different moods: `warm`, `cool`, `cinematic`, `high-contrast`. Config: `export.colorGrade: 'cinematic'`. Ships 4-5 .cube LUT files.
+- **Audio ducking (sidechain)**. True sidechain compression — BGM volume dips when narration is active, rises in gaps. Uses ffmpeg `sidechaincompress`. More sophisticated than current constant-volume mixing.
+- **Segment-level export**. Export individual scenes as standalone clips with their own intro cards + transitions. For embedding specific features in docs pages. `argo export demo --scene intro --scene features`.
+- **Animated thumbnails**. Auto-generate a 3-second looping video thumbnail (like YouTube hover previews) from the most visually active scenes. Uses scene change detection + trim + loop.
+
+### Platform / Distribution
+
+- **`argo publish`**. One command to upload to YouTube/Vimeo/Loom with title, description, and tags from `.meta.json`. Uses official APIs. `argo publish demo --platform youtube --visibility unlisted`.
+- **Social package export**. `argo package demo` generates a folder with: MP4, GIF, thumbnail PNG, transcript, SRT, chapter list, and a `RELEASE.md` with embed snippets. Everything needed for a product launch post.
+- **Embed snippet generator**. After export, output HTML `<video>` tags with poster, subtitles track, and responsive sizing. Copy-paste into docs/blog.
+- **RSS feed for demo series**. `argo feed` generates an RSS/Atom feed from all exported demos. Subscribe to get notified when new demos are published. Good for internal teams.
+
+### Developer Experience
+
+- **Hot reload preview**. `argo preview <demo> --watch` watches `.scenes.json` for changes and auto-refreshes the preview. No manual page reload.
+- **`argo benchmark`**. Profile pipeline performance: TTS generation time, recording duration, export encoding speed. Identifies bottlenecks when optimizing for CI.
+- **Playwright trace integration**. Link each scene in the preview to its Playwright trace viewer span. Click a scene → opens trace at that timestamp. Already capturing traces (`trace: 'on'`), just need the UI.
+- **Config validation with suggestions**. `argo doctor` checks config values against known-good ranges and suggests improvements: "CRF 16 with preset 'slow' produces large files — consider CRF 23 for drafts".
