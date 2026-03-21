@@ -248,7 +248,7 @@ export function buildOverlayPngFilters(
     const outputLabel = `ovlpng${i}`;
 
     filterParts.push(
-      `[${currentVideo}][${pngInputIdx}:v]overlay=${posExpr}:enable='between(t\\,${startSec}\\,${endSec})':format=auto:shortest=1[${outputLabel}]`,
+      `[${currentVideo}][${pngInputIdx}:v]overlay=${posExpr}:enable='between(t\\,${startSec}\\,${endSec})':format=auto:eof_action=pass[${outputLabel}]`,
     );
     currentVideo = outputLabel;
   }

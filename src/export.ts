@@ -9,7 +9,7 @@ import { buildSpeedRampFilter, type Segment } from './speed-ramp.js';
 import { buildCameraMoveFilter, type CameraMove } from './camera-move.js';
 import { buildFreezeFilter, type ResolvedFreeze } from './freeze.js';
 import { getVideoFrameRate } from './media.js';
-import { buildOverlayPngFilters, type RenderedOverlayPng } from './overlays/render-to-png.js';
+import { buildOverlayPngFilters, isImportedVideo, type RenderedOverlayPng } from './overlays/render-to-png.js';
 
 export interface ExportOptions {
   demoName: string;
@@ -160,6 +160,7 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
   const demoDir = join(argoDir, demoName);
   const videoPath = join(demoDir, 'video.webm');
   const audioPath = join(demoDir, 'narration-aligned.wav');
+  const importedVideo = isImportedVideo(argoDir, demoName);
 
   if (!existsSync(videoPath)) {
     throw new Error(`Missing video.webm at ${videoPath}`);
@@ -457,9 +458,11 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     // Skip -shortest when:
     // - Freeze-frame holds extend the video beyond the audio
     // - Overlay PNGs are present (imported videos where audio may be shorter than video)
+    // - Imported videos have narration shorter than the full source video
     const hasFreezes = freezeSpecs && freezeSpecs.length > 0;
     const hasOverlayPngs = options.overlayPngs && options.overlayPngs.length > 0;
-    if (!hasFreezes && !hasOverlayPngs) {
+    const importedNarrationVideo = importedVideo && hasAudio;
+    if (!hasFreezes && !hasOverlayPngs && !importedNarrationVideo) {
       args.push('-shortest');
     }
   }
