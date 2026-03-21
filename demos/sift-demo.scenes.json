@@ -1,10 +1,10 @@
 [
   {
     "scene": "intro",
-    "text": "Welcome to Sift",
+    "text": "Hello from Sift!",
     "overlay": {
       "type": "callout",
-      "placement": "top-right"
+      "text": "Hello"
     }
   }
 ]

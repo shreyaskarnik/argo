@@ -9,6 +9,7 @@ import { buildSpeedRampFilter, type Segment } from './speed-ramp.js';
 import { buildCameraMoveFilter, type CameraMove } from './camera-move.js';
 import { buildFreezeFilter, type ResolvedFreeze } from './freeze.js';
 import { getVideoFrameRate } from './media.js';
+import { buildOverlayPngFilters, type RenderedOverlayPng } from './overlays/render-to-png.js';
 
 export interface ExportOptions {
   demoName: string;
@@ -52,6 +53,8 @@ export interface ExportOptions {
   freezeSpecs?: ResolvedFreeze[];
   /** Watermark/brand bug overlay config. */
   watermark?: WatermarkConfig;
+  /** Pre-rendered overlay PNGs to composite onto the video (for imported videos). */
+  overlayPngs?: RenderedOverlayPng[];
 }
 
 function formatSeconds(ms: number): string {
@@ -312,6 +315,17 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
       filterParts.push(camFilter.filter);
       videoSource = camFilter.outputLabel;
     }
+  }
+
+  // Overlay PNGs for imported videos — composited AFTER transitions/camera moves,
+  // BEFORE watermark (same layer priority as recorded overlays would have).
+  const overlayPngs = options.overlayPngs;
+  if (overlayPngs && overlayPngs.length > 0) {
+    const ovlResult = buildOverlayPngFilters(overlayPngs, nextInput, videoSource);
+    args.push(...ovlResult.inputArgs);
+    filterParts.push(...ovlResult.filterParts);
+    videoSource = ovlResult.videoSource;
+    nextInput = ovlResult.nextInput;
   }
 
   // Watermark overlay — applied AFTER all other video filters (last in chain)

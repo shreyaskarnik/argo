@@ -40,6 +40,14 @@ export {
   type MotionPreset,
 } from './overlays/index.js';
 
+// Overlay PNG rendering (for imported videos)
+export {
+  renderOverlaysToPng,
+  buildOverlayPngFilters,
+  type RenderedOverlayPng,
+  type OverlayPngInput,
+} from './overlays/render-to-png.js';
+
 // Effects
 export { showConfetti, type ConfettiOptions } from './effects.js';
 
