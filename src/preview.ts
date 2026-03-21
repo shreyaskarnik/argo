@@ -380,10 +380,8 @@ function refreshPreviewAudioArtifacts(
     };
     const clipPath = cache.getClipPath(demoName, cacheEntry);
     if (!existsSync(clipPath)) {
-      throw new Error(
-        `Expected regenerated clip for scene "${entry.scene}" at ${clipPath}, but it was not found. ` +
-        `Try running: argo tts generate ${scenesPath}`
-      );
+      // Clip not generated yet (e.g., imported video without TTS run) — skip silently
+      continue;
     }
     const clipInfo = readClipInfo(clipPath, entry.scene);
     clips.push(clipInfo);
@@ -1230,6 +1228,47 @@ const PREVIEW_HTML = `<!DOCTYPE html>
   .overlay-cue[data-zone="bottom-right"] { bottom: 60px; right: 40px; }
   .overlay-cue[data-zone="center"] { top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
+  /* Drag-to-snap overlay positioning */
+  .overlay-cue.overlay-draggable {
+    cursor: grab;
+    user-select: none;
+    pointer-events: auto;
+  }
+  .overlay-cue.overlay-draggable:active {
+    cursor: grabbing;
+  }
+  .overlay-cue.overlay-dragging {
+    cursor: grabbing;
+    opacity: 0.85;
+    z-index: 20;
+  }
+  .snap-zone {
+    position: absolute;
+    border: 2px dashed rgba(99, 102, 241, 0.4);
+    border-radius: 8px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 15;
+  }
+  .snap-zone.visible {
+    opacity: 1;
+  }
+  .snap-zone.highlight {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.8);
+  }
+  .snap-zone-label {
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: rgba(99, 102, 241, 0.8);
+    font-family: var(--mono);
+    white-space: nowrap;
+  }
+
   /* Timeline bar */
   .timeline {
     background: var(--surface);
@@ -1834,6 +1873,12 @@ const PREVIEW_HTML = `<!DOCTYPE html>
   <div class="video-container">
     <video id="video" src="/video" preload="auto" muted playsinline></video>
     <div class="overlay-layer" id="overlay-layer"></div>
+    <div class="snap-zone" data-zone="top-left" style="top:10%;left:5%;width:35%;height:35%"><span class="snap-zone-label">top-left</span></div>
+    <div class="snap-zone" data-zone="top-right" style="top:10%;right:5%;width:35%;height:35%"><span class="snap-zone-label">top-right</span></div>
+    <div class="snap-zone" data-zone="bottom-left" style="bottom:10%;left:5%;width:35%;height:35%"><span class="snap-zone-label">bottom-left</span></div>
+    <div class="snap-zone" data-zone="bottom-right" style="bottom:10%;right:5%;width:35%;height:35%"><span class="snap-zone-label">bottom-right</span></div>
+    <div class="snap-zone" data-zone="bottom-center" style="bottom:5%;left:25%;width:50%;height:20%"><span class="snap-zone-label">bottom-center</span></div>
+    <div class="snap-zone" data-zone="center" style="top:30%;left:25%;width:50%;height:40%"><span class="snap-zone-label">center</span></div>
   </div>
 
   <div class="timeline">
@@ -2142,6 +2187,7 @@ function renderOverlayElements() {
     el.innerHTML = '<span class="preview-badge">PREVIEW</span>' + s.rendered.html;
     Object.assign(el.style, s.rendered.styles);
     overlayLayer.appendChild(el);
+    makeOverlayDraggable(el);
   }
 }
 
@@ -2164,6 +2210,152 @@ function updateOverlayVisibility(currentMs) {
 
 document.getElementById('cb-overlays').addEventListener('change', () => {
   updateOverlayVisibility(video.currentTime * 1000);
+});
+
+// ─── Drag-to-snap overlay positioning ──────────────────────────────────────
+const SNAP_ZONES = ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'bottom-center', 'center'];
+const snapZoneEls = document.querySelectorAll('.snap-zone');
+
+// Zone center positions as fractions of the container
+const ZONE_CENTERS = {
+  'top-left':      { x: 0.05 + 0.35 / 2, y: 0.10 + 0.35 / 2 },
+  'top-right':     { x: 1 - 0.05 - 0.35 / 2, y: 0.10 + 0.35 / 2 },
+  'bottom-left':   { x: 0.05 + 0.35 / 2, y: 1 - 0.10 - 0.35 / 2 },
+  'bottom-right':  { x: 1 - 0.05 - 0.35 / 2, y: 1 - 0.10 - 0.35 / 2 },
+  'bottom-center': { x: 0.25 + 0.50 / 2, y: 1 - 0.05 - 0.20 / 2 },
+  'center':        { x: 0.25 + 0.50 / 2, y: 0.30 + 0.40 / 2 },
+};
+
+let dragState = null;
+
+function showSnapZones() {
+  snapZoneEls.forEach(el => el.classList.add('visible'));
+}
+
+function hideSnapZones() {
+  snapZoneEls.forEach(el => {
+    el.classList.remove('visible', 'highlight');
+  });
+}
+
+function highlightNearestZone(fracX, fracY) {
+  let nearest = null;
+  let minDist = Infinity;
+  for (const zone of SNAP_ZONES) {
+    const c = ZONE_CENTERS[zone];
+    const d = Math.hypot(fracX - c.x, fracY - c.y);
+    if (d < minDist) {
+      minDist = d;
+      nearest = zone;
+    }
+  }
+  snapZoneEls.forEach(el => {
+    el.classList.toggle('highlight', el.dataset.zone === nearest);
+  });
+  return nearest;
+}
+
+function makeOverlayDraggable(el) {
+  el.classList.add('overlay-draggable');
+
+  el.addEventListener('mousedown', (e) => {
+    // Only primary button
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const container = el.closest('.video-container');
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+
+    // Store original zone positioning styles so we can restore if needed
+    const sceneName = el.dataset.scene;
+
+    dragState = {
+      el,
+      sceneName,
+      container,
+      containerRect,
+      // Offset from mouse to element top-left
+      offsetX: e.clientX - elRect.left,
+      offsetY: e.clientY - elRect.top,
+      nearestZone: null,
+    };
+
+    // Switch to fixed positioning for free drag
+    el.classList.add('overlay-dragging');
+    el.style.position = 'absolute';
+    el.style.left = (elRect.left - containerRect.left) + 'px';
+    el.style.top = (elRect.top - containerRect.top) + 'px';
+    el.style.right = 'auto';
+    el.style.bottom = 'auto';
+    el.style.transform = 'none';
+
+    showSnapZones();
+  });
+}
+
+document.addEventListener('mousemove', (e) => {
+  if (!dragState) return;
+  e.preventDefault();
+
+  const { el, container, containerRect, offsetX, offsetY } = dragState;
+  const rect = containerRect;
+
+  const newLeft = e.clientX - rect.left - offsetX;
+  const newTop = e.clientY - rect.top - offsetY;
+
+  el.style.left = newLeft + 'px';
+  el.style.top = newTop + 'px';
+
+  // Calculate overlay center as fraction of container
+  const elRect = el.getBoundingClientRect();
+  const centerX = (elRect.left + elRect.width / 2 - rect.left) / rect.width;
+  const centerY = (elRect.top + elRect.height / 2 - rect.top) / rect.height;
+
+  dragState.nearestZone = highlightNearestZone(centerX, centerY);
+});
+
+document.addEventListener('mouseup', (e) => {
+  if (!dragState) return;
+
+  const { el, sceneName, nearestZone } = dragState;
+  const zone = nearestZone || 'bottom-center';
+
+  // Remove drag styles — let CSS zone positioning take over
+  el.classList.remove('overlay-dragging');
+  el.style.position = '';
+  el.style.left = '';
+  el.style.top = '';
+  el.style.right = '';
+  el.style.bottom = '';
+  el.style.transform = '';
+
+  // Update the data-zone attribute so CSS positioning applies
+  el.dataset.zone = zone;
+
+  // Update the placement dropdown in the scene card
+  const placeEl = document.querySelector('select[data-scene="' + sceneName + '"][data-field="overlay-placement"]');
+  if (placeEl) {
+    placeEl.value = zone;
+    // Trigger change event to fire overlay preview
+    placeEl.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  // Also update the scene's overlay data directly
+  const s = scenes.find(sc => sc.name === sceneName);
+  if (s && s.overlay) {
+    s.overlay.placement = zone;
+  }
+
+  hideSnapZones();
+  markDirty();
+
+  // Trigger live preview update
+  previewOverlays();
+
+  dragState = null;
 });
 
 // ─── Scene list (sidebar) ──────────────────────────────────────────────────

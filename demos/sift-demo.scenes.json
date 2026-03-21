@@ -1,0 +1,10 @@
+[
+  {
+    "scene": "intro",
+    "text": "Welcome to Sift",
+    "overlay": {
+      "type": "callout",
+      "placement": "top-right"
+    }
+  }
+]
