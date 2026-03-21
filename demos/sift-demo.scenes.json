@@ -3,18 +3,15 @@
     "scene": "intro",
     "overlay": {
       "type": "lower-third",
-      "placement": "top-right",
-      "text": "Welcome to Sift"
-    },
-    "text": "Welcome to Sift!"
+      "text": "This is Sift!"
+    }
   },
   {
     "scene": "scene-2",
-    "text": "Embeddings powered by embedding gemma",
+    "text": "Too many posts cluttering your feed?",
     "overlay": {
       "type": "callout",
-      "placement": "top-right",
-      "text": "Powered by Embedding Gemma"
+      "text": "Worry no more!"
     }
   }
 ]

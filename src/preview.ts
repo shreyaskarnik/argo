@@ -486,16 +486,36 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
   const demoName = options.demoName;
   const demoDir = join(argoDir, demoName);
 
-  // Prefer exported MP4 (has keyframes for seeking) over raw WebM (no cue points)
-  const webmPath = join(demoDir, 'video.webm');
-  const mp4Path = join(outputDir, `${demoName}.mp4`);
-  let videoPath = existsSync(mp4Path) ? mp4Path : webmPath;
-  if (!existsSync(videoPath)) {
+  // Prefer exported MP4 (has keyframes for seeking), then original-extension import, then raw WebM
+  const exportedMp4 = join(outputDir, `${demoName}.mp4`);
+  const mimeMap: Record<string, string> = {
+    '.mp4': 'video/mp4', '.mov': 'video/mp4', '.mkv': 'video/x-matroska',
+    '.avi': 'video/x-msvideo', '.webm': 'video/webm',
+  };
+  let videoPath: string | null = null;
+  if (existsSync(exportedMp4)) {
+    videoPath = exportedMp4;
+  } else {
+    // Find the original-extension video first (correct MIME), fall back to video.webm
+    for (const ext of ['.mp4', '.mov', '.mkv', '.avi', '.webm']) {
+      const candidate = join(demoDir, `video${ext}`);
+      if (existsSync(candidate)) { videoPath = candidate; break; }
+    }
+  }
+  if (!videoPath || !existsSync(videoPath)) {
     throw new Error(
-      `No recording found for '${demoName}'. Run 'argo pipeline ${demoName}' first.`
+      `No recording found for '${demoName}'. Run 'argo pipeline ${demoName}' or 'argo import' first.`
     );
   }
-  let videoMime = videoPath.endsWith('.mp4') ? 'video/mp4' : 'video/webm';
+  const ext = videoPath.slice(videoPath.lastIndexOf('.'));
+  let videoMime = mimeMap[ext] ?? 'video/mp4';
+
+  // Raw video path in .argo/<demo>/ — used for duration probing and theme detection
+  let rawVideoPath: string = videoPath; // fallback to served video
+  for (const rawExt of ['.mp4', '.mov', '.mkv', '.avi', '.webm']) {
+    const candidate = join(demoDir, `video${rawExt}`);
+    if (existsSync(candidate)) { rawVideoPath = candidate; break; }
+  }
 
   // Track BGM saved from the music generator panel
   let activeMusicPath: string | undefined;
@@ -563,7 +583,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
 
         // Detect per-scene theme from the video for adaptive overlays
         let liveThemeMap: Record<string, BackgroundTheme> | undefined;
-        if (existsSync(webmPath) && body.length > 0) {
+        if (rawVideoPath && existsSync(rawVideoPath) && body.length > 0) {
           const timingFile = join(demoDir, '.timing.json');
           const liveTiming = existsSync(timingFile)
             ? readJsonFile<Record<string, number>>(timingFile, {}) : {};
@@ -573,7 +593,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             const nextMs = Object.values(liveTiming)
               .filter((ms) => ms > sceneMs)
               .sort((a, b) => a - b)[0];
-            liveThemeMap[ov.scene] = detectVideoTheme(webmPath, sceneMs, nextMs ?? sceneMs + 5000);
+            liveThemeMap[ov.scene] = detectVideoTheme(rawVideoPath, sceneMs, nextMs ?? sceneMs + 5000);
           }
         }
 
@@ -731,7 +751,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
           // Get video duration
           const { execFileSync } = await import('node:child_process');
           const rawDur = execFileSync('ffprobe', [
-            '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', webmPath,
+            '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', rawVideoPath,
           ], { encoding: 'utf-8' }).trim();
           const totalDurationMs = Math.round(parseFloat(rawDur) * 1000);
           const shiftedDurationMs = totalDurationMs - headTrimMs;
@@ -846,8 +866,9 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
           });
 
           // Switch to serving the new MP4
-          if (existsSync(mp4Path)) {
-            videoPath = mp4Path;
+          const newMp4 = join(outputDir, `${demoName}.mp4`);
+          if (existsSync(newMp4)) {
+            videoPath = newMp4;
             videoMime = 'video/mp4';
           }
           res.end(JSON.stringify({ ok: true }));
@@ -1003,7 +1024,7 @@ self.onmessage = async (e) => {
 
       // Serve video with Range request support (required for seeking)
       if (url === '/video' || url === '/video.webm') {
-        serveFileWithRanges(req, res, videoPath, videoMime);
+        serveFileWithRanges(req, res, videoPath!, videoMime);
         return;
       }
 
