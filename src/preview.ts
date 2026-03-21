@@ -2695,6 +2695,9 @@ function renderSceneList() {
     wireOverlayListeners(s.name);
     wireEffectListeners(s.name);
   }
+
+  // Trigger overlay preview after rendering so existing overlays appear on the video
+  previewOverlays();
 }
 
 // ─── Add Scene button ────────────────────────────────────────────────────
@@ -2859,6 +2862,8 @@ function updateOverlayFieldsForScene(sceneName) {
     section.outerHTML = renderOverlayFields(fakeScene);
     // Re-wire event listeners for the new overlay fields
     wireOverlayListeners(sceneName);
+    // Trigger preview to show the overlay immediately after type change
+    previewOverlays();
   }
 }
 
