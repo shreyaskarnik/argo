@@ -2266,6 +2266,8 @@ if (getPreviewDurationMs() > 0) {
 }
 
 video.addEventListener('timeupdate', () => {
+  // Don't update UI during scrubbing — scrubToX handles it directly
+  if (isScrubbing) return;
   const totalMs = getPreviewDurationMs();
   const currentMs = video.currentTime * 1000;
   if (scenePlaybackEndMs !== null && currentMs >= scenePlaybackEndMs) {
@@ -2301,16 +2303,23 @@ let isScrubbing = false;
 function scrubToX(clientX) {
   const rect = timelineBar.getBoundingClientRect();
   const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-  const totalMs = getPreviewDurationMs();
-  if (!totalMs) return;
-  const seekTime = pct * (totalMs / 1000);
+  const dur = video.duration;
+  if (!dur || !Number.isFinite(dur)) return;
+  const targetSec = pct * dur;
   scenePlaybackEndMs = null;
-  void seekAbsoluteMs(seekTime * 1000);
+  // Direct assignment — no async seek during scrubbing
+  video.currentTime = targetSec;
+  // Update UI immediately
+  const ms = targetSec * 1000;
+  document.getElementById('time-current').textContent = formatTime(ms);
+  timelineProgress.style.width = (pct * 100) + '%';
+  document.getElementById('timeline-playhead').style.left = (pct * 100) + '%';
 }
 
 timelineBar.addEventListener('mousedown', (e) => {
   isScrubbing = true;
   video.pause();
+  showPlayIcon();
   scrubToX(e.clientX);
   e.preventDefault();
 });
@@ -2318,12 +2327,11 @@ timelineBar.addEventListener('mousedown', (e) => {
 document.addEventListener('mousemove', (e) => {
   if (!isScrubbing) return;
   scrubToX(e.clientX);
+  e.preventDefault();
 });
 
 document.addEventListener('mouseup', () => {
-  if (isScrubbing) {
-    isScrubbing = false;
-  }
+  isScrubbing = false;
 });
 
 // Play/pause icon toggling
