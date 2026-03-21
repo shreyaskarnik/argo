@@ -597,9 +597,9 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
           if (existing) {
             changed = updatePreviewVoiceoverEntry(existing, vo) || changed;
           } else {
-            // New scene — create a manifest entry
+            // New scene — always create a manifest entry (even without text)
             const newEntry: Record<string, any> = { scene: vo.scene };
-            if (vo.text) newEntry.text = vo.text;
+            if (vo.text?.trim()) newEntry.text = vo.text;
             if (vo.voice) newEntry.voice = vo.voice;
             if (vo.speed) newEntry.speed = vo.speed;
             if (vo.lang) newEntry.lang = vo.lang;
