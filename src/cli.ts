@@ -8,6 +8,7 @@ import { generateClips } from './tts/generate.js';
 import { exportVideo } from './export.js';
 import { runPipeline, runBatchPipeline } from './pipeline.js';
 import { init, initFrom } from './init.js';
+import { importVideo } from './import.js';
 import { startPreviewServer } from './preview.js';
 import { startDashboardServer } from './dashboard.js';
 import { validateDemo } from './validate.js';
@@ -401,6 +402,26 @@ export function createProgram(): Command {
       console.log('Press Ctrl+C to stop.\n');
       // Keep process alive
       await new Promise(() => {});
+    });
+
+  program
+    .command('import <video-file>')
+    .description('Import an external video recording into the Argo pipeline')
+    .option('--demo <name>', 'demo name (default: derived from video filename)')
+    .action(async (videoFile: string, cmdOpts: { demo?: string }) => {
+      if (cmdOpts.demo) validateDemoName(cmdOpts.demo);
+      const result = await importVideo({
+        videoPath: videoFile,
+        demo: cmdOpts.demo,
+        cwd: process.cwd(),
+      });
+      const durationSec = (result.durationMs / 1000).toFixed(1);
+      console.log(`\nImported ${basename(videoFile)} as "${result.demoName}" (duration: ${durationSec}s)`);
+      console.log(`\nNext steps:`);
+      console.log(`  1. Run: npx argo preview ${result.demoName}`);
+      console.log(`  2. Scrub the video and add scene boundaries`);
+      console.log(`  3. Write voiceover text for each scene`);
+      console.log(`  4. Click Export to generate the final video\n`);
     });
 
   program

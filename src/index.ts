@@ -119,5 +119,8 @@ export { releasePrep, type ReleasePrepOptions } from './release-prep.js';
 // Init
 export { init } from './init.js';
 
+// Import
+export { importVideo, type ImportOptions, type ImportResult } from './import.js';
+
 // Music Generation
 export { generateMusic, generateMusicCached, type MusicGenOptions } from './music/musicgen.js';
