@@ -454,10 +454,12 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     args.push('-c:v:1', 'png', '-disposition:v:1', 'attached_pic');
     // Skip -shortest: the PNG has 0 duration and would truncate the whole output.
   } else if (hasAnyAudio) {
-    // Skip -shortest when freeze-frame holds extend the video beyond the audio.
-    // Freezes intentionally make video longer; -shortest would truncate back.
+    // Skip -shortest when:
+    // - Freeze-frame holds extend the video beyond the audio
+    // - Overlay PNGs are present (imported videos where audio may be shorter than video)
     const hasFreezes = freezeSpecs && freezeSpecs.length > 0;
-    if (!hasFreezes) {
+    const hasOverlayPngs = options.overlayPngs && options.overlayPngs.length > 0;
+    if (!hasFreezes && !hasOverlayPngs) {
       args.push('-shortest');
     }
   }
