@@ -234,8 +234,10 @@ export function buildOverlayPngFilters(
     const png = pngs[i];
     const pngInputIdx = nextInput++;
 
-    // Add PNG as looped input (so ffmpeg treats it as a video stream)
-    inputArgs.push('-loop', '1', '-i', png.pngPath);
+    // Add PNG as looped input with explicit duration to prevent ffmpeg hanging.
+    // Without -t, -loop 1 creates an infinite stream that never terminates.
+    const durSec = ((png.endMs + 1000) / 1000).toFixed(3);
+    inputArgs.push('-loop', '1', '-t', durSec, '-i', png.pngPath);
 
     const startSec = (png.startMs / 1000).toFixed(3);
     const endSec = (png.endMs / 1000).toFixed(3);
@@ -243,7 +245,7 @@ export function buildOverlayPngFilters(
     const outputLabel = `ovlpng${i}`;
 
     filterParts.push(
-      `[${currentVideo}][${pngInputIdx}:v]overlay=${posExpr}:enable='between(t,${startSec},${endSec})':format=auto[${outputLabel}]`,
+      `[${currentVideo}][${pngInputIdx}:v]overlay=${posExpr}:enable='between(t\\,${startSec}\\,${endSec})':format=auto:shortest=1[${outputLabel}]`,
     );
     currentVideo = outputLabel;
   }
