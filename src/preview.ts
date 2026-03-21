@@ -484,6 +484,16 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
           const existing = scenes.find((s: any) => s.scene === vo.scene);
           if (existing) {
             changed = updatePreviewVoiceoverEntry(existing, vo) || changed;
+          } else {
+            // New scene — create a manifest entry
+            const newEntry: Record<string, any> = { scene: vo.scene };
+            if (vo.text) newEntry.text = vo.text;
+            if (vo.voice) newEntry.voice = vo.voice;
+            if (vo.speed) newEntry.speed = vo.speed;
+            if (vo.lang) newEntry.lang = vo.lang;
+            if (vo._hint) newEntry._hint = vo._hint;
+            scenes.push(newEntry);
+            changed = true;
           }
         }
         if (changed) {
@@ -556,6 +566,29 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, changed }));
+        return;
+      }
+
+      // Save timing marks to .timing.json
+      if (url === '/api/save-timing' && req.method === 'POST') {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(chunk as Buffer);
+        const { timing } = JSON.parse(Buffer.concat(chunks).toString('utf-8')) as { timing: Record<string, number> };
+        const timingPath = join(demoDir, '.timing.json');
+        // Read existing timing to merge (preserves any extra keys)
+        const existing = readJsonFile<Record<string, number>>(timingPath, {});
+        // If the pipeline applied head-trimming, shift new timing marks back to raw timeline
+        const metaPath = join(outputDir, `${demoName}.meta.json`);
+        const meta = existsSync(metaPath) ? readJsonFile<Record<string, any>>(metaPath, {}) : {};
+        const headTrimMs: number = meta?.export?.headTrimMs ?? 0;
+        const rawTiming: Record<string, number> = {};
+        for (const [scene, ms] of Object.entries(timing)) {
+          rawTiming[scene] = ms + headTrimMs;
+        }
+        const merged = { ...existing, ...rawTiming };
+        writeFileSync(timingPath, JSON.stringify(merged, null, 2) + '\n', 'utf-8');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
         return;
       }
 
@@ -1638,6 +1671,24 @@ const PREVIEW_HTML = `<!DOCTYPE html>
     border-radius: 4px;
   }
 
+  .add-scene-btn {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 12px;
+    background: var(--bg-card, var(--surface));
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .add-scene-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
   /* Editable fields */
   .field-group { margin-top: 8px; }
   .field-group label {
@@ -1948,6 +1999,7 @@ const PREVIEW_HTML = `<!DOCTYPE html>
     <button class="sidebar-tab" data-tab="metadata">Metadata</button>
   </div>
   <div class="sidebar-panel" id="panel-scenes">
+    <button id="add-scene-btn" class="add-scene-btn">+ Add scene at current time</button>
     <div id="scene-list"></div>
     <div class="music-panel" id="music-panel">
       <div class="music-panel-header" id="music-panel-header">
@@ -2482,6 +2534,58 @@ function renderSceneList() {
   }
 }
 
+// ─── Add Scene button ────────────────────────────────────────────────────
+document.getElementById('add-scene-btn').addEventListener('click', () => {
+  // Generate a unique scene name
+  let idx = scenes.length + 1;
+  let name = 'scene-' + idx;
+  const existingNames = new Set(scenes.map(s => s.name));
+  while (existingNames.has(name)) {
+    idx++;
+    name = 'scene-' + idx;
+  }
+
+  // Timestamp from current video position
+  const startMs = Math.round(video.currentTime * 1000);
+
+  // Add to timing data
+  DATA.timing[name] = startMs;
+  DATA.sceneDurations[name] = 0;
+  DATA.voiceover.push({ scene: name, text: '' });
+
+  // Insert scene into the sorted array at the right position
+  const newScene = {
+    name,
+    startMs,
+    vo: { scene: name, text: '' },
+    overlay: undefined,
+    effects: [],
+    rendered: undefined,
+    report: undefined,
+  };
+  // Find insertion index to keep sorted by startMs
+  let insertIdx = scenes.length;
+  for (let i = 0; i < scenes.length; i++) {
+    if (scenes[i].startMs > startMs) {
+      insertIdx = i;
+      break;
+    }
+  }
+  scenes.splice(insertIdx, 0, newScene);
+
+  // Re-render scene list
+  renderSceneList();
+  snapshotAllScenes();
+  markDirty();
+
+  // Auto-scroll to the new card and expand it
+  const newCard = document.querySelector('.scene-card[data-scene="' + name + '"]');
+  if (newCard) {
+    newCard.classList.add('expanded');
+    newCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+});
+
 function renderDynamicOverlayFields(sceneName, type, ov) {
   if (!type) return '';
   let fields = '';
@@ -2774,6 +2878,18 @@ async function saveEffects() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(fx),
+  });
+}
+
+async function saveTiming() {
+  const timing = {};
+  for (const s of scenes) {
+    timing[s.name] = s.startMs;
+  }
+  await fetch('/api/save-timing', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ timing }),
   });
 }
 
@@ -3300,6 +3416,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
     await saveVoiceover();
     await saveOverlays();
     await saveEffects();
+    await saveTiming();
     clearDirty();
     setStatus('All changes saved', 'saved');
     saveBtn.textContent = '\\u2713 Saved';
@@ -3322,6 +3439,7 @@ document.getElementById('btn-export').addEventListener('click', async () => {
     await saveVoiceover();
     await saveOverlays();
     await saveEffects();
+    await saveTiming();
     clearDirty();
   }
   const overlay = document.getElementById('recording-overlay');
@@ -3366,6 +3484,7 @@ document.getElementById('btn-rerecord').addEventListener('click', async () => {
     await saveVoiceover();
     await saveOverlays();
     await saveEffects();
+    await saveTiming();
     clearDirty();
   }
   const overlay = document.getElementById('recording-overlay');

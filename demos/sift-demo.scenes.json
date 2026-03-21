@@ -3,8 +3,11 @@
     "scene": "intro",
     "text": "Hello from Sift!",
     "overlay": {
-      "type": "callout",
-      "text": "Hello"
+      "type": "headline-card",
+      "placement": "top-right",
+      "title": "Sift",
+      "body": "Chrome Extension",
+      "kicker": "Download Now"
     }
   }
 ]
