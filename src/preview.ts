@@ -2222,13 +2222,7 @@ function scrubToX(clientX) {
   const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
   const seekTime = pct * video.duration;
   scenePlaybackEndMs = null;
-  video.currentTime = seekTime;
-  // Update UI immediately for responsive scrubbing
-  const ms = seekTime * 1000;
-  document.getElementById('time-current').textContent = formatTime(ms);
-  const progressPct = (seekTime / video.duration) * 100;
-  document.getElementById('timeline-progress').style.width = progressPct + '%';
-  document.getElementById('timeline-playhead').style.left = progressPct + '%';
+  void seekAbsoluteMs(seekTime * 1000);
 }
 
 timelineBar.addEventListener('mousedown', (e) => {
