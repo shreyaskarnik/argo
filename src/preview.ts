@@ -290,8 +290,13 @@ function loadPreviewData(
 
   // Detect per-scene overlay theme from the video content.
   // Uses ffmpeg to sample frames at each overlay's scene timestamp.
-  const videoPath = existsSync(join(demoDir, 'video.webm'))
-    ? join(demoDir, 'video.webm') : null;
+  // Find video file — prefer original extension (imported videos) over .webm
+  const videoExts = ['.mp4', '.mov', '.mkv', '.avi', '.webm'];
+  let videoPath: string | null = null;
+  for (const ext of videoExts) {
+    const candidate = join(demoDir, `video${ext}`);
+    if (existsSync(candidate)) { videoPath = candidate; break; }
+  }
   let overlayThemeMap: Record<string, BackgroundTheme> | undefined;
   if (videoPath && overlays.length > 0) {
     overlayThemeMap = {};
