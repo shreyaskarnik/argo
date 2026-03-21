@@ -44,6 +44,8 @@ export {
 export {
   renderOverlaysToPng,
   buildOverlayPngFilters,
+  buildOverlayPngsForImport,
+  isImportedVideo,
   type RenderedOverlayPng,
   type OverlayPngInput,
 } from './overlays/render-to-png.js';

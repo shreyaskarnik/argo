@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto';
 import { renderTemplate, type TemplateResult } from './templates.js';
 import type { OverlayCue, Zone } from './types.js';
 import type { BackgroundTheme } from './zones.js';
+import type { Placement } from '../tts/align.js';
 
 export interface OverlayPngInput {
   scene: string;
@@ -106,8 +107,8 @@ function buildOverlayHtml(
  * Compute a content hash for cache invalidation.
  * Changes to the overlay cue or video dimensions invalidate the cache.
  */
-function computeHash(overlay: OverlayCue, width: number, height: number): string {
-  const data = JSON.stringify({ overlay, width, height });
+function computeHash(overlay: OverlayCue, width: number, height: number, theme: string = 'dark'): string {
+  const data = JSON.stringify({ overlay, width, height, theme });
   return createHash('sha256').update(data).digest('hex').slice(0, 16);
 }
 
@@ -143,7 +144,7 @@ export async function renderOverlaysToPng(
 
   for (const input of overlays) {
     const zone: Zone = input.overlay.placement ?? 'bottom-center';
-    const hash = computeHash(input.overlay, videoWidth, videoHeight);
+    const hash = computeHash(input.overlay, videoWidth, videoHeight, theme);
     const pngPath = join(outputDir, `${input.scene}-overlay-${hash}.png`);
 
     if (existsSync(pngPath)) {
@@ -251,4 +252,78 @@ export function buildOverlayPngFilters(
   }
 
   return { inputArgs, filterParts, videoSource: currentVideo, nextInput };
+}
+
+/**
+ * Check if a demo is an imported video (has `.imported` marker).
+ */
+export function isImportedVideo(argoDir: string, demoName: string): boolean {
+  return existsSync(join(argoDir, demoName, '.imported'));
+}
+
+/**
+ * Build overlay PNGs for an imported video if overlays are defined.
+ *
+ * Shared across all export paths (CLI, pipeline, preview) to ensure parity.
+ * Detects adaptive theme from the video frame at the overlay's start time.
+ *
+ * @param argoDir - Path to .argo directory
+ * @param demoName - Demo name
+ * @param manifestPath - Path to .scenes.json manifest
+ * @param placements - Scene placements with timing
+ * @param videoWidth - Output video width
+ * @param videoHeight - Output video height
+ * @param deviceScaleFactor - Recording scale factor (for PNG rendering resolution)
+ * @returns Rendered overlay PNGs or undefined if not applicable
+ */
+export async function buildOverlayPngsForImport(options: {
+  argoDir: string;
+  demoName: string;
+  manifestPath: string;
+  placements: Placement[];
+  videoWidth: number;
+  videoHeight: number;
+  deviceScaleFactor?: number;
+}): Promise<RenderedOverlayPng[] | undefined> {
+  const { argoDir, demoName, manifestPath, placements, videoWidth, videoHeight, deviceScaleFactor = 1 } = options;
+
+  if (!isImportedVideo(argoDir, demoName)) return undefined;
+  if (placements.length === 0) return undefined;
+
+  let scenes: Array<{ scene?: string; overlay?: OverlayCue }>;
+  try {
+    scenes = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+  } catch {
+    return undefined;
+  }
+
+  const hasOverlays = scenes.some((s) => s.overlay);
+  if (!hasOverlays) return undefined;
+
+  const overlayInputs: OverlayPngInput[] = [];
+  for (const entry of scenes) {
+    if (!entry.overlay || !entry.scene) continue;
+    const placement = placements.find((p) => p.scene === entry.scene);
+    if (!placement) continue;
+    overlayInputs.push({
+      scene: entry.scene,
+      overlay: entry.overlay,
+      startMs: placement.startMs,
+      endMs: placement.endMs,
+    });
+  }
+
+  if (overlayInputs.length === 0) return undefined;
+
+  // Detect theme from the video at the first overlay's start time
+  const { detectVideoTheme } = await import('../media.js');
+  const videoPath = join(argoDir, demoName, 'video.webm');
+  const theme = detectVideoTheme(videoPath, overlayInputs[0].startMs);
+
+  const pngDir = join(argoDir, demoName, 'overlay-pngs');
+  const renderW = videoWidth * deviceScaleFactor;
+  const renderH = videoHeight * deviceScaleFactor;
+  const pngs = await renderOverlaysToPng(overlayInputs, pngDir, renderW, renderH, theme);
+  console.log(`  Rendered ${pngs.length} overlay PNG(s) for compositing (theme: ${theme})`);
+  return pngs;
 }

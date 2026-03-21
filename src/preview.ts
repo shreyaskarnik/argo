@@ -23,7 +23,7 @@ import { exportVideo, checkFfmpeg } from './export.js';
 import { applySpeedRampToTimeline } from './speed-ramp.js';
 import { shiftCameraMoves, scaleCameraMoves, type CameraMove } from './camera-move.js';
 import { resolveFreezes, adjustPlacementsForFreezes, totalFreezeDurationMs, type FreezeSpec } from './freeze.js';
-import { renderOverlaysToPng, type RenderedOverlayPng, type OverlayPngInput } from './overlays/render-to-png.js';
+import { buildOverlayPngsForImport, type RenderedOverlayPng } from './overlays/render-to-png.js';
 
 export interface PreviewExportConfig {
   preset?: string;
@@ -739,31 +739,15 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
           } catch { /* optional */ }
 
           // Render overlay PNGs for imported videos (no Playwright recording step).
-          // Check if a .demo.ts script exists — if not, overlays were never burned in.
-          let overlayPngs: RenderedOverlayPng[] | undefined;
-          const demoScriptPath = join(demosDir, `${demoName}.demo.ts`);
-          const hasOverlays = scenes.some((s: any) => s.overlay);
-          if (!existsSync(demoScriptPath) && hasOverlays && freezeAdjustedPlacements.length > 0) {
-            const overlayInputs: OverlayPngInput[] = [];
-            for (const entry of scenes) {
-              if (!entry.overlay || !entry.scene) continue;
-              const placement = freezeAdjustedPlacements.find((p: any) => p.scene === entry.scene);
-              if (!placement) continue;
-              overlayInputs.push({
-                scene: entry.scene,
-                overlay: entry.overlay,
-                startMs: placement.startMs,
-                endMs: placement.endMs,
-              });
-            }
-            if (overlayInputs.length > 0) {
-              const pngDir = join(demoDir, 'overlay-pngs');
-              const videoW = ec?.outputWidth ?? 1920;
-              const videoH = ec?.outputHeight ?? 1080;
-              overlayPngs = await renderOverlaysToPng(overlayInputs, pngDir, videoW, videoH);
-              console.log(`  Rendered ${overlayPngs.length} overlay PNG(s) for compositing`);
-            }
-          }
+          const overlayPngs = await buildOverlayPngsForImport({
+            argoDir,
+            demoName,
+            manifestPath: scenesPath,
+            placements: freezeAdjustedPlacements,
+            videoWidth: ec?.outputWidth ?? 1920,
+            videoHeight: ec?.outputHeight ?? 1080,
+            deviceScaleFactor: ec?.deviceScaleFactor,
+          });
 
           // Export — use full config so output matches argo pipeline
           await exportVideo({

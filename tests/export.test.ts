@@ -494,6 +494,68 @@ describe('exportVideo', () => {
     expect(a).not.toContain('-filter_complex');
   });
 
+  // ---------- overlay PNGs ----------
+
+  it('adds overlay PNG inputs with correct filter_complex for imported videos', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      overlayPngs: [
+        { scene: 'intro', pngPath: '/tmp/intro-overlay.png', zone: 'bottom-center', startMs: 0, endMs: 5000 },
+        { scene: 'features', pngPath: '/tmp/features-overlay.png', zone: 'top-left', startMs: 5000, endMs: 10000 },
+      ],
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const a = args as string[];
+    // Should have overlay PNG inputs with -loop 1 and -t
+    expect(a).toContain('-loop');
+    expect(a).toContain('/tmp/intro-overlay.png');
+    expect(a).toContain('/tmp/features-overlay.png');
+    // Should have filter_complex with overlay enable expressions
+    expect(a).toContain('-filter_complex');
+    const fcIdx = a.indexOf('-filter_complex');
+    const fc = a[fcIdx + 1];
+    expect(fc).toContain('overlay=');
+    expect(fc).toContain("enable='between");
+    expect(fc).toContain('0.000');
+    expect(fc).toContain('5.000');
+    expect(fc).toContain('10.000');
+  });
+
+  it('overlay PNG input indices account for other inputs', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      chapterMetadataPath: '.argo/demo/chapters.txt',
+      overlayPngs: [
+        { scene: 'intro', pngPath: '/tmp/intro-overlay.png', zone: 'center', startMs: 0, endMs: 3000 },
+      ],
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const a = args as string[];
+    // Inputs: 0=video, 1=audio, 2=chapters, 3=overlay PNG
+    const fcIdx = a.indexOf('-filter_complex');
+    const fc = a[fcIdx + 1];
+    // Overlay PNG should reference input 3 (after video, audio, chapters)
+    expect(fc).toContain('[3:v]');
+  });
+
+  it('empty overlayPngs array does not affect output', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      overlayPngs: [],
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const a = args as string[];
+    // No filter_complex from empty overlays
+    expect(a).not.toContain('-filter_complex');
+    expect(a).not.toContain('-loop');
+  });
+
   it('watermark input index accounts for other inputs (audio, chapters, thumbnail)', async () => {
     setupHappy();
     await exportVideo({

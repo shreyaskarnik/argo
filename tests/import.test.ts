@@ -49,6 +49,9 @@ describe('importVideo', () => {
     // Check .timing.json was created
     const timing = JSON.parse(await readFile(join(dir, '.argo', 'recording', '.timing.json'), 'utf-8'));
     expect(timing).toEqual({ intro: 0 });
+
+    // Check .imported marker was created
+    expect(existsSync(join(dir, '.argo', 'recording', '.imported'))).toBe(true);
   });
 
   it('uses --demo flag to set the demo name', async () => {

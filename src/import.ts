@@ -98,5 +98,8 @@ export async function importVideo(options: ImportOptions): Promise<ImportResult>
     writeFileSync(timingPath, JSON.stringify({ intro: 0 }, null, 2) + '\n', 'utf-8');
   }
 
+  // 9. Write .imported marker so export paths know overlays need PNG compositing
+  writeFileSync(join(demoDir, '.imported'), '', 'utf-8');
+
   return { demoName, demoDir, durationMs };
 }
