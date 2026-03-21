@@ -2751,6 +2751,9 @@ document.getElementById('add-scene-btn').addEventListener('click', () => {
   }
   scenes.splice(insertIdx, 0, newScene);
 
+  // Capture current form values before re-render wipes the DOM
+  syncFormValuesToScenes();
+
   // Re-render scene list
   renderSceneList();
   snapshotAllScenes();
@@ -3347,6 +3350,22 @@ async function regenClip(sceneName, btn) {
   } finally {
     btn.disabled = false;
     btn.textContent = 'Regen TTS';
+  }
+}
+
+// Sync DOM form values back to in-memory scenes array.
+// Called before renderSceneList() to preserve user edits.
+function syncFormValuesToScenes() {
+  for (const s of scenes) {
+    const textEl = document.querySelector('textarea[data-scene="' + s.name + '"][data-field="text"]');
+    if (textEl && textEl.value) {
+      if (!s.vo) s.vo = { scene: s.name, text: '' };
+      s.vo.text = textEl.value;
+    }
+    const voiceEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="voice"]');
+    if (voiceEl?.value && s.vo) s.vo.voice = voiceEl.value;
+    const speedEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="speed"]');
+    if (speedEl?.value && s.vo) s.vo.speed = parseFloat(speedEl.value);
   }
 }
 
