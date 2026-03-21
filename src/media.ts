@@ -73,7 +73,8 @@ function frameLuminance(videoPath: string, timestampMs: number): number | null {
       'pipe:1',
     ], { stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 64 * 36 * 3 + 1024 });
 
-    if (result.status !== 0 || !result.stdout || result.stdout.length < 3) {
+    // ffmpeg may return non-zero even when stdout has valid frame data (e.g., codec warnings)
+    if (!result.stdout || result.stdout.length < 3) {
       return null;
     }
 
