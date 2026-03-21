@@ -421,15 +421,18 @@ export function createProgram(): Command {
     .command('import <video-file>')
     .description('Import an external video recording into the Argo pipeline')
     .option('--demo <name>', 'demo name (default: derived from video filename)')
-    .action(async (videoFile: string, cmdOpts: { demo?: string }) => {
+    .option('--force', 'overwrite existing scaffold files (.scenes.json, .timing.json)')
+    .action(async (videoFile: string, cmdOpts: { demo?: string; force?: boolean }) => {
       if (cmdOpts.demo) validateDemoName(cmdOpts.demo);
       const result = await importVideo({
         videoPath: videoFile,
         demo: cmdOpts.demo,
         cwd: process.cwd(),
+        force: cmdOpts.force,
       });
       const durationSec = (result.durationMs / 1000).toFixed(1);
-      console.log(`\nImported ${basename(videoFile)} as "${result.demoName}" (duration: ${durationSec}s)`);
+      const dimStr = result.dimensions ? ` ${result.dimensions.width}×${result.dimensions.height}` : '';
+      console.log(`\nImported ${basename(videoFile)} as "${result.demoName}" (${durationSec}s${dimStr})`);
       console.log(`\nNext steps:`);
       console.log(`  1. Run: npx argo preview ${result.demoName}`);
       console.log(`  2. Scrub the video and add scene boundaries`);

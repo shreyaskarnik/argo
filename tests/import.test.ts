@@ -4,10 +4,11 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-// Mock getVideoDurationMs to avoid needing a real video + ffprobe
+// Mock media.js to avoid needing a real video + ffprobe
 vi.mock('../src/media.js', () => ({
   getVideoDurationMs: vi.fn(() => 45200),
   getVideoFrameRate: vi.fn(() => 30),
+  getVideoDimensions: vi.fn(() => ({ width: 1920, height: 1080 })),
 }));
 
 import { importVideo } from '../src/import.js';
@@ -50,8 +51,15 @@ describe('importVideo', () => {
     const timing = JSON.parse(await readFile(join(dir, '.argo', 'recording', '.timing.json'), 'utf-8'));
     expect(timing).toEqual({ intro: 0 });
 
-    // Check .imported marker was created
+    // Check .imported marker was created with metadata
     expect(existsSync(join(dir, '.argo', 'recording', '.imported'))).toBe(true);
+    const imported = JSON.parse(await readFile(join(dir, '.argo', 'recording', '.imported'), 'utf-8'));
+    expect(imported.width).toBe(1920);
+    expect(imported.height).toBe(1080);
+    expect(imported.durationMs).toBe(45200);
+
+    // Check result includes dimensions
+    expect(result.dimensions).toEqual({ width: 1920, height: 1080 });
   });
 
   it('uses --demo flag to set the demo name', async () => {
@@ -122,5 +130,22 @@ describe('importVideo', () => {
     const videoPath = await createFakeVideo('capture.mov');
     const result = await importVideo({ videoPath, cwd: dir });
     expect(result.demoName).toBe('capture');
+  });
+
+  it('overwrites scaffold files with --force', async () => {
+    const videoPath = await createFakeVideo('test.mp4');
+    // Pre-create a manifest and timing
+    await mkdir(join(dir, 'demos'), { recursive: true });
+    await writeFile(join(dir, 'demos', 'test.scenes.json'), '[{"scene":"existing","text":"hello"}]');
+    await mkdir(join(dir, '.argo', 'test'), { recursive: true });
+    await writeFile(join(dir, '.argo', 'test', '.timing.json'), '{"existing":500}');
+
+    await importVideo({ videoPath, cwd: dir, force: true });
+
+    // Should be overwritten with fresh scaffold
+    const manifest = JSON.parse(await readFile(join(dir, 'demos', 'test.scenes.json'), 'utf-8'));
+    expect(manifest[0].scene).toBe('intro');
+    const timing = JSON.parse(await readFile(join(dir, '.argo', 'test', '.timing.json'), 'utf-8'));
+    expect(timing).toEqual({ intro: 0 });
   });
 });

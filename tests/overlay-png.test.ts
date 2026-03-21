@@ -29,6 +29,21 @@ describe('isImportedVideo', () => {
   it('returns false when demo dir does not exist', () => {
     expect(isImportedVideo(dir, 'nonexistent')).toBe(false);
   });
+
+  it('returns true for variant subdir when base demo has .imported marker', async () => {
+    // Simulates pipeline variant: base demo is "myapp", variant subdir is "myapp-mobile"
+    await mkdir(join(dir, 'myapp'), { recursive: true });
+    await writeFile(join(dir, 'myapp', '.imported'), '');
+    await mkdir(join(dir, 'myapp-mobile'), { recursive: true });
+    // No .imported in myapp-mobile — should fall back to base "myapp"
+    expect(isImportedVideo(dir, 'myapp-mobile')).toBe(true);
+  });
+
+  it('returns false for variant subdir when base demo also lacks .imported', async () => {
+    await mkdir(join(dir, 'myapp'), { recursive: true });
+    await mkdir(join(dir, 'myapp-mobile'), { recursive: true });
+    expect(isImportedVideo(dir, 'myapp-mobile')).toBe(false);
+  });
 });
 
 describe('buildOverlayPngFilters', () => {

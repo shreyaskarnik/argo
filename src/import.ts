@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, copyFileSync, writeFileSync } from 'node:fs';
 import { join, basename, extname } from 'node:path';
-import { getVideoDurationMs } from './media.js';
+import { getVideoDurationMs, getVideoDimensions } from './media.js';
 
 const SUPPORTED_EXTENSIONS = new Set(['.mp4', '.mov', '.webm', '.mkv', '.avi']);
 
@@ -8,12 +8,16 @@ export interface ImportOptions {
   videoPath: string;
   demo?: string;
   cwd?: string;
+  /** Overwrite existing scaffold files (.scenes.json, .timing.json). */
+  force?: boolean;
 }
 
 export interface ImportResult {
   demoName: string;
   demoDir: string;
   durationMs: number;
+  /** Video dimensions probed from the source file. */
+  dimensions?: { width: number; height: number };
 }
 
 /**
@@ -39,7 +43,7 @@ function sanitizeDemoName(filename: string): string {
 }
 
 export async function importVideo(options: ImportOptions): Promise<ImportResult> {
-  const { videoPath, cwd = process.cwd() } = options;
+  const { videoPath, cwd = process.cwd(), force = false } = options;
 
   // 1. Validate video file exists
   const resolvedVideoPath = join(cwd, videoPath);
@@ -74,14 +78,15 @@ export async function importVideo(options: ImportOptions): Promise<ImportResult>
   const destVideoPath = join(demoDir, 'video.webm');
   copyFileSync(absVideoPath, destVideoPath);
 
-  // 6. Get video duration
+  // 6. Get video duration and dimensions
   const durationMs = getVideoDurationMs(destVideoPath);
+  const dimensions = getVideoDimensions(destVideoPath);
 
   // 7. Create scaffold .scenes.json in demos/ directory
   const demosDir = join(cwd, 'demos');
   mkdirSync(demosDir, { recursive: true });
   const manifestPath = join(demosDir, `${demoName}.scenes.json`);
-  if (!existsSync(manifestPath)) {
+  if (force || !existsSync(manifestPath)) {
     const manifest = [
       {
         scene: 'intro',
@@ -94,12 +99,18 @@ export async function importVideo(options: ImportOptions): Promise<ImportResult>
 
   // 8. Create .timing.json with single mark at 0ms
   const timingPath = join(demoDir, '.timing.json');
-  if (!existsSync(timingPath)) {
+  if (force || !existsSync(timingPath)) {
     writeFileSync(timingPath, JSON.stringify({ intro: 0 }, null, 2) + '\n', 'utf-8');
   }
 
-  // 9. Write .imported marker so export paths know overlays need PNG compositing
-  writeFileSync(join(demoDir, '.imported'), '', 'utf-8');
+  // 9. Write .imported marker with metadata so export paths know overlays
+  // need PNG compositing and can use the probed video dimensions.
+  const importedMeta = {
+    importedAt: new Date().toISOString(),
+    ...(dimensions ? { width: dimensions.width, height: dimensions.height } : {}),
+    durationMs,
+  };
+  writeFileSync(join(demoDir, '.imported'), JSON.stringify(importedMeta, null, 2) + '\n', 'utf-8');
 
-  return { demoName, demoDir, durationMs };
+  return { demoName, demoDir, durationMs, dimensions: dimensions ?? undefined };
 }

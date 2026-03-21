@@ -57,20 +57,12 @@ export function getVideoFrameRate(videoPath: string): number {
 }
 
 /**
- * Detect whether a video frame is predominantly dark or light.
- * Extracts a single frame at the given timestamp using ffmpeg, reads raw
- * RGB pixel data, and computes average luminance.
- *
- * Returns the *overlay* theme for contrast: dark video → 'light' overlay,
- * light video → 'dark' overlay. Falls back to 'dark' on error.
+ * Compute average luminance of a single video frame at the given timestamp.
+ * Returns a value 0–255 or null on failure.
  */
-export function detectVideoTheme(
-  videoPath: string,
-  timestampMs = 0,
-): BackgroundTheme {
+function frameLuminance(videoPath: string, timestampMs: number): number | null {
   try {
     const ss = (timestampMs / 1000).toFixed(3);
-    // Extract a single frame as raw RGB, scaled down for fast analysis
     const result = spawnSync('ffmpeg', [
       '-ss', ss,
       '-i', videoPath,
@@ -82,7 +74,7 @@ export function detectVideoTheme(
     ], { stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 64 * 36 * 3 + 1024 });
 
     if (result.status !== 0 || !result.stdout || result.stdout.length < 3) {
-      return 'dark'; // fallback
+      return null;
     }
 
     const pixels = result.stdout as Buffer;
@@ -94,11 +86,69 @@ export function detectVideoTheme(
       const b = pixels[i * 3 + 2];
       totalLuminance += 0.299 * r + 0.587 * g + 0.114 * b;
     }
-    const avgLuminance = totalLuminance / pixelCount;
-
-    // Dark background → light overlay, light background → dark overlay
-    return avgLuminance < 128 ? 'light' : 'dark';
+    return totalLuminance / pixelCount;
   } catch {
-    return 'dark'; // safe fallback
+    return null;
+  }
+}
+
+/**
+ * Detect whether a video region is predominantly dark or light.
+ * Samples multiple frames across the given time range for robustness
+ * (a single frame might be a transition or black screen).
+ *
+ * Returns the *overlay* theme for contrast: dark video → 'light' overlay,
+ * light video → 'dark' overlay. Falls back to 'dark' on error.
+ */
+export function detectVideoTheme(
+  videoPath: string,
+  startMs = 0,
+  endMs?: number,
+): BackgroundTheme {
+  // Sample up to 5 frames spread across the range; if no endMs, sample around startMs
+  const sampleCount = 5;
+  const timestamps: number[] = [];
+  if (endMs !== undefined && endMs > startMs) {
+    const step = (endMs - startMs) / (sampleCount + 1);
+    for (let i = 1; i <= sampleCount; i++) {
+      timestamps.push(Math.round(startMs + step * i));
+    }
+  } else {
+    // Single point — sample at start plus small offsets
+    timestamps.push(startMs);
+    if (startMs > 500) timestamps.push(startMs - 500);
+    timestamps.push(startMs + 500);
+  }
+
+  const luminances: number[] = [];
+  for (const ts of timestamps) {
+    const lum = frameLuminance(videoPath, Math.max(0, ts));
+    if (lum !== null) luminances.push(lum);
+  }
+
+  if (luminances.length === 0) return 'dark';
+
+  const avgLuminance = luminances.reduce((a, b) => a + b, 0) / luminances.length;
+  return avgLuminance < 128 ? 'light' : 'dark';
+}
+
+/**
+ * Probe video dimensions (width × height) using ffprobe.
+ * Returns { width, height } or null on failure.
+ */
+export function getVideoDimensions(videoPath: string): { width: number; height: number } | null {
+  try {
+    const raw = execFileSync(
+      'ffprobe',
+      ['-v', 'error', '-select_streams', 'v:0',
+       '-show_entries', 'stream=width,height',
+       '-of', 'csv=p=0:s=x', videoPath],
+      { encoding: 'utf-8' },
+    ).trim();
+    const match = raw.match(/^(\d+)x(\d+)$/);
+    if (!match) return null;
+    return { width: Number(match[1]), height: Number(match[2]) };
+  } catch {
+    return null;
   }
 }

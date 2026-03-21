@@ -129,6 +129,9 @@ export { releasePrep, type ReleasePrepOptions } from './release-prep.js';
 // Init
 export { init } from './init.js';
 
+// Media utilities
+export { getVideoDurationMs, getVideoFrameRate, getVideoDimensions, detectVideoTheme } from './media.js';
+
 // Import
 export { importVideo, type ImportOptions, type ImportResult } from './import.js';
 

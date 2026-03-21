@@ -7,7 +7,7 @@
  * composited via ffmpeg's overlay filter with `enable` timeline.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { renderTemplate, type TemplateResult } from './templates.js';
@@ -124,7 +124,7 @@ function computeHash(overlay: OverlayCue, width: number, height: number, theme: 
  * @param outputDir - Directory to save PNGs (e.g. `.argo/<demo>/overlay-pngs/`)
  * @param videoWidth - Width of the target video in pixels
  * @param videoHeight - Height of the target video in pixels
- * @param theme - Background theme for overlay styling (default: 'dark')
+ * @param theme - Background theme for overlay styling, or per-overlay map keyed by scene name
  * @returns Array of rendered overlay PNGs with timing and position info
  */
 export async function renderOverlaysToPng(
@@ -132,41 +132,43 @@ export async function renderOverlaysToPng(
   outputDir: string,
   videoWidth: number,
   videoHeight: number,
-  theme: BackgroundTheme = 'dark',
+  theme: BackgroundTheme | Record<string, BackgroundTheme> = 'dark',
 ): Promise<RenderedOverlayPng[]> {
   if (overlays.length === 0) return [];
 
   mkdirSync(outputDir, { recursive: true });
 
+  const resolveTheme = (scene: string): BackgroundTheme =>
+    typeof theme === 'string' ? theme : (theme[scene] ?? 'dark');
+
   // Check which overlays need rendering (cache check)
-  const toRender: Array<{ input: OverlayPngInput; pngPath: string; hash: string }> = [];
+  const toRender: Array<{ input: OverlayPngInput; pngPath: string; hash: string; theme: BackgroundTheme }> = [];
   const results: RenderedOverlayPng[] = [];
+  const validPngPaths = new Set<string>();
 
   for (const input of overlays) {
     const zone: Zone = input.overlay.placement ?? 'bottom-center';
-    const hash = computeHash(input.overlay, videoWidth, videoHeight, theme);
+    const overlayTheme = resolveTheme(input.scene);
+    const hash = computeHash(input.overlay, videoWidth, videoHeight, overlayTheme);
     const pngPath = join(outputDir, `${input.scene}-overlay-${hash}.png`);
+    validPngPaths.add(`${input.scene}-overlay-${hash}.png`);
 
     if (existsSync(pngPath)) {
-      // Cached — reuse
-      results.push({
-        scene: input.scene,
-        pngPath,
-        zone,
-        startMs: input.startMs,
-        endMs: input.endMs,
-      });
+      results.push({ scene: input.scene, pngPath, zone, startMs: input.startMs, endMs: input.endMs });
     } else {
-      toRender.push({ input, pngPath, hash });
-      results.push({
-        scene: input.scene,
-        pngPath,
-        zone,
-        startMs: input.startMs,
-        endMs: input.endMs,
-      });
+      toRender.push({ input, pngPath, hash, theme: overlayTheme });
+      results.push({ scene: input.scene, pngPath, zone, startMs: input.startMs, endMs: input.endMs });
     }
   }
+
+  // Clean up stale PNGs whose content hash no longer matches any current overlay
+  try {
+    for (const file of readdirSync(outputDir)) {
+      if (file.endsWith('.png') && !validPngPaths.has(file)) {
+        try { unlinkSync(join(outputDir, file)); } catch { /* ignore */ }
+      }
+    }
+  } catch { /* dir may not exist yet */ }
 
   if (toRender.length === 0) return results;
 
@@ -181,9 +183,9 @@ export async function renderOverlaysToPng(
     });
     const page = await context.newPage();
 
-    for (const { input, pngPath } of toRender) {
+    for (const { input, pngPath, theme: overlayTheme } of toRender) {
       const zone: Zone = input.overlay.placement ?? 'bottom-center';
-      const templateResult = renderTemplate(input.overlay, theme);
+      const templateResult = renderTemplate(input.overlay, overlayTheme);
       const html = buildOverlayHtml(templateResult, zone, videoWidth, videoHeight);
 
       await page.setContent(html, { waitUntil: 'load' });
@@ -256,24 +258,26 @@ export function buildOverlayPngFilters(
 
 /**
  * Check if a demo is an imported video (has `.imported` marker).
+ * For variants (e.g. `demo-mobile`), also checks the base demo name.
  */
 export function isImportedVideo(argoDir: string, demoName: string): boolean {
-  return existsSync(join(argoDir, demoName, '.imported'));
+  if (existsSync(join(argoDir, demoName, '.imported'))) return true;
+  // Variant subdirs like `demo-mobile` — check the base demo
+  const dashIdx = demoName.lastIndexOf('-');
+  if (dashIdx > 0) {
+    const baseName = demoName.slice(0, dashIdx);
+    if (existsSync(join(argoDir, baseName, '.imported'))) return true;
+  }
+  return false;
 }
 
 /**
  * Build overlay PNGs for an imported video if overlays are defined.
  *
  * Shared across all export paths (CLI, pipeline, preview) to ensure parity.
- * Detects adaptive theme from the video frame at the overlay's start time.
+ * Detects adaptive theme per-overlay from the video frame at each overlay's
+ * time range — a dark section gets light overlays and vice versa.
  *
- * @param argoDir - Path to .argo directory
- * @param demoName - Demo name
- * @param manifestPath - Path to .scenes.json manifest
- * @param placements - Scene placements with timing
- * @param videoWidth - Output video width
- * @param videoHeight - Output video height
- * @param deviceScaleFactor - Recording scale factor (for PNG rendering resolution)
  * @returns Rendered overlay PNGs or undefined if not applicable
  */
 export async function buildOverlayPngsForImport(options: {
@@ -315,15 +319,21 @@ export async function buildOverlayPngsForImport(options: {
 
   if (overlayInputs.length === 0) return undefined;
 
-  // Detect theme from the video at the first overlay's start time
+  // Detect theme per-overlay from the video at each overlay's time range
   const { detectVideoTheme } = await import('../media.js');
   const videoPath = join(argoDir, demoName, 'video.webm');
-  const theme = detectVideoTheme(videoPath, overlayInputs[0].startMs);
+  const themeMap: Record<string, BackgroundTheme> = {};
+  for (const input of overlayInputs) {
+    themeMap[input.scene] = detectVideoTheme(videoPath, input.startMs, input.endMs);
+  }
+
+  const uniqueThemes = [...new Set(Object.values(themeMap))];
+  const themeLabel = uniqueThemes.length === 1 ? uniqueThemes[0] : `mixed (${uniqueThemes.join('/')})`;
 
   const pngDir = join(argoDir, demoName, 'overlay-pngs');
   const renderW = videoWidth * deviceScaleFactor;
   const renderH = videoHeight * deviceScaleFactor;
-  const pngs = await renderOverlaysToPng(overlayInputs, pngDir, renderW, renderH, theme);
-  console.log(`  Rendered ${pngs.length} overlay PNG(s) for compositing (theme: ${theme})`);
+  const pngs = await renderOverlaysToPng(overlayInputs, pngDir, renderW, renderH, themeMap);
+  console.log(`  Rendered ${pngs.length} overlay PNG(s) for compositing (theme: ${themeLabel})`);
   return pngs;
 }
