@@ -3166,8 +3166,9 @@ async function regenClip(sceneName, btn) {
   setStatus('Regenerating TTS for ' + sceneName + '...', 'saving');
 
   try {
-    // Save current voiceover state first
+    // Save current voiceover + timing state first (new scenes need timing marks)
     await saveVoiceover();
+    await saveTiming();
 
     const resp = await fetch('/api/regen-clip', {
       method: 'POST',
