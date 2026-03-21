@@ -2244,6 +2244,8 @@ function renderTimelineMarkers() {
     marker.dataset.scene = s.name;
     marker.addEventListener('click', (e) => {
       e.stopPropagation();
+      // Don't seek to scene start if user just finished scrubbing
+      if (justScrubbed) return;
       seekToScene(s);
     });
     timelineBar.appendChild(marker);
@@ -2299,6 +2301,7 @@ video.addEventListener('timeupdate', () => {
 
 // Click and drag on timeline bar to scrub
 let isScrubbing = false;
+let justScrubbed = false;
 
 function scrubToX(clientX) {
   const rect = timelineBar.getBoundingClientRect();
@@ -2331,7 +2334,12 @@ document.addEventListener('mousemove', (e) => {
 });
 
 document.addEventListener('mouseup', () => {
-  isScrubbing = false;
+  if (isScrubbing) {
+    isScrubbing = false;
+    // Prevent the subsequent click event on scene markers from seeking to scene start
+    justScrubbed = true;
+    setTimeout(() => { justScrubbed = false; }, 50);
+  }
 });
 
 // Play/pause icon toggling
