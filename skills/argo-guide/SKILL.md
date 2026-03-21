@@ -91,7 +91,7 @@ narration.mark('details');
 await zoomTo(page, '#revenue-chart', { narration, scale: 1.5, holdMs: 2000 });
 await page.waitForTimeout(narration.durationFor('details'));
 ```
-The zoom is applied during export via ffmpeg `crop+scale` with lanczos resampling. Camera moves are written to `.timing.camera-moves.json` and auto-shifted for head trim + scaled for `deviceScaleFactor`.
+The zoom is applied during export via ffmpeg `zoompan` (not `crop` — crop w/h are not per-frame). Camera moves are written to `.timing.camera-moves.json` and auto-shifted for head trim + scaled for `deviceScaleFactor`.
 
 ### Mobile Demos
 
@@ -112,6 +112,16 @@ These options can also be set in `argo.config.mjs` under `video` for all demos:
 ```javascript
 video: { width: 390, height: 664, isMobile: true, hasTouch: true }
 ```
+
+### Timeouts
+
+Long demos need generous timeouts. Playwright default is 30s, but a 10-scene demo with TTS easily runs 2-3 minutes:
+
+```typescript
+test.setTimeout(scenes.length * 15_000); // ~15s per scene as a rule of thumb
+```
+
+Or just use a large fixed value: `test.setTimeout(300_000)` for up to 5 minutes.
 
 ### Auto-Trim (Off-Camera Setup)
 
@@ -173,11 +183,25 @@ Four types, each with a `type` discriminant. All support `placement`, `motion`, 
 
 **Auto background:** Set `autoBackground: true` to auto-detect page contrast. Skips fixed/sticky elements (navbars).
 
-### Manifest vs Inline Overlays
+### How Overlays Get Triggered
 
-Use **one or the other** per scene:
-- **Manifest** (recommended): overlay object in `.scenes.json`. `showOverlay(page, scene, durationMs)` — no inline cue.
-- **Inline**: `showOverlay(page, scene, cue, durationMs)` with explicit cue in the script. Use for camera effect coordination or conditional logic.
+Overlays need **two things** to appear in the video:
+1. **Define** the overlay in `.scenes.json` (what to show — template, text, placement)
+2. **Trigger** it in the demo script via `showOverlay(page, scene, durationMs)` (when to show it)
+
+The manifest alone does NOT render overlays during recording. You must call `showOverlay()` in the script:
+
+```typescript
+narration.mark('intro');
+// This triggers the overlay defined in .scenes.json for "intro"
+await showOverlay(page, 'intro', narration.durationFor('intro'));
+```
+
+**Two call signatures:**
+- `showOverlay(page, scene, durationMs)` — reads overlay from manifest (recommended, 90% of cases)
+- `showOverlay(page, scene, cueObject, durationMs)` — inline cue, overrides manifest (for conditional/dynamic overlays)
+
+Use `withOverlay(page, scene, async () => { ... })` when you need camera effects during the overlay.
 
 ---
 
@@ -193,6 +217,7 @@ npx argo preview <name>                     # Interactive replay viewer (iterate
 npx argo preview                            # Multi-demo dashboard (lists all demos with status)
 npx argo clip <name> <scene>                # Extract a scene as MP4 clip
 npx argo clip <name> <scene> --format gif   # Extract as GIF (for release notes, docs)
+npx argo import video.mp4 --demo myapp       # Import external video (QuickTime, OBS, ffmpeg)
 npx argo init                               # Scaffold example demo + config
 npx argo init --from tests/spec.ts          # Convert existing Playwright test
 ```
@@ -297,6 +322,36 @@ Argo demos are standard Playwright tests — they show up in VS Code's Playwrigh
 ### Preview Iteration Workflow
 
 Run `argo pipeline` once, then `argo preview` to iterate on voiceover and overlays without re-recording. Preview provides editable text/voice/speed per scene, per-scene TTS regeneration, overlay editing, and a Save button that persists to manifests. Only re-run `pipeline` when the demo script changes.
+
+### Imported Videos (Desktop Apps, Screen Recordings)
+
+For videos not recorded by Playwright (QuickTime, OBS, ffmpeg, any screen recorder):
+
+```bash
+argo import recording.mp4 --demo myapp    # import into Argo
+argo preview myapp                        # open preview to add scenes
+```
+
+In preview:
+1. Scrub the video to scene boundaries
+2. Click **"+ Add scene at current time"** to mark each scene
+3. Write voiceover text, pick overlay type, drag to snap position
+4. Click **Regen** per scene to generate TTS
+5. Click **Export** — overlays rendered to PNG and composited via ffmpeg
+
+This is "Argo as post-production" — no Playwright script needed. Supports MP4, MOV, WebM, MKV, AVI.
+
+### `about:blank` + `setContent()` Pattern
+
+For demos without a live app (slideshows, product screenshots):
+
+```typescript
+await page.goto('about:blank');
+await page.setContent('<div style="...">Your content here</div>');
+narration.mark('intro');
+```
+
+This is a supported pattern for marketing/product videos that don't need a running web server.
 
 ---
 
