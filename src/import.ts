@@ -76,13 +76,10 @@ export async function importVideo(options: ImportOptions): Promise<ImportResult>
   const demoDir = join(cwd, '.argo', demoName);
   mkdirSync(demoDir, { recursive: true });
 
-  // 5. Copy video with original extension (ffprobe needs correct extension for format detection)
-  // Also copy as video.webm for pipeline compatibility (export.ts looks for video.webm)
+  // 5. Copy video with original extension — no renaming to .webm
+  // Export and preview both find the video by scanning extensions.
   const destVideoPath = join(demoDir, `video${ext}`);
   copyFileSync(absVideoPath, destVideoPath);
-  if (ext !== '.webm') {
-    copyFileSync(absVideoPath, join(demoDir, 'video.webm'));
-  }
 
   // 6. Get video duration and dimensions
   const durationMs = getVideoDurationMs(destVideoPath);

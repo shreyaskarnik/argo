@@ -38,7 +38,7 @@ describe('importVideo', () => {
     expect(result.durationMs).toBe(45200);
 
     // Check video was copied
-    expect(existsSync(join(dir, '.argo', 'recording', 'video.webm'))).toBe(true);
+    expect(existsSync(join(dir, '.argo', 'recording', 'video.mp4'))).toBe(true);
 
     // Check .scenes.json was created
     const manifest = JSON.parse(await readFile(join(dir, 'demos', 'recording.scenes.json'), 'utf-8'));
@@ -67,7 +67,7 @@ describe('importVideo', () => {
     const result = await importVideo({ videoPath, demo: 'myapp', cwd: dir });
 
     expect(result.demoName).toBe('myapp');
-    expect(existsSync(join(dir, '.argo', 'myapp', 'video.webm'))).toBe(true);
+    expect(existsSync(join(dir, '.argo', 'myapp', 'video.mov'))).toBe(true);
     expect(existsSync(join(dir, 'demos', 'myapp.scenes.json'))).toBe(true);
   });
 

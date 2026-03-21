@@ -51,7 +51,11 @@ describe('checkFfmpeg', () => {
 describe('exportVideo', () => {
   function setupHappy() {
     mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
-    mockedExistsSync.mockReturnValue(true);
+    mockedExistsSync.mockImplementation((p) => {
+      const path = String(p);
+      if (path.includes('.imported')) return false;
+      return true;
+    });
     mockedSpawnSync.mockReturnValue({ status: 0 } as any);
   }
 
@@ -63,7 +67,7 @@ describe('exportVideo', () => {
     const [cmd, args] = mockedSpawnSync.mock.calls[0];
     expect(cmd).toBe('ffmpeg');
     expect(args).toEqual([
-      '-i', '.argo/my-demo/video.webm',
+      '-i', '.argo/my-demo/video.mp4',
       '-i', '.argo/my-demo/narration-aligned.wav',
       '-c:v', 'libx264',
       '-pix_fmt', 'yuv420p',
@@ -133,15 +137,17 @@ describe('exportVideo', () => {
     );
   });
 
-  it('throws on missing video.webm', async () => {
+  it('throws on missing video file', async () => {
     mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
     mockedExistsSync.mockImplementation((p) => {
-      if (String(p).endsWith('video.webm')) return false;
+      const ps = String(p);
+      // No video file at all
+      if (ps.includes('video.')) return false;
       return true;
     });
 
     await expect(exportVideo({ demoName: 'demo', argoDir: '.argo', outputDir: 'out' }))
-      .rejects.toThrow(/video\.webm/);
+      .rejects.toThrow(/No video found/);
   });
 
   it('exports without audio when narration-aligned.wav is missing (silent mode)', async () => {
@@ -521,6 +527,24 @@ describe('exportVideo', () => {
     expect(fc).toContain('0.000');
     expect(fc).toContain('5.000');
     expect(fc).toContain('10.000');
+  });
+
+  it('does not use -shortest for imported videos with narration and no overlays', async () => {
+    setupHappy();
+    mockedExistsSync.mockImplementation((p) => {
+      const path = String(p);
+      if (path.endsWith('.argo/demo/.imported')) return true;
+      return true;
+    });
+
+    await exportVideo({
+      demoName: 'demo',
+      argoDir: '.argo',
+      outputDir: 'out',
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    expect(args as string[]).not.toContain('-shortest');
   });
 
   it('overlay PNG input indices account for other inputs', async () => {

@@ -158,12 +158,17 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
   checkFfmpeg();
 
   const demoDir = join(argoDir, demoName);
-  const videoPath = join(demoDir, 'video.webm');
   const audioPath = join(demoDir, 'narration-aligned.wav');
   const importedVideo = isImportedVideo(argoDir, demoName);
 
+  // Find the video file — prefer original extension (imported videos), fall back to .webm
+  let videoPath = join(demoDir, 'video.webm');
+  for (const vExt of ['.mp4', '.mov', '.mkv', '.avi']) {
+    const candidate = join(demoDir, `video${vExt}`);
+    if (existsSync(candidate)) { videoPath = candidate; break; }
+  }
   if (!existsSync(videoPath)) {
-    throw new Error(`Missing video.webm at ${videoPath}`);
+    throw new Error(`No video found in ${demoDir}. Expected video.webm or video.mp4.`);
   }
   const hasAudio = existsSync(audioPath);
 

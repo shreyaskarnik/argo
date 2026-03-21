@@ -2,16 +2,18 @@
   {
     "scene": "intro",
     "overlay": {
-      "type": "lower-third",
-      "text": "This is Sift!"
-    }
+      "type": "callout",
+      "placement": "top-right",
+      "text": "Your personal browser sidekick"
+    },
+    "text": "Welcome to sift"
   },
   {
     "scene": "scene-2",
-    "text": "Too many posts cluttering your feed?",
+    "text": "Powered by personalized embeddings",
     "overlay": {
-      "type": "callout",
-      "text": "Worry no more!"
+      "type": "lower-third",
+      "text": "Embedding Gemma at the core"
     }
   }
 ]
