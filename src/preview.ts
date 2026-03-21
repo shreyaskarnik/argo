@@ -774,8 +774,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
           // Generate TTS clips for any scenes with text (auto-regen before export)
           const manifestPath = join(demosDir, `${demoName}.scenes.json`);
           try {
-            const regenerateTts = options.regenerateTts ?? ((args: { manifestPath: string }) => runPreviewTtsGenerate(args.manifestPath));
-            await regenerateTts({ manifestPath });
+            await runPreviewTtsGenerate(manifestPath);
           } catch (ttsErr) {
             console.warn(`Warning: TTS generation failed, exporting without voiceover: ${(ttsErr as Error).message}`);
           }
