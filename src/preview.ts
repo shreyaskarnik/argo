@@ -2612,16 +2612,23 @@ document.addEventListener('mouseup', (e) => {
   if (s && s.overlay) {
     s.overlay.placement = zone;
   }
+  const dataOverlay = DATA.overlays.find(o => o.scene === sceneName);
+  if (dataOverlay) {
+    dataOverlay.placement = zone;
+  }
+  if (DATA.renderedOverlays[sceneName]) {
+    DATA.renderedOverlays[sceneName].zone = zone;
+  }
 
   hideSnapZones();
   isOverlayDragging = false;
   markDirty();
 
-  // Re-render only this overlay's position (not all overlays)
+  // Placement-only drag should not trigger a full overlay preview refresh:
+  // previewOverlays() re-scrapes every scene card from the DOM, which can
+  // pull stale values from other scenes while the user is dragging. The
+  // dragged element already has the new zone applied locally.
   updateOverlayVisibility(video.currentTime * 1000);
-
-  // Trigger live preview update
-  previewOverlays();
 
   dragState = null;
 });
@@ -2875,6 +2882,10 @@ function updateOverlayFieldsForScene(sceneName) {
   const typeEl = document.querySelector('select[data-scene="' + sceneName + '"][data-field="overlay-type"]');
   const type = typeEl?.value ?? '';
   const s = scenes.find(sc => sc.name === sceneName);
+  if (s) {
+    if (!type) s.overlay = undefined;
+    else s.overlay = { ...(s.overlay ?? {}), type };
+  }
   const ov = s?.overlay;
   const container = document.querySelector('.overlay-fields-dynamic[data-scene="' + sceneName + '"]');
   if (!container) return;
@@ -2900,6 +2911,7 @@ function wireOverlayListeners(sceneName) {
   let debounceTimer;
   card.querySelectorAll('[data-field^="overlay"]').forEach(input => {
     const handler = () => {
+      syncOverlayFormValuesForScene(sceneName);
       markDirty();
       // Skip full re-render during overlay drag — drag only changes placement
       if (isOverlayDragging) return;
@@ -3381,6 +3393,53 @@ function syncFormValuesToScenes() {
     const speedEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="speed"]');
     if (speedEl?.value && s.vo) s.vo.speed = parseFloat(speedEl.value);
   }
+  syncOverlayFormValuesToScenes();
+}
+
+function syncOverlayFormValuesForScene(sceneName) {
+  const s = scenes.find(sc => sc.name === sceneName);
+  if (!s) return;
+  const card = document.querySelector('.scene-card[data-scene="' + sceneName + '"]');
+  if (!card) return;
+
+  const type = card.querySelector('[data-field="overlay-type"]')?.value ?? '';
+  if (!type) {
+    s.overlay = undefined;
+    return;
+  }
+
+  const next = { ...(s.overlay ?? {}), type };
+  next.placement = card.querySelector('[data-field="overlay-placement"]')?.value ?? 'bottom-center';
+
+  const motion = card.querySelector('[data-field="overlay-motion"]')?.value ?? 'none';
+  if (motion && motion !== 'none') next.motion = motion;
+  else delete next.motion;
+
+  delete next.text;
+  delete next.title;
+  delete next.body;
+  delete next.kicker;
+  delete next.src;
+
+  const text = card.querySelector('[data-field="overlay-text"]')?.value ?? '';
+  const body = card.querySelector('[data-field="overlay-body"]')?.value ?? '';
+  const kicker = card.querySelector('[data-field="overlay-kicker"]')?.value ?? '';
+  const src = card.querySelector('[data-field="overlay-src"]')?.value ?? '';
+
+  if (type === 'lower-third' || type === 'callout') {
+    next.text = text;
+  } else {
+    next.title = text;
+    if (body) next.body = body;
+    if (type === 'headline-card' && kicker) next.kicker = kicker;
+    if (type === 'image-card' && src) next.src = src;
+  }
+
+  s.overlay = next;
+}
+
+function syncOverlayFormValuesToScenes() {
+  for (const s of scenes) syncOverlayFormValuesForScene(s.name);
 }
 
 function collectVoiceover() {
@@ -3401,43 +3460,10 @@ function collectVoiceover() {
 }
 
 function collectOverlays() {
+  syncOverlayFormValuesToScenes();
   return scenes
-    .map(s => {
-      const typeEl = document.querySelector('select[data-scene="' + s.name + '"][data-field="overlay-type"]');
-      const placeEl = document.querySelector('select[data-scene="' + s.name + '"][data-field="overlay-placement"]');
-      const motionEl = document.querySelector('select[data-scene="' + s.name + '"][data-field="overlay-motion"]');
-      const textEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="overlay-text"]');
-      const bodyEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="overlay-body"]');
-      const kickerEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="overlay-kicker"]');
-      const srcEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="overlay-src"]');
-      const type = typeEl?.value;
-      if (!type) return null;
-      const entry = {
-        ...(s.overlay ?? {}),
-        scene: s.name,
-        type,
-        placement: placeEl?.value ?? 'bottom-center',
-      };
-      if (motionEl?.value && motionEl.value !== 'none') entry.motion = motionEl.value;
-      else delete entry.motion;
-
-      delete entry.text;
-      delete entry.title;
-      delete entry.body;
-      delete entry.kicker;
-      delete entry.src;
-
-      if (type === 'lower-third' || type === 'callout') {
-        entry.text = textEl?.value ?? '';
-      } else {
-        entry.title = textEl?.value ?? '';
-        if (bodyEl?.value) entry.body = bodyEl.value;
-        if (type === 'headline-card' && kickerEl?.value) entry.kicker = kickerEl.value;
-        if (type === 'image-card' && srcEl?.value) entry.src = srcEl.value;
-      }
-      return entry;
-    })
-    .filter(Boolean);
+    .filter(s => s.overlay?.type)
+    .map(s => ({ ...s.overlay, scene: s.name }));
 }
 
 async function saveVoiceover() {
