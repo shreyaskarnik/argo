@@ -2601,15 +2601,13 @@ document.addEventListener('mouseup', (e) => {
   // Update the data-zone attribute so CSS positioning applies
   el.dataset.zone = zone;
 
-  // Update the placement dropdown in the scene card
+  // Update the placement dropdown in the scene card (no change event — avoids re-rendering all overlays)
   const placeEl = document.querySelector('select[data-scene="' + sceneName + '"][data-field="overlay-placement"]');
   if (placeEl) {
     placeEl.value = zone;
-    // Trigger change event to fire overlay preview
-    placeEl.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  // Also update the scene's overlay data directly
+  // Update the scene's overlay data directly
   const s = scenes.find(sc => sc.name === sceneName);
   if (s && s.overlay) {
     s.overlay.placement = zone;
@@ -2618,6 +2616,9 @@ document.addEventListener('mouseup', (e) => {
   hideSnapZones();
   isOverlayDragging = false;
   markDirty();
+
+  // Re-render only this overlay's position (not all overlays)
+  updateOverlayVisibility(video.currentTime * 1000);
 
   // Trigger live preview update
   previewOverlays();
