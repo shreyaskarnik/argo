@@ -114,7 +114,20 @@ export async function detectBackgroundTheme(page: Page, zone: Zone): Promise<Bac
       }
     }
 
-    // Fall back to system theme
+    // Fall back: check body/html computed background directly
+    for (const root of [document.body, document.documentElement]) {
+      const rootBg = getComputedStyle(root).backgroundColor;
+      const rootMatch = rootBg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+      if (rootMatch) {
+        const rootAlpha = rootMatch[4] !== undefined ? parseFloat(rootMatch[4]) : 1;
+        if (rootAlpha > 0.1) {
+          const rootLum = 0.299 * Number(rootMatch[1]) + 0.587 * Number(rootMatch[2]) + 0.114 * Number(rootMatch[3]);
+          return rootLum < 128 ? 'light' as const : 'dark' as const;
+        }
+      }
+    }
+
+    // Last resort: system theme
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     return prefersDark ? 'light' as const : 'dark' as const;
   }, pos);
