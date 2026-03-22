@@ -2491,6 +2491,7 @@ const ZONE_CENTERS = {
 };
 
 let dragState = null;
+let isOverlayDragging = false;
 
 function showSnapZones() {
   snapZoneEls.forEach(el => el.classList.add('visible'));
@@ -2548,6 +2549,7 @@ function makeOverlayDraggable(el) {
     };
 
     // Switch to fixed positioning for free drag
+    isOverlayDragging = true;
     el.classList.add('overlay-dragging');
     el.style.position = 'absolute';
     el.style.left = (elRect.left - containerRect.left) + 'px';
@@ -2614,6 +2616,7 @@ document.addEventListener('mouseup', (e) => {
   }
 
   hideSnapZones();
+  isOverlayDragging = false;
   markDirty();
 
   // Trigger live preview update
@@ -2897,6 +2900,8 @@ function wireOverlayListeners(sceneName) {
   card.querySelectorAll('[data-field^="overlay"]').forEach(input => {
     const handler = () => {
       markDirty();
+      // Skip full re-render during overlay drag — drag only changes placement
+      if (isOverlayDragging) return;
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => previewOverlays(), 300);
     };
