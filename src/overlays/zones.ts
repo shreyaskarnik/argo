@@ -114,17 +114,39 @@ export async function detectBackgroundTheme(page: Page, zone: Zone): Promise<Bac
       }
     }
 
-    // Fall back: check body/html computed background directly
-    for (const root of [document.body, document.documentElement]) {
-      const rootBg = getComputedStyle(root).backgroundColor;
-      const rootMatch = rootBg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-      if (rootMatch) {
-        const rootAlpha = rootMatch[4] !== undefined ? parseFloat(rootMatch[4]) : 1;
-        if (rootAlpha > 0.1) {
-          const rootLum = 0.299 * Number(rootMatch[1]) + 0.587 * Number(rootMatch[2]) + 0.114 * Number(rootMatch[3]);
-          return rootLum < 128 ? 'light' as const : 'dark' as const;
-        }
+    // Fall back: resolve CSS custom properties used for backgrounds.
+    // getComputedStyle(body).backgroundColor returns transparent when
+    // the background is set via CSS variables (e.g., background: var(--bg)).
+    // We resolve the variable value and parse the hex/rgb color.
+    const rootStyle = getComputedStyle(document.documentElement);
+    const bgVarNames = ['--bg', '--background', '--bg-color', '--background-color'];
+    for (const varName of bgVarNames) {
+      const varVal = rootStyle.getPropertyValue(varName).trim();
+      if (!varVal) continue;
+      // Try hex color
+      const hexMatch = varVal.match(/^#([0-9a-f]{3,8})$/i);
+      if (hexMatch) {
+        let hex = hexMatch[1];
+        if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+        const r = parseInt(hex.slice(0, 2), 16);
+        const g = parseInt(hex.slice(2, 4), 16);
+        const b = parseInt(hex.slice(4, 6), 16);
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        return lum < 128 ? 'light' as const : 'dark' as const;
       }
+      // Try rgb/rgba
+      const rgbMatch = varVal.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      if (rgbMatch) {
+        const lum = 0.299 * Number(rgbMatch[1]) + 0.587 * Number(rgbMatch[2]) + 0.114 * Number(rgbMatch[3]);
+        return lum < 128 ? 'light' as const : 'dark' as const;
+      }
+    }
+
+    // Check if html/body has a class indicating dark mode
+    const htmlClasses = document.documentElement.className;
+    const bodyClasses = document.body.className;
+    if (/\bdark\b/i.test(htmlClasses) || /\bdark\b/i.test(bodyClasses)) {
+      return 'light' as const;
     }
 
     // Last resort: system theme
