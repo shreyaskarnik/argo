@@ -3460,7 +3460,11 @@ function collectVoiceover() {
 }
 
 function collectOverlays() {
-  syncOverlayFormValuesToScenes();
+  // Serialize from in-memory scene state only.
+  // Per-scene sync happens in wireOverlayListeners on each field change.
+  // Do NOT call syncOverlayFormValuesToScenes() here — it re-reads ALL
+  // scene cards from the DOM which can overwrite good in-memory data
+  // with stale DOM values from collapsed/unedited cards.
   return scenes
     .filter(s => s.overlay?.type)
     .map(s => ({ ...s.overlay, scene: s.name }));
