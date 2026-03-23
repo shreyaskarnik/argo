@@ -9,6 +9,7 @@ import { buildSpeedRampFilter, type Segment } from './speed-ramp.js';
 import { buildCameraMoveFilter, type CameraMove } from './camera-move.js';
 import { buildFreezeFilter, type ResolvedFreeze } from './freeze.js';
 import { getVideoFrameRate } from './media.js';
+import { buildOverlayPngFilters, isImportedVideo, type RenderedOverlayPng } from './overlays/render-to-png.js';
 
 export interface ExportOptions {
   demoName: string;
@@ -52,6 +53,8 @@ export interface ExportOptions {
   freezeSpecs?: ResolvedFreeze[];
   /** Watermark/brand bug overlay config. */
   watermark?: WatermarkConfig;
+  /** Pre-rendered overlay PNGs to composite onto the video (for imported videos). */
+  overlayPngs?: RenderedOverlayPng[];
 }
 
 function formatSeconds(ms: number): string {
@@ -155,11 +158,17 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
   checkFfmpeg();
 
   const demoDir = join(argoDir, demoName);
-  const videoPath = join(demoDir, 'video.webm');
   const audioPath = join(demoDir, 'narration-aligned.wav');
+  const importedVideo = isImportedVideo(argoDir, demoName);
 
+  // Find the video file — prefer original extension (imported videos), fall back to .webm
+  let videoPath = join(demoDir, 'video.webm');
+  for (const vExt of ['.mp4', '.mov', '.mkv', '.avi']) {
+    const candidate = join(demoDir, `video${vExt}`);
+    if (existsSync(candidate)) { videoPath = candidate; break; }
+  }
   if (!existsSync(videoPath)) {
-    throw new Error(`Missing video.webm at ${videoPath}`);
+    throw new Error(`No video found in ${demoDir}. Expected video.webm or video.mp4.`);
   }
   const hasAudio = existsSync(audioPath);
 
@@ -314,6 +323,17 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     }
   }
 
+  // Overlay PNGs for imported videos — composited AFTER transitions/camera moves,
+  // BEFORE watermark (same layer priority as recorded overlays would have).
+  const overlayPngs = options.overlayPngs;
+  if (overlayPngs && overlayPngs.length > 0) {
+    const ovlResult = buildOverlayPngFilters(overlayPngs, nextInput, videoSource);
+    args.push(...ovlResult.inputArgs);
+    filterParts.push(...ovlResult.filterParts);
+    videoSource = ovlResult.videoSource;
+    nextInput = ovlResult.nextInput;
+  }
+
   // Watermark overlay — applied AFTER all other video filters (last in chain)
   const watermark = options.watermark;
   if (watermark && watermark.src) {
@@ -440,10 +460,14 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     args.push('-c:v:1', 'png', '-disposition:v:1', 'attached_pic');
     // Skip -shortest: the PNG has 0 duration and would truncate the whole output.
   } else if (hasAnyAudio) {
-    // Skip -shortest when freeze-frame holds extend the video beyond the audio.
-    // Freezes intentionally make video longer; -shortest would truncate back.
+    // Skip -shortest when:
+    // - Freeze-frame holds extend the video beyond the audio
+    // - Overlay PNGs are present (imported videos where audio may be shorter than video)
+    // - Imported videos have narration shorter than the full source video
     const hasFreezes = freezeSpecs && freezeSpecs.length > 0;
-    if (!hasFreezes) {
+    const hasOverlayPngs = options.overlayPngs && options.overlayPngs.length > 0;
+    const importedNarrationVideo = importedVideo && hasAudio;
+    if (!hasFreezes && !hasOverlayPngs && !importedNarrationVideo) {
       args.push('-shortest');
     }
   }

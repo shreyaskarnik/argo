@@ -18,6 +18,7 @@ import {
 } from './freeze.js';
 import type { ArgoConfig } from './config.js';
 import { getVideoDurationMs } from './media.js';
+import { buildOverlayPngsForImport } from './overlays/render-to-png.js';
 // Note: MusicGen (AI music generation) is a preview-only feature — runs in browser via WebGPU.
 // Pipeline uses saved WAV files via audio.music config path.
 import {
@@ -271,6 +272,17 @@ export async function runPipeline(
   const chapterMetadata = generateChapterMetadata(finalPlacements, finalDurationMs);
   writeFileSync(chapterMetadataPath, chapterMetadata, 'utf-8');
 
+  // Render overlay PNGs for imported videos (no Playwright recording step)
+  const overlayPngs = await buildOverlayPngsForImport({
+    argoDir: '.argo',
+    demoName,
+    manifestPath,
+    placements: finalPlacements,
+    videoWidth: config.video.width,
+    videoHeight: config.video.height,
+    deviceScaleFactor: config.video.deviceScaleFactor,
+  });
+
   // Step 4: Export final video
   console.log('🎞️  Cutting the final take...');
   const exportOptions: Parameters<typeof exportVideo>[0] = {
@@ -294,6 +306,7 @@ export async function runPipeline(
     musicPath: config.export.audio?.music,
     musicVolume: config.export.audio?.musicVolume,
     watermark: config.export.watermark,
+    overlayPngs,
   };
   if (resolvedFreezes.length > 0) {
     exportOptions.freezeSpecs = resolvedFreezes;
@@ -457,6 +470,17 @@ export async function runPipeline(
         variantCameraMoves = scaleCameraMoves(variantCameraMoves, config.video.deviceScaleFactor ?? 1);
       }
 
+      // Render overlay PNGs for imported video variants
+      const variantOverlayPngs = await buildOverlayPngsForImport({
+        argoDir: '.argo',
+        demoName: variantSubdir,
+        manifestPath,
+        placements: variantPlacements,
+        videoWidth: variant.video.width,
+        videoHeight: variant.video.height,
+        deviceScaleFactor: config.video.deviceScaleFactor,
+      });
+
       const variantOutputPath = await exportVideo({
         demoName: variantSubdir,
         argoDir: '.argo',
@@ -477,6 +501,7 @@ export async function runPipeline(
         cameraMoves: variantCameraMoves.length > 0 ? variantCameraMoves : undefined,
         watermark: config.export.watermark,
         freezeSpecs: variantResolvedFreezes.length > 0 ? variantResolvedFreezes : undefined,
+        overlayPngs: variantOverlayPngs,
       });
 
       console.log(`🚀 Variant saved to: ${variantOutputPath}`);

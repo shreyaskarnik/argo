@@ -1,0 +1,19 @@
+[
+  {
+    "scene": "intro",
+    "overlay": {
+      "type": "callout",
+      "placement": "top-right",
+      "text": "Your personal browser sidekick"
+    },
+    "text": "Welcome to sift"
+  },
+  {
+    "scene": "scene-2",
+    "text": "Powered by personalized embeddings",
+    "overlay": {
+      "type": "lower-third",
+      "text": "Embedding Gemma at the core"
+    }
+  }
+]

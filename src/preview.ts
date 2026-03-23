@@ -8,7 +8,7 @@
  * + overlay props inline with per-scene TTS regen.
  */
 
-import { execFile } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync, existsSync, readdirSync, writeFileSync, statSync, createReadStream, unlinkSync, mkdirSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
@@ -23,6 +23,9 @@ import { exportVideo, checkFfmpeg } from './export.js';
 import { applySpeedRampToTimeline } from './speed-ramp.js';
 import { shiftCameraMoves, scaleCameraMoves, type CameraMove } from './camera-move.js';
 import { resolveFreezes, adjustPlacementsForFreezes, totalFreezeDurationMs, type FreezeSpec } from './freeze.js';
+import { buildOverlayPngsForImport, isImportedVideo, type RenderedOverlayPng } from './overlays/render-to-png.js';
+import { detectVideoTheme, getVideoDurationMs } from './media.js';
+import type { BackgroundTheme } from './overlays/zones.js';
 
 export interface PreviewExportConfig {
   preset?: string;
@@ -79,6 +82,10 @@ interface PreviewData {
   sceneReport: PreviewSceneReport | null;
   /** Pre-rendered overlay HTML/CSS for each scene (keyed by scene name). */
   renderedOverlays: Record<string, { html: string; styles: Record<string, string>; zone: Zone }>;
+  /** Detected overlay theme per scene — 'dark' or 'light' (for UI display). */
+  overlayThemes: Record<string, BackgroundTheme>;
+  /** Actual video file duration in ms — used as floor for timeline. */
+  videoDurationMs: number;
   /** Pipeline metadata from last recording (voices, resolution, engine). */
   pipelineMeta: Record<string, unknown> | null;
   /** Preview-only background music state. */
@@ -104,6 +111,41 @@ const MIME_TYPES: Record<string, string> = {
 function readJsonFile<T>(filePath: string, fallback: T): T {
   if (!existsSync(filePath)) return fallback;
   return JSON.parse(readFileSync(filePath, 'utf-8')) as T;
+}
+
+function ensureSeekablePreviewProxy(rawVideoPath: string, proxyPath: string): string | null {
+  try {
+    const needsRender = !existsSync(proxyPath) || statSync(proxyPath).mtimeMs < statSync(rawVideoPath).mtimeMs;
+    if (!needsRender) return proxyPath;
+
+    checkFfmpeg();
+    const result = spawnSync('ffmpeg', [
+      '-i', rawVideoPath,
+      '-map', '0:v:0',
+      '-map', '0:a:0?',
+      '-c:v', 'libx264',
+      '-preset', 'veryfast',
+      '-crf', '23',
+      '-pix_fmt', 'yuv420p',
+      '-movflags', '+faststart',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-y', proxyPath,
+    ], {
+      stdio: 'pipe',
+    });
+
+    if (result.status !== 0) {
+      const stderr = result.stderr?.toString('utf-8').trim();
+      console.warn(`Warning: failed to create preview MP4 proxy for ${rawVideoPath}${stderr ? `: ${stderr}` : ''}`);
+      return null;
+    }
+
+    return proxyPath;
+  } catch (err) {
+    console.warn(`Warning: failed to prepare seekable preview video: ${(err as Error).message}`);
+    return null;
+  }
 }
 
 function setManifestField(target: Record<string, any>, key: string, value: any): boolean {
@@ -173,12 +215,16 @@ function updatePreviewOverlayEntry(target: Record<string, any>, overlay: Overlay
   return changed;
 }
 
-function buildRenderedOverlays(overlays: OverlayManifestEntry[]): PreviewData['renderedOverlays'] {
+function buildRenderedOverlays(
+  overlays: OverlayManifestEntry[],
+  themeMap?: Record<string, BackgroundTheme>,
+): PreviewData['renderedOverlays'] {
   const renderedOverlays: PreviewData['renderedOverlays'] = {};
   for (const entry of overlays) {
     const { scene, ...cue } = entry;
     const zone: Zone = cue.placement ?? 'bottom-center';
-    const { contentHtml, styles } = renderTemplate(cue, 'dark');
+    const theme = themeMap?.[scene] ?? 'dark';
+    const { contentHtml, styles } = renderTemplate(cue, theme);
     renderedOverlays[scene] = { html: contentHtml, styles, zone };
   }
   return renderedOverlays;
@@ -278,7 +324,30 @@ function loadPreviewData(
   const reportPath = join(demoDir, 'scene-report.json');
   const persistedReport = readJsonFile<{ totalDurationMs?: number; overflowMs?: number } | null>(reportPath, null);
   const sceneReport = buildPreviewSceneReport(timing, sceneDurations, persistedReport);
-  const renderedOverlays = buildRenderedOverlays(overlays);
+
+  // Detect per-scene overlay theme from the video content.
+  // Uses ffmpeg to sample frames at each overlay's scene timestamp.
+  // Find video file — prefer original extension (imported videos) over .webm
+  const videoExts = ['.mp4', '.mov', '.mkv', '.avi', '.webm'];
+  let videoPath: string | null = null;
+  for (const ext of videoExts) {
+    const candidate = join(demoDir, `video${ext}`);
+    if (existsSync(candidate)) { videoPath = candidate; break; }
+  }
+  let overlayThemeMap: Record<string, BackgroundTheme> | undefined;
+  if (videoPath && overlays.length > 0) {
+    overlayThemeMap = {};
+    for (const ov of overlays) {
+      const sceneMs = timing[ov.scene] ?? 0;
+      // Use next scene start as end bound, or scene + 5s as fallback
+      const nextSceneMs = Object.values(timing)
+        .filter((ms) => ms > sceneMs)
+        .sort((a, b) => a - b)[0];
+      const endMs = nextSceneMs ?? sceneMs + 5000;
+      overlayThemeMap[ov.scene] = detectVideoTheme(videoPath, sceneMs, endMs);
+    }
+  }
+  const renderedOverlays = buildRenderedOverlays(overlays, overlayThemeMap);
 
   // Pipeline metadata (reuse meta loaded above for headTrimMs)
   const pipelineMeta = Object.keys(meta).length > 0 ? meta as Record<string, unknown> : null;
@@ -291,6 +360,22 @@ function loadPreviewData(
     volume: exportConfig?.musicVolume ?? 0.15,
   };
 
+  // Get actual video duration as the timeline floor
+  let videoDurationMs = 0;
+  const videoExtsForDur = ['.mp4', '.mov', '.mkv', '.avi', '.webm'];
+  for (const ext of videoExtsForDur) {
+    const candidate = join(demoDir, `video${ext}`);
+    if (existsSync(candidate)) {
+      try { videoDurationMs = getVideoDurationMs(candidate); } catch { /* ignore */ }
+      break;
+    }
+  }
+  // Also check the exported MP4
+  const exportedMp4 = join(outputDir, `${demoName}.mp4`);
+  if (videoDurationMs === 0 && existsSync(exportedMp4)) {
+    try { videoDurationMs = getVideoDurationMs(exportedMp4); } catch { /* ignore */ }
+  }
+
   return {
     demoName,
     timing,
@@ -300,6 +385,8 @@ function loadPreviewData(
     sceneDurations,
     sceneReport,
     renderedOverlays,
+    overlayThemes: overlayThemeMap ?? {},
+    videoDurationMs,
     pipelineMeta,
     bgm,
   };
@@ -380,10 +467,8 @@ function refreshPreviewAudioArtifacts(
     };
     const clipPath = cache.getClipPath(demoName, cacheEntry);
     if (!existsSync(clipPath)) {
-      throw new Error(
-        `Expected regenerated clip for scene "${entry.scene}" at ${clipPath}, but it was not found. ` +
-        `Try running: argo tts generate ${scenesPath}`
-      );
+      // Clip not generated yet (e.g., imported video without TTS run) — skip silently
+      continue;
     }
     const clipInfo = readClipInfo(clipPath, entry.scene);
     clips.push(clipInfo);
@@ -435,17 +520,43 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
   const port = options.port ?? 0; // 0 = auto-assign
   const demoName = options.demoName;
   const demoDir = join(argoDir, demoName);
+  const importedVideo = isImportedVideo(argoDir, demoName);
 
-  // Prefer exported MP4 (has keyframes for seeking) over raw WebM (no cue points)
-  const webmPath = join(demoDir, 'video.webm');
-  const mp4Path = join(outputDir, `${demoName}.mp4`);
-  let videoPath = existsSync(mp4Path) ? mp4Path : webmPath;
-  if (!existsSync(videoPath)) {
+  // Raw video path in .argo/<demo>/ — used for duration probing/theme detection and
+  // as the source for an optional seekable preview proxy.
+  let rawVideoPath: string | null = null;
+  for (const rawExt of ['.mp4', '.mov', '.mkv', '.avi', '.webm']) {
+    const candidate = join(demoDir, `video${rawExt}`);
+    if (existsSync(candidate)) { rawVideoPath = candidate; break; }
+  }
+
+  // Prefer exported MP4 (has keyframes for seeking), then original-extension import, then raw WebM
+  const exportedMp4 = join(outputDir, `${demoName}.mp4`);
+  const previewProxyMp4 = join(demoDir, 'preview.mp4');
+  const mimeMap: Record<string, string> = {
+    '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.mkv': 'video/x-matroska',
+    '.avi': 'video/x-msvideo', '.webm': 'video/webm',
+  };
+  let videoPath: string | null = null;
+  if (existsSync(exportedMp4)) {
+    videoPath = exportedMp4;
+  } else if (importedVideo && rawVideoPath) {
+    videoPath = ensureSeekablePreviewProxy(rawVideoPath, previewProxyMp4) ?? rawVideoPath;
+  } else {
+    // Find the original-extension video first (correct MIME), fall back to video.webm
+    for (const ext of ['.mp4', '.mov', '.mkv', '.avi', '.webm']) {
+      const candidate = join(demoDir, `video${ext}`);
+      if (existsSync(candidate)) { videoPath = candidate; break; }
+    }
+  }
+  if (!videoPath || !existsSync(videoPath)) {
     throw new Error(
-      `No recording found for '${demoName}'. Run 'argo pipeline ${demoName}' first.`
+      `No recording found for '${demoName}'. Run 'argo pipeline ${demoName}' or 'argo import' first.`
     );
   }
-  let videoMime = videoPath.endsWith('.mp4') ? 'video/mp4' : 'video/webm';
+  const ext = videoPath.slice(videoPath.lastIndexOf('.'));
+  let videoMime = mimeMap[ext] ?? 'video/mp4';
+  if (!rawVideoPath) rawVideoPath = videoPath; // fallback to served video
 
   // Track BGM saved from the music generator panel
   let activeMusicPath: string | undefined;
@@ -485,6 +596,16 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
           const existing = scenes.find((s: any) => s.scene === vo.scene);
           if (existing) {
             changed = updatePreviewVoiceoverEntry(existing, vo) || changed;
+          } else {
+            // New scene — always create a manifest entry (even without text)
+            const newEntry: Record<string, any> = { scene: vo.scene };
+            if (vo.text?.trim()) newEntry.text = vo.text;
+            if (vo.voice) newEntry.voice = vo.voice;
+            if (vo.speed) newEntry.speed = vo.speed;
+            if (vo.lang) newEntry.lang = vo.lang;
+            if (vo._hint) newEntry._hint = vo._hint;
+            scenes.push(newEntry);
+            changed = true;
           }
         }
         if (changed) {
@@ -500,7 +621,24 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
         const chunks: Buffer[] = [];
         for await (const chunk of req) chunks.push(chunk as Buffer);
         const body = JSON.parse(Buffer.concat(chunks).toString('utf-8')) as OverlayManifestEntry[];
-        const renderedOverlays = buildRenderedOverlays(body);
+
+        // Detect per-scene theme from the video for adaptive overlays
+        let liveThemeMap: Record<string, BackgroundTheme> | undefined;
+        if (rawVideoPath && existsSync(rawVideoPath) && body.length > 0) {
+          const timingFile = join(demoDir, '.timing.json');
+          const liveTiming = existsSync(timingFile)
+            ? readJsonFile<Record<string, number>>(timingFile, {}) : {};
+          liveThemeMap = {};
+          for (const ov of body) {
+            const sceneMs = liveTiming[ov.scene] ?? 0;
+            const nextMs = Object.values(liveTiming)
+              .filter((ms) => ms > sceneMs)
+              .sort((a, b) => a - b)[0];
+            liveThemeMap[ov.scene] = detectVideoTheme(rawVideoPath, sceneMs, nextMs ?? sceneMs + 5000);
+          }
+        }
+
+        const renderedOverlays = buildRenderedOverlays(body, liveThemeMap);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, renderedOverlays }));
         return;
@@ -560,6 +698,29 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
         return;
       }
 
+      // Save timing marks to .timing.json
+      if (url === '/api/save-timing' && req.method === 'POST') {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(chunk as Buffer);
+        const { timing } = JSON.parse(Buffer.concat(chunks).toString('utf-8')) as { timing: Record<string, number> };
+        const timingPath = join(demoDir, '.timing.json');
+        // Read existing timing to merge (preserves any extra keys)
+        const existing = readJsonFile<Record<string, number>>(timingPath, {});
+        // If the pipeline applied head-trimming, shift new timing marks back to raw timeline
+        const metaPath = join(outputDir, `${demoName}.meta.json`);
+        const meta = existsSync(metaPath) ? readJsonFile<Record<string, any>>(metaPath, {}) : {};
+        const headTrimMs: number = meta?.export?.headTrimMs ?? 0;
+        const rawTiming: Record<string, number> = {};
+        for (const [scene, ms] of Object.entries(timing)) {
+          rawTiming[scene] = ms + headTrimMs;
+        }
+        const merged = { ...existing, ...rawTiming };
+        writeFileSync(timingPath, JSON.stringify(merged, null, 2) + '\n', 'utf-8');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
+
       // Regenerate a single TTS clip
       if (url === '/api/regen-clip' && req.method === 'POST') {
         const chunks: Buffer[] = [];
@@ -610,6 +771,14 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
           const bodyText = Buffer.concat(chunks).toString('utf-8').trim();
           const body = bodyText ? JSON.parse(bodyText) as { includeBgm?: boolean; musicVolume?: number } : {};
 
+          // Generate TTS clips for any scenes with text (auto-regen before export)
+          const manifestPath = join(demosDir, `${demoName}.scenes.json`);
+          try {
+            await runPreviewTtsGenerate(manifestPath);
+          } catch (ttsErr) {
+            console.warn(`Warning: TTS generation failed, exporting without voiceover: ${(ttsErr as Error).message}`);
+          }
+
           // Refresh aligned audio from current clips + timing
           const refreshed = refreshPreviewAudioArtifacts(demoName, argoDir, demosDir, options.ttsDefaults);
 
@@ -617,7 +786,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
           const timing = readJsonFile<Record<string, number>>(join(demoDir, '.timing.json'), {});
           const markTimes = Object.values(timing);
           let headTrimMs = 0;
-          if (markTimes.length > 0) {
+          if (!importedVideo && markTimes.length > 0) {
             const firstMarkMs = Math.min(...markTimes);
             headTrimMs = Math.max(0, firstMarkMs - 200);
             if (headTrimMs <= 500) headTrimMs = 0;
@@ -631,7 +800,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
           // Get video duration
           const { execFileSync } = await import('node:child_process');
           const rawDur = execFileSync('ffprobe', [
-            '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', webmPath,
+            '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', rawVideoPath,
           ], { encoding: 'utf-8' }).trim();
           const totalDurationMs = Math.round(parseFloat(rawDur) * 1000);
           const shiftedDurationMs = totalDurationMs - headTrimMs;
@@ -658,7 +827,8 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             ? Math.max(0, Math.min(1, body.musicVolume))
             : (ec?.musicVolume ?? 0.15);
           const exportMusicPath = includeBgm ? (activeMusicPath ?? ec?.musicPath) : undefined;
-          const rampResult = applySpeedRampToTimeline(placements, shiftedDurationMs, ec?.speedRamp);
+          const effectiveSpeedRamp = importedVideo ? undefined : ec?.speedRamp;
+          const rampResult = applySpeedRampToTimeline(placements, shiftedDurationMs, effectiveSpeedRamp);
           const finalPlacements = rampResult.placements;
           const finalDurationMs = rampResult.totalDurationMs;
           const speedRampSegments = rampResult.segments.length > 0 ? rampResult.segments : undefined;
@@ -706,6 +876,17 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             }
           } catch { /* optional */ }
 
+          // Render overlay PNGs for imported videos (no Playwright recording step).
+          const overlayPngs = await buildOverlayPngsForImport({
+            argoDir,
+            demoName,
+            manifestPath: scenesPath,
+            placements: freezeAdjustedPlacements,
+            videoWidth: ec?.outputWidth ?? 1920,
+            videoHeight: ec?.outputHeight ?? 1080,
+            deviceScaleFactor: ec?.deviceScaleFactor,
+          });
+
           // Export — use full config so output matches argo pipeline
           await exportVideo({
             demoName,
@@ -731,11 +912,13 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             cameraMoves,
             watermark: ec?.watermark,
             freezeSpecs: previewResolvedFreezes.length > 0 ? previewResolvedFreezes : undefined,
+            overlayPngs,
           });
 
           // Switch to serving the new MP4
-          if (existsSync(mp4Path)) {
-            videoPath = mp4Path;
+          const newMp4 = join(outputDir, `${demoName}.mp4`);
+          if (existsSync(newMp4)) {
+            videoPath = newMp4;
             videoMime = 'video/mp4';
           }
           res.end(JSON.stringify({ ok: true }));
@@ -891,7 +1074,7 @@ self.onmessage = async (e) => {
 
       // Serve video with Range request support (required for seeking)
       if (url === '/video' || url === '/video.webm') {
-        serveFileWithRanges(req, res, videoPath, videoMime);
+        serveFileWithRanges(req, res, videoPath!, videoMime);
         return;
       }
 
@@ -1229,6 +1412,47 @@ const PREVIEW_HTML = `<!DOCTYPE html>
   .overlay-cue[data-zone="bottom-left"] { bottom: 60px; left: 40px; }
   .overlay-cue[data-zone="bottom-right"] { bottom: 60px; right: 40px; }
   .overlay-cue[data-zone="center"] { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+
+  /* Drag-to-snap overlay positioning */
+  .overlay-cue.overlay-draggable {
+    cursor: grab;
+    user-select: none;
+    pointer-events: auto;
+  }
+  .overlay-cue.overlay-draggable:active {
+    cursor: grabbing;
+  }
+  .overlay-cue.overlay-dragging {
+    cursor: grabbing;
+    opacity: 0.85;
+    z-index: 20;
+  }
+  .snap-zone {
+    position: absolute;
+    border: 2px dashed rgba(99, 102, 241, 0.4);
+    border-radius: 8px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 15;
+  }
+  .snap-zone.visible {
+    opacity: 1;
+  }
+  .snap-zone.highlight {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.8);
+  }
+  .snap-zone-label {
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: rgba(99, 102, 241, 0.8);
+    font-family: var(--mono);
+    white-space: nowrap;
+  }
 
   /* Timeline bar */
   .timeline {
@@ -1570,6 +1794,24 @@ const PREVIEW_HTML = `<!DOCTYPE html>
     border-radius: 4px;
   }
 
+  .add-scene-btn {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 12px;
+    background: var(--bg-card, var(--surface));
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .add-scene-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
   /* Editable fields */
   .field-group { margin-top: 8px; }
   .field-group label {
@@ -1834,6 +2076,12 @@ const PREVIEW_HTML = `<!DOCTYPE html>
   <div class="video-container">
     <video id="video" src="/video" preload="auto" muted playsinline></video>
     <div class="overlay-layer" id="overlay-layer"></div>
+    <div class="snap-zone" data-zone="top-left" style="top:10%;left:5%;width:35%;height:35%"><span class="snap-zone-label">top-left</span></div>
+    <div class="snap-zone" data-zone="top-right" style="top:10%;right:5%;width:35%;height:35%"><span class="snap-zone-label">top-right</span></div>
+    <div class="snap-zone" data-zone="bottom-left" style="bottom:10%;left:5%;width:35%;height:35%"><span class="snap-zone-label">bottom-left</span></div>
+    <div class="snap-zone" data-zone="bottom-right" style="bottom:10%;right:5%;width:35%;height:35%"><span class="snap-zone-label">bottom-right</span></div>
+    <div class="snap-zone" data-zone="bottom-center" style="bottom:5%;left:25%;width:50%;height:20%"><span class="snap-zone-label">bottom-center</span></div>
+    <div class="snap-zone" data-zone="center" style="top:30%;left:25%;width:50%;height:40%"><span class="snap-zone-label">center</span></div>
   </div>
 
   <div class="timeline">
@@ -1874,6 +2122,7 @@ const PREVIEW_HTML = `<!DOCTYPE html>
     <button class="sidebar-tab" data-tab="metadata">Metadata</button>
   </div>
   <div class="sidebar-panel" id="panel-scenes">
+    <button id="add-scene-btn" class="add-scene-btn">+ Add scene at current time</button>
     <div id="scene-list"></div>
     <div class="music-panel" id="music-panel">
       <div class="music-panel-header" id="music-panel-header">
@@ -1976,12 +2225,19 @@ const scenes = Object.entries(DATA.timing)
 
 let activeScene = null;
 
-// ─── Timeline ──────────────────────────────────────────────────────────────
-video.addEventListener('loadedmetadata', () => {
-  const totalMs = video.duration * 1000;
-  document.getElementById('time-total').textContent = formatTime(totalMs);
+function getPreviewDurationMs() {
+  const mediaDurationMs = Number.isFinite(video.duration) && video.duration > 0
+    ? video.duration * 1000
+    : 0;
+  return mediaDurationMs || DATA.videoDurationMs || DATA.sceneReport?.totalDurationMs || 0;
+}
 
-  // Render scene markers on timeline
+function renderTimelineMarkers() {
+  const totalMs = getPreviewDurationMs();
+  if (!totalMs) return;
+
+  timelineBar.querySelectorAll('.timeline-scene').forEach(node => node.remove());
+
   scenes.forEach((s, i) => {
     const pct = (s.startMs / totalMs) * 100;
     const nextStart = i + 1 < scenes.length ? scenes[i + 1].startMs : totalMs;
@@ -1992,22 +2248,37 @@ video.addEventListener('loadedmetadata', () => {
     marker.style.left = pct + '%';
     marker.style.width = Math.max(widthPct, 2) + '%';
     const hasOverlay = DATA.overlays.find(o => o.scene === s.name);
-    // s.name is already escaped via esc() — safe for innerHTML
     marker.innerHTML = esc(s.name) + (hasOverlay ? '<span class="has-overlay"></span>' : '');
     marker.dataset.scene = s.name;
     marker.addEventListener('click', (e) => {
       e.stopPropagation();
+      // Don't seek to scene start if user just finished scrubbing
+      if (justScrubbed) return;
       seekToScene(s);
     });
     timelineBar.appendChild(marker);
   });
+}
+
+// ─── Timeline ──────────────────────────────────────────────────────────────
+video.addEventListener('loadedmetadata', () => {
+  const totalMs = getPreviewDurationMs();
+  document.getElementById('time-total').textContent = formatTime(totalMs);
+  renderTimelineMarkers();
 
   // Create overlay DOM elements
   renderOverlayElements();
 });
 
+if (getPreviewDurationMs() > 0) {
+  document.getElementById('time-total').textContent = formatTime(getPreviewDurationMs());
+  renderTimelineMarkers();
+}
+
 video.addEventListener('timeupdate', () => {
-  const totalMs = video.duration * 1000;
+  // Don't update UI during scrubbing — scrubToX handles it directly
+  if (isScrubbing) return;
+  const totalMs = getPreviewDurationMs();
   const currentMs = video.currentTime * 1000;
   if (scenePlaybackEndMs !== null && currentMs >= scenePlaybackEndMs) {
     const stopAt = scenePlaybackEndMs;
@@ -2036,13 +2307,47 @@ video.addEventListener('timeupdate', () => {
   }
 });
 
-// Click on timeline bar to seek
-timelineBar.addEventListener('click', (e) => {
+// Click and drag on timeline bar to scrub
+let isScrubbing = false;
+let justScrubbed = false;
+
+function scrubToX(clientX) {
   const rect = timelineBar.getBoundingClientRect();
-  const pct = (e.clientX - rect.left) / rect.width;
-  const seekTime = pct * video.duration;
+  const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  const dur = video.duration;
+  if (!dur || !Number.isFinite(dur)) return;
+  const targetSec = pct * dur;
   scenePlaybackEndMs = null;
-  void seekAbsoluteMs(seekTime * 1000);
+  // Direct assignment — no async seek during scrubbing
+  video.currentTime = targetSec;
+  // Update UI immediately
+  const ms = targetSec * 1000;
+  document.getElementById('time-current').textContent = formatTime(ms);
+  timelineProgress.style.width = (pct * 100) + '%';
+  document.getElementById('timeline-playhead').style.left = (pct * 100) + '%';
+}
+
+timelineBar.addEventListener('mousedown', (e) => {
+  isScrubbing = true;
+  video.pause();
+  showPlayIcon();
+  scrubToX(e.clientX);
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isScrubbing) return;
+  scrubToX(e.clientX);
+  e.preventDefault();
+});
+
+document.addEventListener('mouseup', () => {
+  if (isScrubbing) {
+    isScrubbing = false;
+    // Prevent the subsequent click event on scene markers from seeking to scene start
+    justScrubbed = true;
+    setTimeout(() => { justScrubbed = false; }, 50);
+  }
 });
 
 // Play/pause icon toggling
@@ -2142,6 +2447,7 @@ function renderOverlayElements() {
     el.innerHTML = '<span class="preview-badge">PREVIEW</span>' + s.rendered.html;
     Object.assign(el.style, s.rendered.styles);
     overlayLayer.appendChild(el);
+    makeOverlayDraggable(el);
   }
 }
 
@@ -2155,15 +2461,178 @@ function updateOverlayVisibility(currentMs) {
     const el = overlayLayer.querySelector('[data-scene="' + s.name + '"]');
     if (!el) continue;
 
-    // Show overlay only during this scene's own duration (not bleeding into next scene)
+    // Show overlay during this scene's time range.
+    // For scenes without TTS (endMs === startMs), extend to the next scene's start or video end.
     const { startMs, endMs } = getSceneBounds(s);
-    const isActive = currentMs >= startMs && currentMs < endMs;
+    const sceneIdx = scenes.indexOf(s);
+    const nextStart = sceneIdx + 1 < scenes.length ? scenes[sceneIdx + 1].startMs : getPreviewDurationMs();
+    const effectiveEnd = endMs > startMs ? endMs : nextStart;
+    const isActive = currentMs >= startMs && currentMs < effectiveEnd;
     el.classList.toggle('visible', isActive);
   }
 }
 
 document.getElementById('cb-overlays').addEventListener('change', () => {
   updateOverlayVisibility(video.currentTime * 1000);
+});
+
+// ─── Drag-to-snap overlay positioning ──────────────────────────────────────
+const SNAP_ZONES = ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'bottom-center', 'center'];
+const snapZoneEls = document.querySelectorAll('.snap-zone');
+
+// Zone center positions as fractions of the container
+const ZONE_CENTERS = {
+  'top-left':      { x: 0.05 + 0.35 / 2, y: 0.10 + 0.35 / 2 },
+  'top-right':     { x: 1 - 0.05 - 0.35 / 2, y: 0.10 + 0.35 / 2 },
+  'bottom-left':   { x: 0.05 + 0.35 / 2, y: 1 - 0.10 - 0.35 / 2 },
+  'bottom-right':  { x: 1 - 0.05 - 0.35 / 2, y: 1 - 0.10 - 0.35 / 2 },
+  'bottom-center': { x: 0.25 + 0.50 / 2, y: 1 - 0.05 - 0.20 / 2 },
+  'center':        { x: 0.25 + 0.50 / 2, y: 0.30 + 0.40 / 2 },
+};
+
+let dragState = null;
+let isOverlayDragging = false;
+
+function showSnapZones() {
+  snapZoneEls.forEach(el => el.classList.add('visible'));
+}
+
+function hideSnapZones() {
+  snapZoneEls.forEach(el => {
+    el.classList.remove('visible', 'highlight');
+  });
+}
+
+function highlightNearestZone(fracX, fracY) {
+  let nearest = null;
+  let minDist = Infinity;
+  for (const zone of SNAP_ZONES) {
+    const c = ZONE_CENTERS[zone];
+    const d = Math.hypot(fracX - c.x, fracY - c.y);
+    if (d < minDist) {
+      minDist = d;
+      nearest = zone;
+    }
+  }
+  snapZoneEls.forEach(el => {
+    el.classList.toggle('highlight', el.dataset.zone === nearest);
+  });
+  return nearest;
+}
+
+function makeOverlayDraggable(el) {
+  el.classList.add('overlay-draggable');
+
+  el.addEventListener('mousedown', (e) => {
+    // Only primary button
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const container = el.closest('.video-container');
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+
+    // Store original zone positioning styles so we can restore if needed
+    const sceneName = el.dataset.scene;
+
+    dragState = {
+      el,
+      sceneName,
+      container,
+      containerRect,
+      // Offset from mouse to element top-left
+      offsetX: e.clientX - elRect.left,
+      offsetY: e.clientY - elRect.top,
+      nearestZone: null,
+    };
+
+    // Switch to fixed positioning for free drag
+    isOverlayDragging = true;
+    el.classList.add('overlay-dragging');
+    el.style.position = 'absolute';
+    el.style.left = (elRect.left - containerRect.left) + 'px';
+    el.style.top = (elRect.top - containerRect.top) + 'px';
+    el.style.right = 'auto';
+    el.style.bottom = 'auto';
+    el.style.transform = 'none';
+
+    showSnapZones();
+  });
+}
+
+document.addEventListener('mousemove', (e) => {
+  if (!dragState) return;
+  e.preventDefault();
+
+  const { el, container, containerRect, offsetX, offsetY } = dragState;
+  const rect = containerRect;
+
+  const newLeft = e.clientX - rect.left - offsetX;
+  const newTop = e.clientY - rect.top - offsetY;
+
+  el.style.left = newLeft + 'px';
+  el.style.top = newTop + 'px';
+
+  // Calculate overlay center as fraction of container
+  const elRect = el.getBoundingClientRect();
+  const centerX = (elRect.left + elRect.width / 2 - rect.left) / rect.width;
+  const centerY = (elRect.top + elRect.height / 2 - rect.top) / rect.height;
+
+  dragState.nearestZone = highlightNearestZone(centerX, centerY);
+});
+
+document.addEventListener('mouseup', (e) => {
+  if (!dragState) return;
+
+  const { el, sceneName, nearestZone } = dragState;
+  const zone = nearestZone || 'bottom-center';
+
+  // Remove drag styles — let CSS zone positioning take over
+  el.classList.remove('overlay-dragging');
+  el.style.position = '';
+  el.style.left = '';
+  el.style.top = '';
+  el.style.right = '';
+  el.style.bottom = '';
+  el.style.transform = '';
+
+  // Update the data-zone attribute so CSS positioning applies
+  el.dataset.zone = zone;
+
+  // Update the placement dropdown in the scene card (no change event — avoids re-rendering all overlays)
+  const placeEl = document.querySelector('select[data-scene="' + sceneName + '"][data-field="overlay-placement"]');
+  if (placeEl) {
+    placeEl.value = zone;
+  }
+
+  // Update the scene's overlay data directly
+  const s = scenes.find(sc => sc.name === sceneName);
+  if (s && s.overlay) {
+    s.overlay.placement = zone;
+  }
+  const dataOverlay = DATA.overlays.find(o => o.scene === sceneName);
+  if (dataOverlay) {
+    dataOverlay.placement = zone;
+  }
+  if (DATA.renderedOverlays[sceneName]) {
+    DATA.renderedOverlays[sceneName].zone = zone;
+  }
+
+  hideSnapZones();
+  markDirty();
+  // Keep isOverlayDragging true until after the wireOverlayListeners debounce (300ms)
+  // would have fired, to prevent any overlay field handler from triggering a re-render
+  setTimeout(() => { isOverlayDragging = false; }, 500);
+
+  // Placement-only drag should not trigger a full overlay preview refresh:
+  // previewOverlays() re-scrapes every scene card from the DOM, which can
+  // pull stale values from other scenes while the user is dragging. The
+  // dragged element already has the new zone applied locally.
+  updateOverlayVisibility(video.currentTime * 1000);
+
+  dragState = null;
 });
 
 // ─── Scene list (sidebar) ──────────────────────────────────────────────────
@@ -2259,7 +2728,65 @@ function renderSceneList() {
     wireOverlayListeners(s.name);
     wireEffectListeners(s.name);
   }
+
+  // Trigger overlay preview after rendering so existing overlays appear on the video
+  previewOverlays();
 }
+
+// ─── Add Scene button ────────────────────────────────────────────────────
+document.getElementById('add-scene-btn').addEventListener('click', () => {
+  // Generate a unique scene name
+  let idx = scenes.length + 1;
+  let name = 'scene-' + idx;
+  const existingNames = new Set(scenes.map(s => s.name));
+  while (existingNames.has(name)) {
+    idx++;
+    name = 'scene-' + idx;
+  }
+
+  // Timestamp from current video position
+  const startMs = Math.round(video.currentTime * 1000);
+
+  // Add to timing data
+  DATA.timing[name] = startMs;
+  DATA.sceneDurations[name] = 0;
+  DATA.voiceover.push({ scene: name, text: '' });
+
+  // Insert scene into the sorted array at the right position
+  const newScene = {
+    name,
+    startMs,
+    vo: { scene: name, text: '' },
+    overlay: undefined,
+    effects: [],
+    rendered: undefined,
+    report: undefined,
+  };
+  // Find insertion index to keep sorted by startMs
+  let insertIdx = scenes.length;
+  for (let i = 0; i < scenes.length; i++) {
+    if (scenes[i].startMs > startMs) {
+      insertIdx = i;
+      break;
+    }
+  }
+  scenes.splice(insertIdx, 0, newScene);
+
+  // Capture current form values before re-render wipes the DOM
+  syncFormValuesToScenes();
+
+  // Re-render scene list
+  renderSceneList();
+  snapshotAllScenes();
+  markDirty();
+
+  // Auto-scroll to the new card and expand it
+  const newCard = document.querySelector('.scene-card[data-scene="' + name + '"]');
+  if (newCard) {
+    newCard.classList.add('expanded');
+    newCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+});
 
 function renderDynamicOverlayFields(sceneName, type, ov) {
   if (!type) return '';
@@ -2329,6 +2856,13 @@ function renderOverlayFields(s) {
             <option value="bottom-right" \${ov?.placement === 'bottom-right' ? 'selected' : ''}>bottom-right</option>
             <option value="center" \${ov?.placement === 'center' ? 'selected' : ''}>center</option>
           </select>
+        </div>
+        <div style="flex:0 0 auto; display:flex; align-items:flex-end; padding-bottom:2px;">
+          <span class="overlay-theme-badge" data-scene="\${esc(s.name)}" title="Auto-detected overlay theme"
+            style="font-size:11px; padding:2px 6px; border-radius:3px;
+              background:\${(DATA.overlayThemes[s.name] ?? 'dark') === 'light' ? '#fff' : '#333'};
+              color:\${(DATA.overlayThemes[s.name] ?? 'dark') === 'light' ? '#333' : '#ccc'};
+              border:1px solid #555;">\${DATA.overlayThemes[s.name] ?? 'dark'}</span>
         </div>\` : ''}
       </div>
       \${type ? \`<div class="field-group">
@@ -2350,6 +2884,10 @@ function updateOverlayFieldsForScene(sceneName) {
   const typeEl = document.querySelector('select[data-scene="' + sceneName + '"][data-field="overlay-type"]');
   const type = typeEl?.value ?? '';
   const s = scenes.find(sc => sc.name === sceneName);
+  if (s) {
+    if (!type) s.overlay = undefined;
+    else s.overlay = { ...(s.overlay ?? {}), type };
+  }
   const ov = s?.overlay;
   const container = document.querySelector('.overlay-fields-dynamic[data-scene="' + sceneName + '"]');
   if (!container) return;
@@ -2364,6 +2902,8 @@ function updateOverlayFieldsForScene(sceneName) {
     section.outerHTML = renderOverlayFields(fakeScene);
     // Re-wire event listeners for the new overlay fields
     wireOverlayListeners(sceneName);
+    // Trigger preview to show the overlay immediately after type change
+    previewOverlays();
   }
 }
 
@@ -2374,8 +2914,30 @@ function wireOverlayListeners(sceneName) {
   card.querySelectorAll('[data-field^="overlay"]').forEach(input => {
     const handler = () => {
       markDirty();
+      // Skip full re-render during overlay drag — drag only changes placement
+      if (isOverlayDragging) return;
+      // Sync only THIS scene's overlay from DOM on field change
+      syncOverlayFormValuesForScene(sceneName);
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => previewOverlays(), 300);
+      debounceTimer = setTimeout(() => {
+        // Only preview this scene's overlay, not all overlays
+        const singleOv = scenes.find(sc => sc.name === sceneName);
+        if (singleOv?.overlay) {
+          const ov = [{ ...singleOv.overlay, scene: sceneName }];
+          fetch('/api/render-overlays', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(ov),
+          }).then(r => r.json()).then(result => {
+            if (result.renderedOverlays?.[sceneName]) {
+              DATA.renderedOverlays[sceneName] = result.renderedOverlays[sceneName];
+              singleOv.rendered = result.renderedOverlays[sceneName];
+              renderOverlayElements();
+              updateOverlayVisibility(video.currentTime * 1000);
+            }
+          });
+        }
+      }, 300);
     };
     input.addEventListener('input', handler);
     input.addEventListener('change', handler);
@@ -2556,6 +3118,18 @@ async function saveEffects() {
   });
 }
 
+async function saveTiming() {
+  const timing = {};
+  for (const s of scenes) {
+    timing[s.name] = s.startMs;
+  }
+  await fetch('/api/save-timing', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ timing }),
+  });
+}
+
 function previewEffect(sceneName, index) {
   const s = scenes.find(sc => sc.name === sceneName);
   if (!s?.effects?.[index]) return;
@@ -2693,7 +3267,7 @@ async function seekAbsoluteMs(absoluteMs) {
     return;
   }
 
-  const totalMs = video.duration * 1000;
+  const totalMs = getPreviewDurationMs();
   if (totalMs > 0) {
     const pct = (targetMs / totalMs) * 100;
     timelineProgress.style.width = pct + '%';
@@ -2789,8 +3363,9 @@ async function regenClip(sceneName, btn) {
   setStatus('Regenerating TTS for ' + sceneName + '...', 'saving');
 
   try {
-    // Save current voiceover state first
+    // Save current voiceover + timing state first (new scenes need timing marks)
     await saveVoiceover();
+    await saveTiming();
 
     const resp = await fetch('/api/regen-clip', {
       method: 'POST',
@@ -2825,6 +3400,69 @@ async function regenClip(sceneName, btn) {
   }
 }
 
+// Sync DOM form values back to in-memory scenes array.
+// Called before renderSceneList() to preserve user edits.
+function syncFormValuesToScenes() {
+  for (const s of scenes) {
+    const textEl = document.querySelector('textarea[data-scene="' + s.name + '"][data-field="text"]');
+    if (textEl && textEl.value) {
+      if (!s.vo) s.vo = { scene: s.name, text: '' };
+      s.vo.text = textEl.value;
+    }
+    const voiceEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="voice"]');
+    if (voiceEl?.value && s.vo) s.vo.voice = voiceEl.value;
+    const speedEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="speed"]');
+    if (speedEl?.value && s.vo) s.vo.speed = parseFloat(speedEl.value);
+  }
+  syncOverlayFormValuesToScenes();
+}
+
+function syncOverlayFormValuesForScene(sceneName) {
+  const s = scenes.find(sc => sc.name === sceneName);
+  if (!s) return;
+  const card = document.querySelector('.scene-card[data-scene="' + sceneName + '"]');
+  if (!card) return;
+
+  const type = card.querySelector('[data-field="overlay-type"]')?.value ?? '';
+  if (!type) {
+    s.overlay = undefined;
+    return;
+  }
+
+  const next = { ...(s.overlay ?? {}), type };
+  next.placement = card.querySelector('[data-field="overlay-placement"]')?.value ?? 'bottom-center';
+
+  const motion = card.querySelector('[data-field="overlay-motion"]')?.value ?? 'none';
+  if (motion && motion !== 'none') next.motion = motion;
+  else delete next.motion;
+
+  delete next.text;
+  delete next.title;
+  delete next.body;
+  delete next.kicker;
+  delete next.src;
+
+  const text = card.querySelector('[data-field="overlay-text"]')?.value ?? '';
+  const body = card.querySelector('[data-field="overlay-body"]')?.value ?? '';
+  const kicker = card.querySelector('[data-field="overlay-kicker"]')?.value ?? '';
+  const src = card.querySelector('[data-field="overlay-src"]')?.value ?? '';
+
+  if (type === 'lower-third' || type === 'callout') {
+    next.text = text;
+  } else {
+    next.title = text;
+    if (body) next.body = body;
+    if (type === 'headline-card' && kicker) next.kicker = kicker;
+    if (type === 'image-card' && src) next.src = src;
+  }
+
+  s.overlay = next;
+}
+
+function syncOverlayFormValuesToScenes() {
+  for (const s of scenes) syncOverlayFormValuesForScene(s.name);
+}
+
 function collectVoiceover() {
   return scenes.map(s => {
     const textEl = document.querySelector('textarea[data-scene="' + s.name + '"][data-field="text"]');
@@ -2843,43 +3481,14 @@ function collectVoiceover() {
 }
 
 function collectOverlays() {
+  // Serialize from in-memory scene state only.
+  // Per-scene sync happens in wireOverlayListeners on each field change.
+  // Do NOT call syncOverlayFormValuesToScenes() here — it re-reads ALL
+  // scene cards from the DOM which can overwrite good in-memory data
+  // with stale DOM values from collapsed/unedited cards.
   return scenes
-    .map(s => {
-      const typeEl = document.querySelector('select[data-scene="' + s.name + '"][data-field="overlay-type"]');
-      const placeEl = document.querySelector('select[data-scene="' + s.name + '"][data-field="overlay-placement"]');
-      const motionEl = document.querySelector('select[data-scene="' + s.name + '"][data-field="overlay-motion"]');
-      const textEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="overlay-text"]');
-      const bodyEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="overlay-body"]');
-      const kickerEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="overlay-kicker"]');
-      const srcEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="overlay-src"]');
-      const type = typeEl?.value;
-      if (!type) return null;
-      const entry = {
-        ...(s.overlay ?? {}),
-        scene: s.name,
-        type,
-        placement: placeEl?.value ?? 'bottom-center',
-      };
-      if (motionEl?.value && motionEl.value !== 'none') entry.motion = motionEl.value;
-      else delete entry.motion;
-
-      delete entry.text;
-      delete entry.title;
-      delete entry.body;
-      delete entry.kicker;
-      delete entry.src;
-
-      if (type === 'lower-third' || type === 'callout') {
-        entry.text = textEl?.value ?? '';
-      } else {
-        entry.title = textEl?.value ?? '';
-        if (bodyEl?.value) entry.body = bodyEl.value;
-        if (type === 'headline-card' && kickerEl?.value) entry.kicker = kickerEl.value;
-        if (type === 'image-card' && srcEl?.value) entry.src = srcEl.value;
-      }
-      return entry;
-    })
-    .filter(Boolean);
+    .filter(s => s.overlay?.type)
+    .map(s => ({ ...s.overlay, scene: s.name }));
 }
 
 async function saveVoiceover() {
@@ -3079,6 +3688,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
     await saveVoiceover();
     await saveOverlays();
     await saveEffects();
+    await saveTiming();
     clearDirty();
     setStatus('All changes saved', 'saved');
     saveBtn.textContent = '\\u2713 Saved';
@@ -3096,13 +3706,12 @@ document.getElementById('btn-save').addEventListener('click', async () => {
 
 // Export button (re-align audio + export MP4, no re-recording)
 document.getElementById('btn-export').addEventListener('click', async () => {
-  if (isDirty && !confirm('You have unsaved changes. Save before exporting?')) return;
-  if (isDirty) {
-    await saveVoiceover();
-    await saveOverlays();
-    await saveEffects();
-    clearDirty();
-  }
+  // Always save before export to ensure timing marks + voiceover are persisted
+  await saveVoiceover();
+  await saveOverlays();
+  await saveEffects();
+  await saveTiming();
+  clearDirty();
   const overlay = document.getElementById('recording-overlay');
   const title = document.getElementById('recording-title');
   const subtitle = document.getElementById('recording-subtitle');
@@ -3145,6 +3754,7 @@ document.getElementById('btn-rerecord').addEventListener('click', async () => {
     await saveVoiceover();
     await saveOverlays();
     await saveEffects();
+    await saveTiming();
     clearDirty();
   }
   const overlay = document.getElementById('recording-overlay');

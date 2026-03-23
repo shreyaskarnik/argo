@@ -40,6 +40,16 @@ export {
   type MotionPreset,
 } from './overlays/index.js';
 
+// Overlay PNG rendering (for imported videos)
+export {
+  renderOverlaysToPng,
+  buildOverlayPngFilters,
+  buildOverlayPngsForImport,
+  isImportedVideo,
+  type RenderedOverlayPng,
+  type OverlayPngInput,
+} from './overlays/render-to-png.js';
+
 // Effects
 export { showConfetti, type ConfettiOptions } from './effects.js';
 
@@ -118,6 +128,9 @@ export { releasePrep, type ReleasePrepOptions } from './release-prep.js';
 
 // Init
 export { init } from './init.js';
+
+// Media utilities
+export { getVideoDurationMs, getVideoFrameRate, getVideoDimensions, detectVideoTheme } from './media.js';
 
 // Import
 export { importVideo, type ImportOptions, type ImportResult } from './import.js';

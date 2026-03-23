@@ -231,6 +231,23 @@ describePreview('preview server', () => {
     expect(resp.headers.get('content-type')).toBe('video/mp4');
   });
 
+  it('prefers the original imported container over the fallback video.webm copy', async () => {
+    const { argoDir, demosDir } = await scaffoldDemo(dir, 'test-demo');
+    writeFileSync(join(argoDir, 'test-demo', 'video.mp4'), Buffer.from('fake-import-mp4'));
+    writeFileSync(join(argoDir, 'test-demo', '.imported'), JSON.stringify({ durationMs: 8000 }));
+
+    const server = await startPreviewServer({
+      demoName: 'test-demo',
+      argoDir,
+      demosDir,
+    });
+    close = server.close;
+
+    const resp = await fetch(`${server.url}/video`);
+    expect(resp.status).toBe(200);
+    expect(resp.headers.get('content-type')).toBe('video/mp4');
+  });
+
   it('POST /api/voiceover saves the manifest file', async () => {
     const { argoDir, demosDir } = await scaffoldDemo(dir, 'test-demo');
     const server = await startPreviewServer({

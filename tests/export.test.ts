@@ -51,7 +51,11 @@ describe('checkFfmpeg', () => {
 describe('exportVideo', () => {
   function setupHappy() {
     mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
-    mockedExistsSync.mockReturnValue(true);
+    mockedExistsSync.mockImplementation((p) => {
+      const path = String(p);
+      if (path.includes('.imported')) return false;
+      return true;
+    });
     mockedSpawnSync.mockReturnValue({ status: 0 } as any);
   }
 
@@ -63,7 +67,7 @@ describe('exportVideo', () => {
     const [cmd, args] = mockedSpawnSync.mock.calls[0];
     expect(cmd).toBe('ffmpeg');
     expect(args).toEqual([
-      '-i', '.argo/my-demo/video.webm',
+      '-i', '.argo/my-demo/video.mp4',
       '-i', '.argo/my-demo/narration-aligned.wav',
       '-c:v', 'libx264',
       '-pix_fmt', 'yuv420p',
@@ -133,15 +137,17 @@ describe('exportVideo', () => {
     );
   });
 
-  it('throws on missing video.webm', async () => {
+  it('throws on missing video file', async () => {
     mockedExecFileSync.mockReturnValue(Buffer.from('ok'));
     mockedExistsSync.mockImplementation((p) => {
-      if (String(p).endsWith('video.webm')) return false;
+      const ps = String(p);
+      // No video file at all
+      if (ps.includes('video.')) return false;
       return true;
     });
 
     await expect(exportVideo({ demoName: 'demo', argoDir: '.argo', outputDir: 'out' }))
-      .rejects.toThrow(/video\.webm/);
+      .rejects.toThrow(/No video found/);
   });
 
   it('exports without audio when narration-aligned.wav is missing (silent mode)', async () => {
@@ -492,6 +498,86 @@ describe('exportVideo', () => {
     expect(a).not.toContain('assets/missing-logo.png');
     // No filter_complex for watermark
     expect(a).not.toContain('-filter_complex');
+  });
+
+  // ---------- overlay PNGs ----------
+
+  it('adds overlay PNG inputs with correct filter_complex for imported videos', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      overlayPngs: [
+        { scene: 'intro', pngPath: '/tmp/intro-overlay.png', zone: 'bottom-center', startMs: 0, endMs: 5000 },
+        { scene: 'features', pngPath: '/tmp/features-overlay.png', zone: 'top-left', startMs: 5000, endMs: 10000 },
+      ],
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const a = args as string[];
+    // Should have overlay PNG inputs with -loop 1 and -t
+    expect(a).toContain('-loop');
+    expect(a).toContain('/tmp/intro-overlay.png');
+    expect(a).toContain('/tmp/features-overlay.png');
+    // Should have filter_complex with overlay enable expressions
+    expect(a).toContain('-filter_complex');
+    const fcIdx = a.indexOf('-filter_complex');
+    const fc = a[fcIdx + 1];
+    expect(fc).toContain('overlay=');
+    expect(fc).toContain("enable='between");
+    expect(fc).toContain('0.000');
+    expect(fc).toContain('5.000');
+    expect(fc).toContain('10.000');
+  });
+
+  it('does not use -shortest for imported videos with narration and no overlays', async () => {
+    setupHappy();
+    mockedExistsSync.mockImplementation((p) => {
+      const path = String(p);
+      if (path.endsWith('.argo/demo/.imported')) return true;
+      return true;
+    });
+
+    await exportVideo({
+      demoName: 'demo',
+      argoDir: '.argo',
+      outputDir: 'out',
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    expect(args as string[]).not.toContain('-shortest');
+  });
+
+  it('overlay PNG input indices account for other inputs', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      chapterMetadataPath: '.argo/demo/chapters.txt',
+      overlayPngs: [
+        { scene: 'intro', pngPath: '/tmp/intro-overlay.png', zone: 'center', startMs: 0, endMs: 3000 },
+      ],
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const a = args as string[];
+    // Inputs: 0=video, 1=audio, 2=chapters, 3=overlay PNG
+    const fcIdx = a.indexOf('-filter_complex');
+    const fc = a[fcIdx + 1];
+    // Overlay PNG should reference input 3 (after video, audio, chapters)
+    expect(fc).toContain('[3:v]');
+  });
+
+  it('empty overlayPngs array does not affect output', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      overlayPngs: [],
+    });
+
+    const [, args] = mockedSpawnSync.mock.calls[0];
+    const a = args as string[];
+    // No filter_complex from empty overlays
+    expect(a).not.toContain('-filter_complex');
+    expect(a).not.toContain('-loop');
   });
 
   it('watermark input index accounts for other inputs (audio, chapters, thumbnail)', async () => {
