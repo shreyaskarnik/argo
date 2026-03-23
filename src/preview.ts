@@ -2621,8 +2621,10 @@ document.addEventListener('mouseup', (e) => {
   }
 
   hideSnapZones();
-  isOverlayDragging = false;
   markDirty();
+  // Keep isOverlayDragging true until after the wireOverlayListeners debounce (300ms)
+  // would have fired, to prevent any overlay field handler from triggering a re-render
+  setTimeout(() => { isOverlayDragging = false; }, 500);
 
   // Placement-only drag should not trigger a full overlay preview refresh:
   // previewOverlays() re-scrapes every scene card from the DOM, which can
