@@ -1417,6 +1417,9 @@ const PREVIEW_HTML = `<!DOCTYPE html>
   .overlay-cue.overlay-draggable {
     cursor: grab;
     user-select: none;
+    /* pointer-events only on visible overlays — invisible ones must not intercept clicks */
+  }
+  .overlay-cue.overlay-draggable.visible {
     pointer-events: auto;
   }
   .overlay-cue.overlay-draggable:active {
