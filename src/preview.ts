@@ -2911,12 +2911,31 @@ function wireOverlayListeners(sceneName) {
   let debounceTimer;
   card.querySelectorAll('[data-field^="overlay"]').forEach(input => {
     const handler = () => {
-      syncOverlayFormValuesForScene(sceneName);
       markDirty();
       // Skip full re-render during overlay drag — drag only changes placement
       if (isOverlayDragging) return;
+      // Sync only THIS scene's overlay from DOM on field change
+      syncOverlayFormValuesForScene(sceneName);
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => previewOverlays(), 300);
+      debounceTimer = setTimeout(() => {
+        // Only preview this scene's overlay, not all overlays
+        const singleOv = scenes.find(sc => sc.name === sceneName);
+        if (singleOv?.overlay) {
+          const ov = [{ ...singleOv.overlay, scene: sceneName }];
+          fetch('/api/render-overlays', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(ov),
+          }).then(r => r.json()).then(result => {
+            if (result.renderedOverlays?.[sceneName]) {
+              DATA.renderedOverlays[sceneName] = result.renderedOverlays[sceneName];
+              singleOv.rendered = result.renderedOverlays[sceneName];
+              renderOverlayElements();
+              updateOverlayVisibility(video.currentTime * 1000);
+            }
+          });
+        }
+      }, 300);
     };
     input.addEventListener('input', handler);
     input.addEventListener('change', handler);
