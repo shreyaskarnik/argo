@@ -2247,7 +2247,7 @@ function renderTimelineMarkers() {
     marker.className = 'timeline-scene';
     marker.style.left = pct + '%';
     marker.style.width = Math.max(widthPct, 2) + '%';
-    const hasOverlay = DATA.overlays.find(o => o.scene === s.name);
+    const hasOverlay = s.overlay?.type;
     marker.innerHTML = esc(s.name) + (hasOverlay ? '<span class="has-overlay"></span>' : '');
     marker.dataset.scene = s.name;
     marker.addEventListener('click', (e) => {
@@ -2601,37 +2601,26 @@ document.addEventListener('mouseup', (e) => {
   // Update the data-zone attribute so CSS positioning applies
   el.dataset.zone = zone;
 
-  // Update the placement dropdown in the scene card (no change event — avoids re-rendering all overlays)
+  // Update s.overlay (single source of truth)
+  const s = scenes.find(sc => sc.name === sceneName);
+  if (s && s.overlay) {
+    s.overlay.placement = zone;
+  }
+
+  // Update the placement dropdown for visual consistency
   const placeEl = document.querySelector('select[data-scene="' + sceneName + '"][data-field="overlay-placement"]');
   if (placeEl) {
     placeEl.value = zone;
   }
 
-  // Update the scene's overlay data directly
-  const s = scenes.find(sc => sc.name === sceneName);
-  if (s && s.overlay) {
-    s.overlay.placement = zone;
-  }
-  const dataOverlay = DATA.overlays.find(o => o.scene === sceneName);
-  if (dataOverlay) {
-    dataOverlay.placement = zone;
-  }
+  // Update rendered data so renderOverlayElements stays in sync
   if (DATA.renderedOverlays[sceneName]) {
     DATA.renderedOverlays[sceneName].zone = zone;
   }
 
   hideSnapZones();
   markDirty();
-  // Keep isOverlayDragging true until after the wireOverlayListeners debounce (300ms)
-  // would have fired, to prevent any overlay field handler from triggering a re-render
-  setTimeout(() => { isOverlayDragging = false; }, 500);
-
-  // Placement-only drag should not trigger a full overlay preview refresh:
-  // previewOverlays() re-scrapes every scene card from the DOM, which can
-  // pull stale values from other scenes while the user is dragging. The
-  // dragged element already has the new zone applied locally.
-  updateOverlayVisibility(video.currentTime * 1000);
-
+  isOverlayDragging = false;
   dragState = null;
 });
 
@@ -2903,7 +2892,7 @@ function updateOverlayFieldsForScene(sceneName) {
     // Re-wire event listeners for the new overlay fields
     wireOverlayListeners(sceneName);
     // Trigger preview to show the overlay immediately after type change
-    previewOverlays();
+    renderSingleSceneOverlay(sceneName);
   }
 }
 
@@ -2911,41 +2900,80 @@ function wireOverlayListeners(sceneName) {
   const card = document.querySelector('.scene-card[data-scene="' + sceneName + '"]');
   if (!card) return;
   let debounceTimer;
-  card.querySelectorAll('[data-field^="overlay"]').forEach(input => {
+
+  // Type change — special: re-renders the dynamic fields
+  const typeSelect = card.querySelector('select[data-field="overlay-type"]');
+  if (typeSelect) {
+    typeSelect.addEventListener('change', () => {
+      const s = scenes.find(sc => sc.name === sceneName);
+      if (!s) return;
+      const type = typeSelect.value;
+      if (!type) {
+        s.overlay = undefined;
+      } else {
+        s.overlay = { ...(s.overlay ?? {}), type };
+      }
+      updateOverlayFieldsForScene(sceneName);
+    });
+  }
+
+  // All other overlay fields — update s.overlay directly
+  card.querySelectorAll('[data-field^="overlay-"]').forEach(input => {
+    const field = input.dataset.field;
+    if (field === 'overlay-type') return; // handled above
+
     const handler = () => {
-      markDirty();
-      // Skip full re-render during overlay drag — drag only changes placement
-      if (isOverlayDragging) return;
-      // Sync only THIS scene's overlay from DOM on field change
-      syncOverlayFormValuesForScene(sceneName);
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        // Only preview this scene's overlay, not all overlays
-        const singleOv = scenes.find(sc => sc.name === sceneName);
-        if (singleOv?.overlay) {
-          const ov = [{ ...singleOv.overlay, scene: sceneName }];
-          fetch('/api/render-overlays', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(ov),
-          }).then(r => r.json()).then(result => {
-            if (result.renderedOverlays?.[sceneName]) {
-              DATA.renderedOverlays[sceneName] = result.renderedOverlays[sceneName];
-              singleOv.rendered = result.renderedOverlays[sceneName];
-              renderOverlayElements();
-              updateOverlayVisibility(video.currentTime * 1000);
-            }
-          });
+      const s = scenes.find(sc => sc.name === sceneName);
+      if (!s || !s.overlay) return;
+
+      // Map field name to overlay property
+      if (field === 'overlay-placement') s.overlay.placement = input.value;
+      else if (field === 'overlay-motion') {
+        if (input.value && input.value !== 'none') s.overlay.motion = input.value;
+        else delete s.overlay.motion;
+      }
+      else if (field === 'overlay-text') {
+        if (s.overlay.type === 'lower-third' || s.overlay.type === 'callout') {
+          s.overlay.text = input.value;
+        } else {
+          s.overlay.title = input.value;
         }
-      }, 300);
+      }
+      else if (field === 'overlay-body') s.overlay.body = input.value || undefined;
+      else if (field === 'overlay-kicker') s.overlay.kicker = input.value || undefined;
+      else if (field === 'overlay-src') s.overlay.src = input.value || undefined;
+
+      markDirty();
+
+      // Skip render during drag
+      if (isOverlayDragging) return;
+
+      // Debounce per-scene render
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => renderSingleSceneOverlay(sceneName), 300);
     };
+
     input.addEventListener('input', handler);
     input.addEventListener('change', handler);
   });
-  // Re-wire the type change listener
-  const typeSelect = card.querySelector('select[data-field="overlay-type"]');
-  if (typeSelect) {
-    typeSelect.addEventListener('change', () => updateOverlayFieldsForScene(sceneName));
+}
+
+async function renderSingleSceneOverlay(sceneName) {
+  const s = scenes.find(sc => sc.name === sceneName);
+  if (!s?.overlay?.type) return;
+
+  const ov = [{ ...s.overlay, scene: sceneName }];
+  const resp = await fetch('/api/render-overlays', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(ov),
+  });
+  const result = await resp.json();
+  if (result.renderedOverlays?.[sceneName]) {
+    DATA.renderedOverlays[sceneName] = result.renderedOverlays[sceneName];
+    s.rendered = result.renderedOverlays[sceneName];
+    renderOverlayElements();
+    updateOverlayVisibility(video.currentTime * 1000);
   }
 }
 
@@ -3414,54 +3442,8 @@ function syncFormValuesToScenes() {
     const speedEl = document.querySelector('input[data-scene="' + s.name + '"][data-field="speed"]');
     if (speedEl?.value && s.vo) s.vo.speed = parseFloat(speedEl.value);
   }
-  syncOverlayFormValuesToScenes();
 }
 
-function syncOverlayFormValuesForScene(sceneName) {
-  const s = scenes.find(sc => sc.name === sceneName);
-  if (!s) return;
-  const card = document.querySelector('.scene-card[data-scene="' + sceneName + '"]');
-  if (!card) return;
-
-  const type = card.querySelector('[data-field="overlay-type"]')?.value ?? '';
-  if (!type) {
-    s.overlay = undefined;
-    return;
-  }
-
-  const next = { ...(s.overlay ?? {}), type };
-  next.placement = card.querySelector('[data-field="overlay-placement"]')?.value ?? 'bottom-center';
-
-  const motion = card.querySelector('[data-field="overlay-motion"]')?.value ?? 'none';
-  if (motion && motion !== 'none') next.motion = motion;
-  else delete next.motion;
-
-  delete next.text;
-  delete next.title;
-  delete next.body;
-  delete next.kicker;
-  delete next.src;
-
-  const text = card.querySelector('[data-field="overlay-text"]')?.value ?? '';
-  const body = card.querySelector('[data-field="overlay-body"]')?.value ?? '';
-  const kicker = card.querySelector('[data-field="overlay-kicker"]')?.value ?? '';
-  const src = card.querySelector('[data-field="overlay-src"]')?.value ?? '';
-
-  if (type === 'lower-third' || type === 'callout') {
-    next.text = text;
-  } else {
-    next.title = text;
-    if (body) next.body = body;
-    if (type === 'headline-card' && kicker) next.kicker = kicker;
-    if (type === 'image-card' && src) next.src = src;
-  }
-
-  s.overlay = next;
-}
-
-function syncOverlayFormValuesToScenes() {
-  for (const s of scenes) syncOverlayFormValuesForScene(s.name);
-}
 
 function collectVoiceover() {
   return scenes.map(s => {
@@ -3481,11 +3463,7 @@ function collectVoiceover() {
 }
 
 function collectOverlays() {
-  // Serialize from in-memory scene state only.
-  // Per-scene sync happens in wireOverlayListeners on each field change.
-  // Do NOT call syncOverlayFormValuesToScenes() here — it re-reads ALL
-  // scene cards from the DOM which can overwrite good in-memory data
-  // with stale DOM values from collapsed/unedited cards.
+  // Serialize from s.overlay (single source of truth) — no DOM reading
   return scenes
     .filter(s => s.overlay?.type)
     .map(s => ({ ...s.overlay, scene: s.name }));
@@ -3500,7 +3478,7 @@ async function saveVoiceover() {
   });
 }
 
-// Render-only preview (no disk write) — called on every overlay field edit
+// Render-only preview (no disk write) — called on overlay field edits
 async function previewOverlays() {
   const ov = collectOverlays();
   const resp = await fetch('/api/render-overlays', {
@@ -3511,9 +3489,7 @@ async function previewOverlays() {
   const result = await resp.json();
   if (result.renderedOverlays) {
     DATA.renderedOverlays = result.renderedOverlays;
-    DATA.overlays = ov;
     for (const s of scenes) {
-      s.overlay = DATA.overlays.find(o => o.scene === s.name);
       s.rendered = DATA.renderedOverlays[s.name];
     }
     renderOverlayElements();
@@ -3532,9 +3508,7 @@ async function saveOverlays() {
   const result = await resp.json();
   if (result.renderedOverlays) {
     DATA.renderedOverlays = result.renderedOverlays;
-    DATA.overlays = ov;
     for (const s of scenes) {
-      s.overlay = DATA.overlays.find(o => o.scene === s.name);
       s.rendered = DATA.renderedOverlays[s.name];
     }
     renderOverlayElements();
@@ -3570,28 +3544,12 @@ function isSceneModified(sceneName) {
   const voice = card.querySelector('[data-field="voice"]')?.value ?? '';
   const speed = card.querySelector('[data-field="speed"]')?.value ?? '';
   if (text !== snap.text || voice !== snap.voice || String(speed) !== String(snap.speed)) return true;
-  // Check overlay fields
-  const type = card.querySelector('[data-field="overlay-type"]')?.value ?? '';
-  const snapType = snap.overlay?.type ?? '';
-  if (type !== snapType) return true;
-  if (type) {
-    const placement = card.querySelector('[data-field="overlay-placement"]')?.value ?? '';
-    const motion = card.querySelector('[data-field="overlay-motion"]')?.value ?? '';
-    const overlayText = card.querySelector('[data-field="overlay-text"]')?.value ?? '';
-    const body = card.querySelector('[data-field="overlay-body"]')?.value ?? '';
-    const kicker = card.querySelector('[data-field="overlay-kicker"]')?.value ?? '';
-    const src = card.querySelector('[data-field="overlay-src"]')?.value ?? '';
-    const so = snap.overlay || {};
-    if (placement !== (so.placement ?? 'bottom-center')) return true;
-    if (motion !== (so.motion ?? 'none')) return true;
-    const snapText = so.type === 'lower-third' || so.type === 'callout' ? (so.text ?? '') : (so.title ?? '');
-    if (overlayText !== snapText) return true;
-    if (body !== (so.body ?? '')) return true;
-    if (kicker !== (so.kicker ?? '')) return true;
-    if (src !== (so.src ?? '')) return true;
-  }
-  // Check effects
+  // Check overlay and effects from s.overlay / s.effects (single source of truth)
   const s = scenes.find(sc => sc.name === sceneName);
+  const currentOverlay = s?.overlay;
+  const snapOverlay = snap.overlay;
+  if (JSON.stringify(currentOverlay ?? null) !== JSON.stringify(snapOverlay ?? null)) return true;
+  // Check effects
   const currentEffects = JSON.stringify(s?.effects ?? []);
   const snapEffects = JSON.stringify(snap.effects ?? []);
   if (currentEffects !== snapEffects) return true;
@@ -3628,13 +3586,17 @@ function undoScene(sceneName) {
     s.effects = snap.effects?.length ? JSON.parse(JSON.stringify(snap.effects)) : [];
     refreshEffectsUI(sceneName);
   }
-  // Restore overlay type (triggers field re-render)
+  // Restore overlay from snapshot into s.overlay (single source of truth)
+  if (s) {
+    s.overlay = snap.overlay ? JSON.parse(JSON.stringify(snap.overlay)) : undefined;
+  }
+  // Restore overlay type (triggers field re-render via updateOverlayFieldsForScene)
   const typeEl = card.querySelector('[data-field="overlay-type"]');
   if (typeEl) {
     typeEl.value = snap.overlay?.type ?? '';
     updateOverlayFieldsForScene(sceneName);
   }
-  // Restore overlay field values after re-render
+  // Restore overlay field values in DOM after re-render
   setTimeout(() => {
     const so = snap.overlay || {};
     const textField = card.querySelector('[data-field="overlay-text"]');
@@ -3651,8 +3613,8 @@ function undoScene(sceneName) {
     if (placementField) placementField.value = so.placement ?? 'bottom-center';
     const motionField = card.querySelector('[data-field="overlay-motion"]');
     if (motionField) motionField.value = so.motion ?? 'none';
-    // Re-render overlay preview
-    previewOverlays();
+    // Re-render overlay preview for this scene only
+    renderSingleSceneOverlay(sceneName);
     updateUndoButton(sceneName);
     // Check if all scenes are back to saved state
     const anyModified = scenes.some(s => isSceneModified(s.name));
