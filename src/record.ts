@@ -214,6 +214,15 @@ export async function record(demoName: string, options: RecordOptions): Promise<
           ARGO_STREAM_OUT: streamOutPath,
           ARGO_FPS: String(options.video.fps ?? 30),
           ARGO_JPEG_QUALITY: jpegQuality,
+          // CDP-direct screencast: chromium-only path that uses paint timestamps
+          // (CDP metadata.timestamp) instead of arrival wallclock for frame
+          // numbering. Sidesteps the throughput-induced visual lag that the
+          // hotfix only mitigates. Disable via ARGO_CDP_DIRECT=0 to fall back
+          // to the legacy onFrame + image2pipe path (e.g. for debugging).
+          ARGO_USE_CDP_DIRECT:
+            process.env.ARGO_CDP_DIRECT === '0'
+              ? ''
+              : (useJpegStitch && (options.browser ?? 'chromium') === 'chromium' ? '1' : ''),
           BASE_URL: options.baseURL,
           ARGO_ASSET_URL: assetServer?.url ?? '',
           ARGO_AUTO_BACKGROUND: options.autoBackground ? '1' : '',

@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import type { Writable } from 'node:stream';
 import { schedulePlacements, type Placement } from './tts/align.js';
 import type { CameraMove } from './camera-move.js';
+import { startCdpScreencast, type CdpScreencastHandle } from './cdp-screencast.js';
 
 /**
  * Subset of Playwright's Page we depend on — typed structurally so we don't
@@ -29,6 +30,7 @@ interface ScreencastPage {
   evaluate<R>(pageFunction: () => R | Promise<R>): Promise<R>;
   on(event: 'framenavigated', listener: (frame: { parentFrame: () => unknown }) => void): unknown;
   off(event: 'framenavigated', listener: (frame: { parentFrame: () => unknown }) => void): unknown;
+  context(): unknown;
 }
 
 export interface StartRecordingOptions {
@@ -69,6 +71,7 @@ export class NarrationTimeline {
   private _pendingThumbScene: string | null = null;
   private _recordingPage: ScreencastPage | null = null;
   private _navListener: ((frame: { parentFrame: () => unknown }) => void) | null = null;
+  private _cdpHandle: CdpScreencastHandle | null = null;
 
   constructor(sceneDurations?: Record<string, number>) {
     if (sceneDurations) {
@@ -126,6 +129,33 @@ export class NarrationTimeline {
     const thumbsDir = process.env.ARGO_SCENE_THUMBS === '0' ? '' : (process.env.ARGO_THUMBS_DIR || '');
     const streamOut = process.env.ARGO_STREAM_OUT || '';
     const streamFps = Number(process.env.ARGO_FPS) || 30;
+    // CDP-direct screencast: bypass Playwright's onFrame wrapper to access
+    // metadata.timestamp (paint time). Only meaningful with stream-encode
+    // (record.ts only sets the env var for chromium + captureMode: jpeg-stitch).
+    const useCdpDirect = process.env.ARGO_USE_CDP_DIRECT === '1';
+
+    // Honor ARGO_JPEG_QUALITY for stream-encode mode; caller `options.quality` wins.
+    const envQuality = Number(process.env.ARGO_JPEG_QUALITY);
+    const quality = options.quality
+      ?? (Number.isFinite(envQuality) && envQuality > 0 ? envQuality : undefined);
+
+    if (useCdpDirect && streamOut) {
+      // Chromium accepts only one screencast subscriber per target — calling
+      // page.screencast.start would supersede our CDP subscription. Skip it
+      // entirely. showActions still works because it's a separate Playwright
+      // feature that just sets a flag for instrumentation hooks.
+      const captureSize = size ?? { width: 1920, height: 1080 };
+      const handle = await startCdpScreencast(page as Parameters<typeof startCdpScreencast>[0], {
+        outputPath: streamOut,
+        size: captureSize,
+        quality: quality ?? 80,
+        fps: streamFps,
+        liveFramePath: liveFramePath || undefined,
+        thumbsDir: thumbsDir || undefined,
+      });
+      this._cdpHandle = handle;
+      this._screencastStop = async () => { await handle.stop(); };
+    } else {
 
     // Set up the ffmpeg child for stream-encode mode.
     let ffmpegProc: ChildProcessByStdio<Writable, null, null> | null = null;
@@ -215,11 +245,6 @@ export class NarrationTimeline {
       };
     }
 
-    // Honor ARGO_JPEG_QUALITY for stream-encode mode; caller `options.quality` wins.
-    const envQuality = Number(process.env.ARGO_JPEG_QUALITY);
-    const quality = options.quality
-      ?? (Number.isFinite(envQuality) && envQuality > 0 ? envQuality : undefined);
-
     // Playwright's screencast still demands a `path` for its WebM writer even
     // when we ignore that output entirely (stream-encode mode). Pass the path
     // through; for jpeg-stitch users it's a discardable temp file.
@@ -280,6 +305,8 @@ export class NarrationTimeline {
         }
       };
     }
+
+    } // close legacy `else` branch — showActions + timeline anchor below run for both paths.
 
     // Optional auto-annotation of every Playwright interaction.
     const showActionsEnv = process.env.ARGO_SHOW_ACTIONS;
@@ -369,6 +396,7 @@ export class NarrationTimeline {
     // Tell the next onFrame callback to also persist this scene's JPEG —
     // best-effort, gated on ARGO_THUMBS_DIR being set + screencast being live.
     this._pendingThumbScene = scene;
+    if (this._cdpHandle) this._cdpHandle.setPendingThumb(scene);
 
     // Force CDP to emit a fresh frame so this scene's visual state is in the
     // recording at mark-time. Without this, an idle page (no recent paint)
