@@ -15,6 +15,8 @@ test('blocks-showcase', async ({ page, narration }) => {
   `);
   await page.waitForTimeout(500);
 
+  await narration.startRecording(page);
+
   for (const scene of ['intro', 'x-post', 'macos', 'ytlt', 'chart', 'spotify', 'closing']) {
     narration.mark(scene);
     await showOverlay(page, scene, narration.durationFor(scene, { maxMs: 6000 }));

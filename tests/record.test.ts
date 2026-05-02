@@ -190,14 +190,14 @@ describe('record', () => {
       demosDir: 'custom-demos',
       baseURL: 'http://localhost:4321',
       video: { width: 1280, height: 720 },
-      browser: 'webkit',
+      browser: 'chromium',
       deviceScaleFactor: 1.6,
     });
 
     const configPath = join(tempDir, '.argo', 'demo', 'playwright.record.config.mjs');
     const config = readFileSync(configPath, 'utf-8');
 
-    expect(config).toContain("browserName: \"webkit\"");
+    expect(config).toContain("browserName: \"chromium\"");
     expect(config).toContain('deviceScaleFactor: 2');
     expect(execFileMock).toHaveBeenCalledWith(
       'npx',
@@ -206,6 +206,36 @@ describe('record', () => {
         env: expect.objectContaining({
           ARGO_SCREENCAST_WIDTH: '2560',
           ARGO_SCREENCAST_HEIGHT: '1440',
+        }),
+      }),
+      expect.any(Function),
+    );
+  });
+
+  it('clamps deviceScaleFactor to 1 on non-chromium browsers', async () => {
+    // webkit/firefox don't honor --force-device-scale-factor — page renders at 1x
+    // while screencast captures at the 2x viewport, leaving 75% of frames empty.
+    mockSubprocessSuccess();
+
+    await record('demo', {
+      demosDir: 'custom-demos',
+      baseURL: 'http://localhost:4321',
+      video: { width: 1280, height: 720 },
+      browser: 'webkit',
+      deviceScaleFactor: 2,
+    });
+
+    const configPath = join(tempDir, '.argo', 'demo', 'playwright.record.config.mjs');
+    const config = readFileSync(configPath, 'utf-8');
+
+    expect(config).toContain('deviceScaleFactor: 1');
+    expect(execFileMock).toHaveBeenCalledWith(
+      'npx',
+      expect.any(Array),
+      expect.objectContaining({
+        env: expect.objectContaining({
+          ARGO_SCREENCAST_WIDTH: '1280',
+          ARGO_SCREENCAST_HEIGHT: '720',
         }),
       }),
       expect.any(Function),

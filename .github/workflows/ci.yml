@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # ffmpeg is needed for boundary-frame extraction and shader pre-render.
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: npm install
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm test
+
+  cross-browser:
+    name: ci-smoke (${{ matrix.browser }})
+    needs: unit
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    env:
+      ARGO_BROWSER: ${{ matrix.browser }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: npm install
+      # chromium is also installed even when recording on webkit/firefox —
+      # shader-render uses headless chromium for WebGL regardless of the
+      # recording browser.
+      - run: npx playwright install --with-deps chromium "$ARGO_BROWSER"
+      - run: npm run build
+
+      - name: Run pipeline
+        run: npx tsx bin/argo.js pipeline ci-smoke --config demos/ci-smoke.config.mjs --browser "$ARGO_BROWSER"
+
+      - name: Verify output
+        run: |
+          pip install --quiet pillow
+          python3 scripts/verify-ci-smoke.py videos/ci-smoke.mp4
+
+      - name: Upload mp4 artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-smoke-${{ matrix.browser }}
+          path: videos/ci-smoke.mp4
+          if-no-files-found: warn

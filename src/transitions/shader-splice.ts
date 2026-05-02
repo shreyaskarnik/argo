@@ -99,9 +99,11 @@ export function buildShaderSpliceFilter(opts: ShaderSpliceOptions): ShaderSplice
     const sceneEnd = b.boundarySec - dHalf;
     const transitionEnd = b.boundarySec + dHalf;
 
+    // setsar=1 normalizes SAR so concat doesn't fail when source and PNG
+    // sequence disagree (webkit screencast emits SAR 108:109; PNG is 0:1).
     const vSceneLabel = `ssv${activeBoundaries}`;
     parts.push(
-      `[${vSplitLabels[videoSegmentIdx++]}]trim=${cursorSec.toFixed(3)}:${sceneEnd.toFixed(3)},setpts=PTS-STARTPTS[${vSceneLabel}]`,
+      `[${vSplitLabels[videoSegmentIdx++]}]trim=${cursorSec.toFixed(3)}:${sceneEnd.toFixed(3)},setpts=PTS-STARTPTS,setsar=1[${vSceneLabel}]`,
     );
     videoLabels.push(`[${vSceneLabel}]`);
 
@@ -114,7 +116,7 @@ export function buildShaderSpliceFilter(opts: ShaderSpliceOptions): ShaderSplice
     }
 
     const vTransLabel = `stv${activeBoundaries}`;
-    parts.push(`[${b.extraInputIndex}:v]setpts=PTS-STARTPTS[${vTransLabel}]`);
+    parts.push(`[${b.extraInputIndex}:v]setpts=PTS-STARTPTS,setsar=1[${vTransLabel}]`);
     videoLabels.push(`[${vTransLabel}]`);
 
     if (audioInputLabel) {
@@ -132,7 +134,7 @@ export function buildShaderSpliceFilter(opts: ShaderSpliceOptions): ShaderSplice
   // Final scene segment
   const vLastLabel = `ssv${activeBoundaries}`;
   parts.push(
-    `[${vSplitLabels[videoSegmentIdx++]}]trim=${cursorSec.toFixed(3)}:${totalDurationSec.toFixed(3)},setpts=PTS-STARTPTS[${vLastLabel}]`,
+    `[${vSplitLabels[videoSegmentIdx++]}]trim=${cursorSec.toFixed(3)}:${totalDurationSec.toFixed(3)},setpts=PTS-STARTPTS,setsar=1[${vLastLabel}]`,
   );
   videoLabels.push(`[${vLastLabel}]`);
   if (audioInputLabel) {

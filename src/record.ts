@@ -107,7 +107,39 @@ export async function record(demoName: string, options: RecordOptions): Promise<
   // jpeg-stitch (stream-encode) produces an H.264 mp4 directly — JPEG frames
   // are piped to ffmpeg child in narration.startRecording, bypassing
   // Playwright's hardcoded VP8 encoder. Default mode keeps Playwright's WebM.
-  const useJpegStitch = options.captureMode === 'jpeg-stitch';
+  //
+  // jpeg-stitch is chromium-only in practice: webkit/firefox screencast
+  // onFrame delivery is far below 30fps (firefox typically ~3fps), so
+  // 80%+ of frames get synthesized as duplicates and the page-side test
+  // hits its timeout while the CDP transport drains. Auto-fall back to
+  // webm with a loud warning rather than letting the recording hang.
+  const browserName = options.browser ?? 'chromium';
+  let useJpegStitch = options.captureMode === 'jpeg-stitch';
+  if (useJpegStitch && browserName !== 'chromium') {
+    console.warn(
+      `Warning: captureMode: 'jpeg-stitch' is chromium-only — ` +
+      `${browserName}'s screencast cannot sustain the JPEG framerate. ` +
+      `Falling back to captureMode: 'webm' for this run.`,
+    );
+    useJpegStitch = false;
+  }
+
+  // deviceScaleFactor > 1 only works on chromium (via --force-device-scale-factor).
+  // webkit/firefox keep the page at 1x but the screencast still captures at the
+  // 2x/3x viewport size — the page renders into the upper-left of the frame and
+  // the rest is empty gray pixels (a "frame within a frame" once the export's
+  // frame effect wraps it). Clamp to 1 with a warning rather than producing
+  // unusable output.
+  const requestedDsf = normalizeDeviceScaleFactor(options.deviceScaleFactor);
+  if (requestedDsf > 1 && browserName !== 'chromium') {
+    console.warn(
+      `Warning: deviceScaleFactor: ${requestedDsf} is chromium-only — ` +
+      `${browserName} renders the page at 1x while the screencast captures at ` +
+      `${requestedDsf}x, leaving the right and bottom of every frame empty. ` +
+      `Clamping to 1 for this run.`,
+    );
+    options = { ...options, deviceScaleFactor: 1 };
+  }
   const videoExt = useJpegStitch ? '.mp4' : '.webm';
   const videoPath = path.join(argoDir, `video${videoExt}`);
   // Playwright's screencast.start still requires a `path` even when we ignore
@@ -222,7 +254,7 @@ export async function record(demoName: string, options: RecordOptions): Promise<
           ARGO_USE_CDP_DIRECT:
             process.env.ARGO_CDP_DIRECT === '0'
               ? ''
-              : (useJpegStitch && (options.browser ?? 'chromium') === 'chromium' ? '1' : ''),
+              : (useJpegStitch && browserName === 'chromium' ? '1' : ''),
           BASE_URL: options.baseURL,
           ARGO_ASSET_URL: assetServer?.url ?? '',
           ARGO_AUTO_BACKGROUND: options.autoBackground ? '1' : '',

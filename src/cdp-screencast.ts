@@ -211,11 +211,17 @@ export async function startCdpScreencast(
       writeFileSync(concatPath, lines.join('\n') + '\n', 'utf-8');
 
       await new Promise<void>((resolve, reject) => {
+        // -vf fps=N forces CFR output. Without it, the concat-demuxer produces
+        // VFR with avg_frame_rate well below the declared r_frame_rate, which
+        // confuses downstream filter graphs (e.g. shader-splice trims): the
+        // final mp4 ends up several seconds longer than the source.
         const proc = spawn('ffmpeg', [
           '-y',
           '-f', 'concat',
           '-safe', '0',
           '-i', concatPath,
+          '-vf', `fps=${options.fps}`,
+          '-fps_mode', 'cfr',
           '-c:v', 'libx264',
           '-preset', 'ultrafast',
           '-crf', '12',

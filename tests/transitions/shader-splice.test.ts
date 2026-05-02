@@ -124,6 +124,24 @@ describe('buildShaderSpliceFilter', () => {
     expect(result.filterComplex).toMatch(/concat=n=3/);
   });
 
+  it('normalizes SAR=1 on every concat input to avoid mismatch', () => {
+    // webkit screencast emits SAR 108:109; PNG sequence is 0:1. Without
+    // setsar=1 on each input, ffmpeg concat fails with "parameters do not
+    // match". Every video segment (scene + transition) must include setsar=1.
+    const result = buildShaderSpliceFilter({
+      totalDurationSec: 6.0,
+      boundaries: [{ boundarySec: 3.0, durationMs: 800, extraInputIndex: 2 }],
+      videoInputLabel: '[0:v]',
+      audioInputLabel: '[1:a]',
+      fps: 30,
+    });
+    // Scene segments (trim+setpts+setsar)
+    expect(result.filterComplex).toMatch(/trim=0\.000:2\.600,setpts=PTS-STARTPTS,setsar=1/);
+    expect(result.filterComplex).toMatch(/trim=3\.400:6\.000,setpts=PTS-STARTPTS,setsar=1/);
+    // PNG transition segment also normalized
+    expect(result.filterComplex).toMatch(/\[2:v\]setpts=PTS-STARTPTS,setsar=1/);
+  });
+
   it('clamps dHalf when boundary is near video end', () => {
     // boundarySec=2.85, requested halfDur=0.4 — only 0.15 available after
     const result = buildShaderSpliceFilter({
