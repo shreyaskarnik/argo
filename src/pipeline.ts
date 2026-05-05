@@ -33,6 +33,8 @@ import {
 
 export interface PipelineOptions {
   headed?: boolean;
+  /** Override `video.retries` for this run. */
+  retries?: number;
 }
 
 /**
@@ -146,6 +148,7 @@ export async function runPipeline(
     sceneThumbnails: config.video.sceneThumbnails,
     captureMode: config.video.captureMode,
     jpegQuality: config.video.jpegQuality,
+    retries: pipelineOpts?.retries ?? config.video.retries,
     headed: pipelineOpts?.headed,
   });
 
@@ -388,6 +391,22 @@ export async function runPipeline(
   writeFileSync(join(argoDir, 'scene-report.json'), JSON.stringify(report, null, 2), 'utf-8');
   console.log(formatSceneReport(report));
 
+  // Slow-scene warning — surface scenes that took materially longer than the
+  // median. Helpful signal when a long demo flakes intermittently: a scene
+  // that drifts from 6s → 18s on retries is the most likely culprit.
+  if (report.scenes.length >= 3) {
+    const durations = report.scenes.map((s) => s.durationMs).sort((a, b) => a - b);
+    const median = durations[Math.floor(durations.length / 2)];
+    const slowThreshold = median * 1.75;
+    const slow = report.scenes.filter((s) => s.durationMs > slowThreshold);
+    if (slow.length > 0) {
+      const lines = slow.map((s) => `    · ${s.scene}: ${(s.durationMs / 1000).toFixed(1)}s (median ${(median / 1000).toFixed(1)}s)`);
+      console.warn(
+        `\n⚠ Slow scenes (>${(slowThreshold / 1000).toFixed(1)}s, more than 1.75× median):\n${lines.join('\n')}`
+      );
+    }
+  }
+
   // Pipeline metadata — provenance tracking for voices, settings, resolution
   const manifest: Array<{ scene: string; voice?: string; speed?: number }> = (() => {
     try { return JSON.parse(readFileSync(manifestPath, 'utf-8')); } catch { return []; }
@@ -457,6 +476,7 @@ export async function runPipeline(
         sceneThumbnails: config.video.sceneThumbnails,
         captureMode: config.video.captureMode,
         jpegQuality: config.video.jpegQuality,
+        retries: pipelineOpts?.retries ?? config.video.retries,
         headed: pipelineOpts?.headed,
         argoSubdir: variantSubdir,
       });

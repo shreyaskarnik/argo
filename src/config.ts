@@ -52,6 +52,12 @@ export interface VideoConfig {
   /** JPEG quality (0-100) for the screencast frame stream. Higher = larger
    * intermediates and better stitched video. Default: 95. */
   jpegQuality?: number;
+  /** Number of times Playwright will retry the recording test on failure.
+   * Default 0 (no retries). Useful for transient browser hiccups (paint stalls,
+   * intermittent network, race conditions in showOverlay loops). Each retry
+   * re-runs the entire demo from scratch — for long demos consider chunking
+   * scenes or using checkpoints (see roadmap v2). CLI override: `--retries N`. */
+  retries?: number;
 }
 
 export type FilterTransitionType = 'fade-through-black' | 'dissolve' | 'wipe-left' | 'wipe-right';

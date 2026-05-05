@@ -28,6 +28,8 @@ export interface RecordOptions {
   captureMode?: 'webm' | 'jpeg-stitch';
   /** JPEG quality 0-100. Used by jpeg-stitch mode. */
   jpegQuality?: number;
+  /** Playwright test retry count on failure. Default 0. */
+  retries?: number;
 }
 
 export interface RecordResult {
@@ -64,11 +66,13 @@ function createPlaywrightConfig(demoName: string, options: RecordOptions, output
 
   // Recording is driven by `narration.startRecording(page)` which calls
   // page.screencast.start() at the first scene — no Playwright recordVideo here.
+  const retries = Math.max(0, Math.floor(options.retries ?? 0));
   return `import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   preserveOutput: 'always',
   outputDir: ${JSON.stringify(outputDir)},
+  retries: ${retries},
   projects: [
     {
       name: 'demos',
@@ -272,7 +276,23 @@ export async function record(demoName: string, options: RecordOptions): Promise<
         }
         if (error) {
           const output = [stdout, stderr].filter(Boolean).join('\n');
-          reject(new Error(`Playwright recording failed:\n${output}`));
+          // Append the last scene the demo entered before failing — `.scene-progress.jsonl`
+          // is appended on every narration.mark() so its tail is the failure point.
+          // Helps users map a Playwright stack to a scene without reading line numbers.
+          let lastScene = '';
+          try {
+            if (existsSync(progressPath)) {
+              const tail = readFileSync(progressPath, 'utf-8').trim().split('\n').pop();
+              if (tail) {
+                const parsed = JSON.parse(tail) as { scene?: string };
+                if (parsed.scene) lastScene = parsed.scene;
+              }
+            }
+          } catch { /* best-effort — never block on diagnostic parsing */ }
+          const sceneHint = lastScene
+            ? `\n\nLast scene entered: '${lastScene}' — failure occurred during this scene or its setup.`
+            : '';
+          reject(new Error(`Playwright recording failed:\n${output}${sceneHint}`));
           return;
         }
 

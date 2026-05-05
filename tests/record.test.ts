@@ -242,6 +242,44 @@ describe('record', () => {
     );
   });
 
+  it('embeds retries: 0 in the generated playwright config by default', async () => {
+    mockSubprocessSuccess();
+    await record('demo', {
+      demosDir: 'custom-demos',
+      baseURL: 'http://localhost:3000',
+      video: { width: 1280, height: 720 },
+      browser: 'chromium',
+    });
+    const configPath = join(tempDir, '.argo', 'demo', 'playwright.record.config.mjs');
+    expect(readFileSync(configPath, 'utf-8')).toContain('retries: 0');
+  });
+
+  it('embeds the requested retries count in the generated playwright config', async () => {
+    mockSubprocessSuccess();
+    await record('demo', {
+      demosDir: 'custom-demos',
+      baseURL: 'http://localhost:3000',
+      video: { width: 1280, height: 720 },
+      browser: 'chromium',
+      retries: 2,
+    });
+    const configPath = join(tempDir, '.argo', 'demo', 'playwright.record.config.mjs');
+    expect(readFileSync(configPath, 'utf-8')).toContain('retries: 2');
+  });
+
+  it('clamps negative retries to 0 and floors fractional retries', async () => {
+    mockSubprocessSuccess();
+    await record('demo', {
+      demosDir: 'custom-demos',
+      baseURL: 'http://localhost:3000',
+      video: { width: 1280, height: 720 },
+      browser: 'chromium',
+      retries: 2.7,
+    });
+    const configPath = join(tempDir, '.argo', 'demo', 'playwright.record.config.mjs');
+    expect(readFileSync(configPath, 'utf-8')).toContain('retries: 2');
+  });
+
   it('includes isMobile, hasTouch, and contextOptions in generated config', async () => {
     mockSubprocessSuccess();
 
