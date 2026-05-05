@@ -351,17 +351,25 @@ export class NarrationTimeline {
     // Stop CDP screencast first so no more frames arrive after we've sealed
     // the stream-encode pipeline. Then pad/flush ffmpeg and wait for it to
     // close — order matters: we want the full set of CDP frames in the mp4.
+    const errors: string[] = [];
     try {
       await stop();
     } catch (err) {
-      console.warn(`Warning: failed to stop screencast: ${(err as Error).message}`);
+      const message = `failed to stop screencast: ${(err as Error).message}`;
+      console.warn(`Warning: ${message}`);
+      errors.push(message);
     }
     if (cleanup) {
       try {
         await cleanup();
       } catch (err) {
-        console.warn(`Warning: failed to finalize stream-encode: ${(err as Error).message}`);
+        const message = `failed to finalize stream-encode: ${(err as Error).message}`;
+        console.warn(`Warning: ${message}`);
+        errors.push(message);
       }
+    }
+    if (errors.length > 0) {
+      throw new Error(`Recording teardown failed: ${errors.join('; ')}`);
     }
   }
 

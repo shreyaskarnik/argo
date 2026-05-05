@@ -21,7 +21,7 @@ import { generateSrt, generateVtt } from './subtitles.js';
 import { generateChapterMetadata } from './chapters.js';
 import { exportVideo, checkFfmpeg } from './export.js';
 import { applySpeedRampToTimeline } from './speed-ramp.js';
-import { shiftCameraMoves, type CameraMove } from './camera-move.js';
+import { scaleCameraMoves, shiftCameraMoves, type CameraMove } from './camera-move.js';
 import { generateFramePng } from './frame.js';
 import { resolveFreezes, adjustPlacementsForFreezes, totalFreezeDurationMs, type FreezeSpec } from './freeze.js';
 import { buildOverlayPngsForImport, isImportedVideo, type RenderedOverlayPng } from './overlays/render-to-png.js';
@@ -34,6 +34,8 @@ export interface PreviewExportConfig {
   preset?: string;
   crf?: number;
   fps?: number;
+  captureWidth?: number;
+  captureHeight?: number;
   outputWidth?: number;
   outputHeight?: number;
   deviceScaleFactor?: number;
@@ -1020,8 +1022,11 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             if (existsSync(cameraMovesPath)) {
               let moves: CameraMove[] = JSON.parse(readFileSync(cameraMovesPath, 'utf-8'));
               if (headTrimMs > 0) moves = shiftCameraMoves(moves, headTrimMs);
-              // Coords stay at CSS pixels — export's zoompan filter operates on
-              // already-downscaled output-dim frames. See pipeline.ts comment.
+              const captureW = ec?.captureWidth ?? ec?.outputWidth ?? 1920;
+              const captureH = ec?.captureHeight ?? ec?.outputHeight ?? 1080;
+              const outW = ec?.outputWidth ?? captureW;
+              const outH = ec?.outputHeight ?? captureH;
+              moves = scaleCameraMoves(moves, outW / captureW, outH / captureH);
               if (moves.length > 0) cameraMoves = moves;
             }
           } catch { /* optional */ }

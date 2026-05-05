@@ -101,8 +101,15 @@ export interface WatermarkConfig {
   position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
   /** Opacity (0.0 to 1.0). Default: 0.7. */
   opacity?: number;
-  /** Margin from edges in pixels. Default: 20. */
+  /** Margin from edges in pixels. Default: 20. Note: this is in OUTPUT pixels —
+   * at 4K output you may want to roughly double the value used at 1080p. */
   margin?: number;
+  /** Scale factor applied to the watermark image before overlay. Default: 1.
+   * Useful when exporting at higher resolutions (e.g. set to 2 when going from
+   * 1080p to 4K so the logo stays the same relative size on screen). The
+   * upstream PNG is resampled with bicubic — keep originals at 2× the target
+   * on-screen size for cleanest scaling. */
+  scale?: number;
 }
 
 export type BackgroundType = 'solid' | 'gradient' | 'image' | 'auto';
@@ -145,6 +152,10 @@ export interface VariantConfig {
 export interface ExportConfig {
   preset: string;
   crf: number;
+  /** Final output width. Defaults to `video.width` when omitted. */
+  outputWidth?: number;
+  /** Final output height. Defaults to `video.height` when omitted. */
+  outputHeight?: number;
   thumbnailPath?: string;
   formats?: Array<'1:1' | '9:16' | 'gif'>;
   /** Scene transition applied between scenes during export. */
@@ -239,6 +250,13 @@ export function defineConfig(userConfig: UserConfig): ArgoConfig {
     video,
     export: { ...DEFAULTS.export, ...userConfig.export },
     overlays: { ...DEFAULTS.overlays, ...userConfig.overlays },
+  };
+}
+
+export function resolveExportSize(config: Pick<ArgoConfig, 'video' | 'export'>): { width: number; height: number } {
+  return {
+    width: config.export.outputWidth ?? config.video.width,
+    height: config.export.outputHeight ?? config.video.height,
   };
 }
 

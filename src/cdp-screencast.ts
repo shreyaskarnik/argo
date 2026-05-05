@@ -202,8 +202,11 @@ export async function startCdpScreencast(
       try { await cdp.detach(); } catch { /* best-effort */ }
 
       if (frames.length === 0) {
-        console.warn('Warning: cdp-screencast: no frames captured — output mp4 not created.');
-        return;
+        throw new Error(
+          `cdp-screencast captured 0 frames at ${options.size.width}x${options.size.height}; ` +
+          `output mp4 was not created. Try re-running with ARGO_CDP_DIRECT=0 to fall back ` +
+          `to Playwright's onFrame recorder and compare behavior.`,
+        );
       }
 
       const concatPath = join(framesDir, 'concat.txt');

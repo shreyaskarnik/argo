@@ -251,3 +251,33 @@ describe('sceneDuration', () => {
     expect(timeline.sceneDuration('missing')).toBe(5000);
   });
 });
+
+describe('_closeRecording', () => {
+  it('throws when stream finalization fails', async () => {
+    const timeline = new NarrationTimeline();
+    const stop = vi.fn().mockResolvedValue(undefined);
+    const cleanup = vi.fn().mockRejectedValue(new Error('concat exited 1'));
+    (timeline as unknown as { _screencastStop: unknown })._screencastStop = stop;
+    (timeline as unknown as { _streamCleanup: unknown })._streamCleanup = cleanup;
+
+    await expect(timeline._closeRecording()).rejects.toThrow(
+      'Recording teardown failed: failed to finalize stream-encode: concat exited 1',
+    );
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces both stop and cleanup failures', async () => {
+    const timeline = new NarrationTimeline();
+    const stop = vi.fn().mockRejectedValue(new Error('stop failed'));
+    const cleanup = vi.fn().mockRejectedValue(new Error('cleanup failed'));
+    (timeline as unknown as { _screencastStop: unknown })._screencastStop = stop;
+    (timeline as unknown as { _streamCleanup: unknown })._streamCleanup = cleanup;
+
+    await expect(timeline._closeRecording()).rejects.toThrow(
+      'Recording teardown failed: failed to stop screencast: stop failed; failed to finalize stream-encode: cleanup failed',
+    );
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+});

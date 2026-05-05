@@ -210,4 +210,15 @@ describe('scaleCameraMoves', () => {
     const result = scaleCameraMoves(moves, 1);
     expect(result).toBe(moves);
   });
+
+  it('supports non-uniform output scaling', () => {
+    const moves: CameraMove[] = [
+      { startMs: 1000, durationMs: 400, x: 100, y: 200, w: 300, h: 400 },
+    ];
+    const scaled = scaleCameraMoves(moves, 2, 1.5);
+    expect(scaled[0].x).toBe(200);
+    expect(scaled[0].y).toBe(300);
+    expect(scaled[0].w).toBe(600);
+    expect(scaled[0].h).toBe(600);
+  });
 });

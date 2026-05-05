@@ -183,6 +183,26 @@ describe('record', () => {
     expect(existsSync(stalePath)).toBe(false);
   });
 
+  it('reports jpeg-stitch finalization failures without blaming startRecording', async () => {
+    execFileMock.mockImplementation((_cmd, _args, options, callback) => {
+      const argoOutputDir = options.env.ARGO_OUTPUT_DIR as string;
+      mkdirSync(resolve(tempDir, argoOutputDir), { recursive: true });
+      writeFileSync(resolve(tempDir, argoOutputDir, '.timing.json'), '{}');
+      callback(null, '', '');
+      return {} as never;
+    });
+
+    await expect(record('demo', {
+      demosDir: 'custom-demos',
+      baseURL: 'http://localhost:4321',
+      video: { width: 1280, height: 720 },
+      browser: 'chromium',
+      captureMode: 'jpeg-stitch',
+    })).rejects.toThrow(
+      `captureMode: 'jpeg-stitch' did not produce ${join('.argo', 'demo', 'video.mp4')}`,
+    );
+  });
+
   it('normalizes deviceScaleFactor and scales the screencast size env accordingly', async () => {
     mockSubprocessSuccess();
 

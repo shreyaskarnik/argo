@@ -2,7 +2,7 @@ import { Command, Option } from 'commander';
 import { basename } from 'node:path';
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { loadConfig, resolveDemoConfigPath, type ArgoConfig, type BrowserEngine } from './config.js';
+import { loadConfig, resolveDemoConfigPath, resolveExportSize, type ArgoConfig, type BrowserEngine } from './config.js';
 import { record } from './record.js';
 import { generateClips } from './tts/generate.js';
 import { exportVideo } from './export.js';
@@ -26,7 +26,7 @@ import {
 import { generateChapterMetadata } from './chapters.js';
 import { generateSrt, generateVtt } from './subtitles.js';
 import { applySpeedRampToTimeline, type Segment, type SceneSpeedMap } from './speed-ramp.js';
-import { shiftCameraMoves, type CameraMove } from './camera-move.js';
+import { scaleCameraMoves, shiftCameraMoves, type CameraMove } from './camera-move.js';
 import { resolveFreezes, adjustPlacementsForFreezes, totalFreezeDurationMs, type FreezeSpec } from './freeze.js';
 import { renderShaderTransitions } from './transitions/shader-render.js';
 import type { Placement } from './tts/align.js';
@@ -134,6 +134,7 @@ export function createProgram(): Command {
       validateDemoName(demo);
       const configPath = program.opts().config;
       const config = await loadConfigForDemo(demo, configPath);
+      const exportSize = resolveExportSize(config);
       const demoDir = `.argo/${demo}`;
       const timingPath = `${demoDir}/.timing.json`;
       const manifestPath = `${config.demosDir}/${demo}.scenes.json`;
@@ -225,8 +226,8 @@ export function createProgram(): Command {
         demoName: demo,
         manifestPath,
         placements: placements ?? [],
-        videoWidth: config.video.width,
-        videoHeight: config.video.height,
+        videoWidth: exportSize.width,
+        videoHeight: exportSize.height,
         deviceScaleFactor: config.video.deviceScaleFactor,
       });
 
@@ -248,8 +249,8 @@ export function createProgram(): Command {
           videoPath: videoFile,
           boundaries,
           shader: shaderTransition.shader,
-          width: config.video?.width ?? 1280,
-          height: config.video?.height ?? 720,
+          width: exportSize.width,
+          height: exportSize.height,
           fps: config.video?.fps ?? 30,
           cacheDir: `.argo/${demo}/shaders`,
         });
@@ -267,8 +268,8 @@ export function createProgram(): Command {
         preset: config.export.preset,
         crf: config.export.crf,
         fps: config.video.fps,
-        outputWidth: config.video.width,
-        outputHeight: config.video.height,
+        outputWidth: exportSize.width,
+        outputHeight: exportSize.height,
         deviceScaleFactor: config.video.deviceScaleFactor,
         thumbnailPath: config.export.thumbnailPath,
         chapterMetadataPath,
@@ -287,8 +288,9 @@ export function createProgram(): Command {
             if (existsSync(cameraMovesPath)) {
               let moves: CameraMove[] = JSON.parse(readFileSync(cameraMovesPath, 'utf-8'));
               if (headTrimMs && headTrimMs > 0) moves = shiftCameraMoves(moves, headTrimMs);
-              // Coords stay at CSS pixels — export's zoompan filter operates on
-              // already-downscaled output-dim frames. See pipeline.ts comment.
+              const scaleX = exportSize.width / config.video.width;
+              const scaleY = exportSize.height / config.video.height;
+              moves = scaleCameraMoves(moves, scaleX, scaleY);
               return moves;
             }
           } catch { /* optional */ }
@@ -430,6 +432,7 @@ export function createProgram(): Command {
     .action(async (demo: string | undefined, cmdOpts: { port?: number }) => {
       const configPath = program.opts().config;
       const config = await loadConfigForDemo(demo, configPath);
+      const exportSize = resolveExportSize(config);
 
       if (!demo) {
         // Dashboard mode — list all demos
@@ -442,8 +445,10 @@ export function createProgram(): Command {
             preset: config.export.preset,
             crf: config.export.crf,
             fps: config.video.fps,
-            outputWidth: config.video.width,
-            outputHeight: config.video.height,
+            captureWidth: config.video.width,
+            captureHeight: config.video.height,
+            outputWidth: exportSize.width,
+            outputHeight: exportSize.height,
             deviceScaleFactor: config.video.deviceScaleFactor,
             thumbnailPath: config.export.thumbnailPath,
             formats: config.export.formats,
@@ -479,8 +484,10 @@ export function createProgram(): Command {
           preset: config.export.preset,
           crf: config.export.crf,
           fps: config.video.fps,
-          outputWidth: config.video.width,
-          outputHeight: config.video.height,
+          captureWidth: config.video.width,
+          captureHeight: config.video.height,
+          outputWidth: exportSize.width,
+          outputHeight: exportSize.height,
           deviceScaleFactor: config.video.deviceScaleFactor,
           thumbnailPath: config.export.thumbnailPath,
           formats: config.export.formats,

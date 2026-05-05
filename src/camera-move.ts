@@ -270,17 +270,17 @@ export function shiftCameraMoves(moves: CameraMove[], offsetMs: number): CameraM
 }
 
 /**
- * Scale camera move coordinates by deviceScaleFactor.
- * During recording, bounding boxes are in CSS pixels but the video is
- * captured at scaled resolution. Coordinates need to match the video frame.
+ * Scale camera move coordinates from CSS layout pixels to output-frame pixels.
+ * During recording, bounding boxes are measured in CSS pixels; export may
+ * downscale, preserve, or upscale relative to that layout.
  */
-export function scaleCameraMoves(moves: CameraMove[], deviceScaleFactor: number): CameraMove[] {
-  if (deviceScaleFactor <= 1) return moves;
+export function scaleCameraMoves(moves: CameraMove[], scaleX: number, scaleY: number = scaleX): CameraMove[] {
+  if (scaleX === 1 && scaleY === 1) return moves;
   return moves.map((m) => ({
     ...m,
-    x: Math.round(m.x * deviceScaleFactor),
-    y: Math.round(m.y * deviceScaleFactor),
-    w: Math.round(m.w * deviceScaleFactor),
-    h: Math.round(m.h * deviceScaleFactor),
+    x: Math.round(m.x * scaleX),
+    y: Math.round(m.y * scaleY),
+    w: Math.round(m.w * scaleX),
+    h: Math.round(m.h * scaleY),
   }));
 }

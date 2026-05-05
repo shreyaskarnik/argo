@@ -10,14 +10,14 @@ import { generateSrt, generateVtt } from './subtitles.js';
 import { generateChapterMetadata } from './chapters.js';
 import { buildSceneReport, formatSceneReport } from './report.js';
 import { applySpeedRampToTimeline, type SceneSpeedMap } from './speed-ramp.js';
-import { shiftCameraMoves, type CameraMove } from './camera-move.js';
+import { scaleCameraMoves, shiftCameraMoves, type CameraMove } from './camera-move.js';
 import {
   resolveFreezes,
   adjustPlacementsForFreezes,
   totalFreezeDurationMs,
   type FreezeSpec,
 } from './freeze.js';
-import type { ArgoConfig } from './config.js';
+import { resolveExportSize, type ArgoConfig } from './config.js';
 import { getVideoDurationMs } from './media.js';
 import { buildOverlayPngsForImport } from './overlays/render-to-png.js';
 import { renderShaderTransitions } from './transitions/shader-render.js';
@@ -99,6 +99,8 @@ export async function runPipeline(
   }
 
   checkFfmpeg();
+
+  const exportSize = resolveExportSize(config);
 
   const argoDir = join('.argo', demoName);
   mkdirSync(argoDir, { recursive: true });
@@ -301,8 +303,8 @@ export async function runPipeline(
     demoName,
     manifestPath,
     placements: finalPlacements,
-    videoWidth: config.video.width,
-    videoHeight: config.video.height,
+    videoWidth: exportSize.width,
+    videoHeight: exportSize.height,
     deviceScaleFactor: config.video.deviceScaleFactor,
   });
 
@@ -315,8 +317,8 @@ export async function runPipeline(
     preset: config.export.preset,
     crf: config.export.crf,
     fps: config.video.fps,
-    outputWidth: config.video.width,
-    outputHeight: config.video.height,
+    outputWidth: exportSize.width,
+    outputHeight: exportSize.height,
     deviceScaleFactor: config.video.deviceScaleFactor,
     thumbnailPath: config.export.thumbnailPath,
     chapterMetadataPath,
@@ -340,8 +342,8 @@ export async function runPipeline(
   // Pre-render frame PNG for faster encoding
   if (config.export.frame) {
     const framePngPath = join(argoDir, 'frame.png');
-    const outW = config.video.width;
-    const outH = config.video.height;
+    const outW = exportSize.width;
+    const outH = exportSize.height;
     const pngResult = generateFramePng(framePngPath, outW, outH, config.export.frame);
     if (pngResult) {
       exportOptions.framePngPath = pngResult;
@@ -353,11 +355,14 @@ export async function runPipeline(
   if (tailPadMs !== undefined) exportOptions.tailPadMs = tailPadMs;
   if (headTrimMs > 0) exportOptions.headTrimMs = headTrimMs;
 
-  // Apply camera moves — shift for head trim. Coords stay at CSS pixels; the
-  // export's zoompan filter operates on already-downscaled output-dim frames
-  // (see export.ts: vFilters lanczos downscale runs before cameraMoves).
+  // Apply camera moves — shift for head trim, then scale from CSS layout
+  // coordinates to the final export dimensions when those differ.
   if (cameraMoves.length > 0) {
-    exportOptions.cameraMoves = shiftCameraMoves(cameraMoves, headTrimMs);
+    let moves = shiftCameraMoves(cameraMoves, headTrimMs);
+    const scaleX = exportSize.width / config.video.width;
+    const scaleY = exportSize.height / config.video.height;
+    moves = scaleCameraMoves(moves, scaleX, scaleY);
+    exportOptions.cameraMoves = moves;
   }
 
   // Pre-render shader transition frames when transition type is 'shader'
@@ -372,8 +377,8 @@ export async function runPipeline(
       videoPath,
       boundaries,
       shader: shaderTransition.shader,
-      width: config.video?.width ?? 1280,
-      height: config.video?.height ?? 720,
+      width: exportSize.width,
+      height: exportSize.height,
       fps: config.video?.fps ?? 30,
       cacheDir: join(argoDir, 'shaders'),
     });

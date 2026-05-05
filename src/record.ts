@@ -297,11 +297,20 @@ export async function record(demoName: string, options: RecordOptions): Promise<
         }
 
         // narration.startRecording() wrote the screencast directly to videoPath.
-        // If it's missing, the demo never called startRecording() — fail loudly.
+        // If it's missing, surface a mode-specific hint. In jpeg-stitch mode the
+        // demo may have called startRecording() successfully, but the recorder
+        // can still fail during finalization (zero CDP frames, ffmpeg concat
+        // failure, etc.).
         if (!existsSync(videoPath)) {
+          const hint = useJpegStitch
+            ? `The demo completed, but captureMode: 'jpeg-stitch' did not produce ${videoPath}. ` +
+              `This usually means the CDP/ffmpeg recorder failed during finalization, not that ` +
+              `startRecording() was never called. Re-run and inspect the Playwright error output ` +
+              `for a cdp-screencast or stream-encode failure.`
+            : `Ensure the demo calls 'await narration.startRecording(page)' before the first ` +
+              `'narration.mark()'.`;
           reject(new Error(
-            `No screencast recording found at ${videoPath}. ` +
-            `Ensure the demo calls 'await narration.startRecording(page)' before the first 'narration.mark()'.`
+            `No screencast recording found at ${videoPath}. ${hint}`
           ));
           return;
         }

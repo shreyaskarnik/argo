@@ -81,12 +81,21 @@ export const test = base.extend<{ narration: NarrationTimeline }>({
     const durations = loadSceneDurations();
     const timeline = new NarrationTimeline(durations);
     timeline.start();
+    let useError: unknown;
+    let closeError: unknown;
+    let flushError: unknown;
     try {
       await use(timeline);
+    } catch (err) {
+      useError = err;
     } finally {
       // Stop the screencast (if any) before flushing — the page is still
       // alive at this point because Playwright tears down fixtures bottom-up.
-      await timeline._closeRecording();
+      try {
+        await timeline._closeRecording();
+      } catch (err) {
+        closeError = err;
+      }
 
       // Restore original env to avoid leaking across tests in the same worker
       if (autoDiscovered) {
@@ -98,8 +107,16 @@ export const test = base.extend<{ narration: NarrationTimeline }>({
       const outputPath = argoDir
         ? `${argoDir}/.timing.json`
         : `narration-${testInfo.title}.json`;
-      await timeline.flush(outputPath);
+      try {
+        await timeline.flush(outputPath);
+      } catch (err) {
+        flushError = err;
+      }
     }
+
+    if (useError) throw useError;
+    if (closeError) throw closeError;
+    if (flushError) throw flushError;
   },
 });
 

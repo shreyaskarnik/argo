@@ -163,6 +163,29 @@ describe('runPipeline', () => {
     }));
   });
 
+  it('uses export output size overrides and scales camera moves to match', async () => {
+    writeFileSync(join(ARGO_DIR, '.timing.camera-moves.json'), JSON.stringify([
+      { startMs: 1200, durationMs: 400, x: 100, y: 120, w: 300, h: 240, scale: 1.4 },
+    ]));
+
+    const config = {
+      ...defaultConfig,
+      export: { ...defaultConfig.export, outputWidth: 3840, outputHeight: 2160 },
+      video: { ...defaultConfig.video, deviceScaleFactor: 2 },
+    };
+
+    await runPipeline(DEMO_NAME, config);
+
+    expect(mockedExportVideo).toHaveBeenCalledWith(expect.objectContaining({
+      outputWidth: 3840,
+      outputHeight: 2160,
+      deviceScaleFactor: 2,
+      cameraMoves: [
+        expect.objectContaining({ x: 200, y: 240, w: 600, h: 480 }),
+      ],
+    }));
+  });
+
   it('writes scene durations metadata for recording-time pacing', async () => {
     mockedGenerateClips.mockResolvedValue([
       { scene: 'intro', clipPath: join(ARGO_DIR, 'clips', 'intro.wav'), durationMs: 1200 },

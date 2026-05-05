@@ -6,6 +6,7 @@ import {
   defineConfig,
   loadConfig,
   demosProject,
+  resolveExportSize,
   type ArgoConfig,
   type TTSEngine,
 } from '../src/config.js';
@@ -62,6 +63,13 @@ describe('defineConfig', () => {
     const config = defineConfig({ export: { crf: 23 } });
     expect(config.export.preset).toBe('slow');
     expect(config.export.crf).toBe(23);
+  });
+
+  it('allows export output size overrides', () => {
+    const config = defineConfig({ export: { outputWidth: 3840, outputHeight: 2160 } });
+    expect(config.export.outputWidth).toBe(3840);
+    expect(config.export.outputHeight).toBe(2160);
+    expect(resolveExportSize(config)).toEqual({ width: 3840, height: 2160 });
   });
 
   it('preserves a custom TTS engine', () => {

@@ -3,6 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../src/config.js', () => ({
   loadConfig: vi.fn(),
   resolveDemoConfigPath: vi.fn().mockResolvedValue(undefined),
+  resolveExportSize: vi.fn((config: any) => ({
+    width: config.export?.outputWidth ?? config.video.width,
+    height: config.export?.outputHeight ?? config.video.height,
+  })),
 }));
 
 vi.mock('../src/record.js', () => ({

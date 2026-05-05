@@ -504,10 +504,21 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
       };
       const posExpr = positionMap[wmPosition];
 
-      // Build watermark filter chain
-      const wmRef = `${wmInputIdx}:v`;
+      // Build watermark filter chain. When `scale` is set, resample the
+      // watermark BEFORE applying opacity so the alpha channel is honored
+      // through the scale (`scale` defaults to bicubic sampling). Required
+      // when exporting at higher resolutions than the source PNG was
+      // designed for — at 4K, a 200×60 logo built for 1080p would otherwise
+      // render at 200×60 on a 3840-wide canvas, visually half the size.
+      let wmRef: string = `${wmInputIdx}:v`;
+      const wmScale = watermark.scale;
+      if (typeof wmScale === 'number' && wmScale > 0 && wmScale !== 1) {
+        filterParts.push(
+          `[${wmRef}]scale=iw*${wmScale}:ih*${wmScale}:flags=bicubic[wmscaled]`,
+        );
+        wmRef = 'wmscaled';
+      }
       const needsOpacity = wmOpacity < 1.0;
-
       if (needsOpacity) {
         filterParts.push(`[${wmRef}]colorchannelmixer=aa=${wmOpacity}[wm]`);
       }

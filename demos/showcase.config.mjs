@@ -10,10 +10,11 @@ export default defineConfig({
     height: 1080,
     fps: 30,
     browser: 'chromium',
-    // 2x DPI capture — page renders at 3840×2160, export downscales with lanczos.
-    // Requires --force-device-scale-factor flag (auto-applied by record.ts) so the
-    // CDP screencast actually delivers 4K JPEGs (without the flag, screencast caps
-    // at viewport CSS pixels regardless of DPR).
+    // 2x DPI capture — page keeps the normal 1920px desktop layout while the
+    // recorder captures a 3840×2160 source.
+    // Requires --force-device-scale-factor flag (auto-applied by record.ts) so
+    // the CDP screencast actually delivers 4K JPEGs (without the flag,
+    // screencast caps at viewport CSS pixels regardless of DPR).
     deviceScaleFactor: 2,
     // EXPERIMENT (feat/jpeg-stitch): capture all frames as high-quality JPEGs
     // and stitch in post with libx264 — bypasses the engine's VP8 encoder.
@@ -31,6 +32,10 @@ export default defineConfig({
     // Pin the encoder so preview re-export matches pipeline output exactly.
     // Without this, preview defaults to GPU (videotoolbox watercolor risk).
     encoder: 'cpu',
+    // Keep the 1920px-wide desktop layout during recording, but export a 4K
+    // master so the 2x capture is not downscaled back to 1080p.
+    outputWidth: 3840,
+    outputHeight: 2160,
     transition: { type: 'shader', shader: 'crosswarp', durationMs: 1200 },
     // speedRamp: { gapSpeed: 2.0, minGapMs: 600 },  // disabled for now — conflicts with transitions
     // formats: ['gif'],  // too long for GIF — use argo clip for scene-level GIFs
@@ -39,7 +44,12 @@ export default defineConfig({
       src: 'assets/logo-watermark.png',
       position: 'bottom-right',
       opacity: 0.16,
-      margin: 26,
+      // 4K master: scale up so the watermark stays visually-relative to a
+      // 1080p master, and bump margin proportionally. The PNG is sampled with
+      // bicubic during scale — for cleanest output, replace with a 2× asset
+      // when one is available.
+      scale: 2,
+      margin: 52,
     },
     sharpen: true,
     // Frame: wrap the recording in a styled frame with padding, rounded corners,
