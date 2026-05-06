@@ -30,6 +30,14 @@ export interface RecordOptions {
   jpegQuality?: number;
   /** Playwright test retry count on failure. Default 0. */
   retries?: number;
+  /** EXPERIMENTAL — pass `--enable-features=CanvasDrawElement` to chromium. */
+  experimentalCanvasDrawElement?: boolean;
+  /** Optional Playwright browser channel (chrome-canary, chrome-beta, ...). */
+  browserChannel?: string;
+  /** When true, pass `--allow-file-access-from-files` so file:// pages can
+   * fetch sibling assets (relative GLTF/textures used by hyperframes
+   * compositions). Toggled on automatically by renderComposition. */
+  allowFileAccessFromFiles?: boolean;
 }
 
 export interface RecordResult {
@@ -59,9 +67,21 @@ function createPlaywrightConfig(demoName: string, options: RecordOptions, output
   // emulated device pixel ratio). The `--force-device-scale-factor` launch flag
   // pins the renderer's native DPR so screencast frames come out at true 2x/3x
   // resolution — required for supersampled lanczos downscale in export.
-  const needsDpiFlag = browser === 'chromium' && deviceScaleFactor > 1;
-  const launchOptionsField = needsDpiFlag
-    ? `\n        launchOptions: { args: ['--force-device-scale-factor=${deviceScaleFactor}'] },`
+  const launchArgs: string[] = [];
+  if (browser === 'chromium' && deviceScaleFactor > 1) {
+    launchArgs.push(`--force-device-scale-factor=${deviceScaleFactor}`);
+  }
+  if (browser === 'chromium' && options.experimentalCanvasDrawElement) {
+    launchArgs.push('--enable-features=CanvasDrawElement');
+  }
+  if (browser === 'chromium' && options.allowFileAccessFromFiles) {
+    launchArgs.push('--allow-file-access-from-files');
+  }
+  const launchOptionsField = launchArgs.length > 0
+    ? `\n        launchOptions: { args: ${JSON.stringify(launchArgs)} },`
+    : '';
+  const channelField = options.browserChannel
+    ? `\n        channel: ${JSON.stringify(options.browserChannel)},`
     : '';
 
   // Recording is driven by `narration.startRecording(page)` which calls
@@ -80,7 +100,7 @@ export default defineConfig({
       testMatch: ${JSON.stringify(`${demoName}.demo.ts`)},
       use: {
         headless: ${options.headed ? 'false' : 'true'},
-        browserName: ${JSON.stringify(browser)},
+        browserName: ${JSON.stringify(browser)},${channelField}
         baseURL: ${JSON.stringify(options.baseURL)},
         viewport: { width: ${width}, height: ${height} },
         deviceScaleFactor: ${deviceScaleFactor},${extraUse}${launchOptionsField}

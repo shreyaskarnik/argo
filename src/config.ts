@@ -52,6 +52,17 @@ export interface VideoConfig {
   /** JPEG quality (0-100) for the screencast frame stream. Higher = larger
    * intermediates and better stitched video. Default: 95. */
   jpegQuality?: number;
+  /** EXPERIMENTAL — pass `--enable-features=CanvasDrawElement` to chromium so
+   * compositions that depend on the WICG html-in-canvas API can call
+   * `drawElementImage`. Requires Chrome Canary or Brave 147+. No effect on
+   * non-chromium browsers. */
+  experimentalCanvasDrawElement?: boolean;
+  /** Optional Playwright browser channel (`chrome-canary`, `chrome-beta`,
+   * etc.). When set, Playwright launches a system-installed channel instead
+   * of its bundled Chromium. macOS install: `brew install --cask
+   * google-chrome@canary`. Pair with `experimentalCanvasDrawElement: true`
+   * for compositions that need html-in-canvas. */
+  browserChannel?: 'chrome' | 'chrome-beta' | 'chrome-canary' | 'chrome-dev' | 'msedge' | 'msedge-beta' | 'msedge-canary' | 'msedge-dev';
   /** Number of times Playwright will retry the recording test on failure.
    * Default 0 (no retries). Useful for transient browser hiccups (paint stalls,
    * intermittent network, race conditions in showOverlay loops). Each retry

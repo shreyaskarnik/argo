@@ -151,6 +151,12 @@ export async function runPipeline(
     captureMode: config.video.captureMode,
     jpegQuality: config.video.jpegQuality,
     retries: pipelineOpts?.retries ?? config.video.retries,
+    experimentalCanvasDrawElement: config.video.experimentalCanvasDrawElement,
+    browserChannel: config.video.browserChannel,
+    // Compositions loaded via file:// need file-from-file fetches for relative
+    // assets (GLTF, textures). Default on when html-in-canvas is enabled —
+    // both flags travel together for renderComposition's use case.
+    allowFileAccessFromFiles: config.video.experimentalCanvasDrawElement,
     headed: pipelineOpts?.headed,
   });
 
@@ -482,6 +488,9 @@ export async function runPipeline(
         captureMode: config.video.captureMode,
         jpegQuality: config.video.jpegQuality,
         retries: pipelineOpts?.retries ?? config.video.retries,
+        experimentalCanvasDrawElement: config.video.experimentalCanvasDrawElement,
+        browserChannel: config.video.browserChannel,
+        allowFileAccessFromFiles: config.video.experimentalCanvasDrawElement,
         headed: pipelineOpts?.headed,
         argoSubdir: variantSubdir,
       });
