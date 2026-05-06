@@ -77,6 +77,13 @@ function createPlaywrightConfig(demoName: string, options: RecordOptions, output
   if (browser === 'chromium' && options.allowFileAccessFromFiles) {
     launchArgs.push('--allow-file-access-from-files');
   }
+  // WebGL flags so Three.js / shader compositions render in headless chromium.
+  // Mirrors the args Argo's shader-render uses for boundary-frame pre-render.
+  // Auto-enabled together with experimentalCanvasDrawElement since the only
+  // current consumers (hyperframes blocks) need both.
+  if (browser === 'chromium' && options.experimentalCanvasDrawElement) {
+    launchArgs.push('--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist');
+  }
   const launchOptionsField = launchArgs.length > 0
     ? `\n        launchOptions: { args: ${JSON.stringify(launchArgs)} },`
     : '';

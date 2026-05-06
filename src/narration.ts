@@ -94,6 +94,14 @@ export class NarrationTimeline {
    * No-op when ARGO_SCREENCAST_PATH is unset (e.g., running standalone in
    * VS Code without the argo pipeline). The fixture wires the env var.
    */
+  /** True once `startRecording()` has been called and the screencast is
+   *  active. Used by `renderComposition` to decide whether to start the
+   *  recording itself (after a composition's warmup) or leave it alone
+   *  when the demo started recording earlier for a recorded scene. */
+  get isRecording(): boolean {
+    return this._screencastStop !== null;
+  }
+
   async startRecording(page: ScreencastPage, options: StartRecordingOptions = {}): Promise<void> {
     const screencastPath = process.env.ARGO_SCREENCAST_PATH;
     if (!screencastPath) {
