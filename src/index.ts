@@ -80,6 +80,17 @@ export {
   type CursorHighlightOptions,
 } from './cursor.js';
 
+// Composition — embed a self-contained HTML composition as an Argo scene.
+// Follows hyperframes' contract (data-composition-id + paused master timeline
+// + ready signal) so a composition that runs in hyperframes runs unchanged
+// in Argo. Argo adds `window.__argoVideoSrc` so compositions can wrap an
+// Argo recording (e.g. 3D device frame textured via html-in-canvas).
+export {
+  renderComposition,
+  readCompositionDuration,
+  type RenderCompositionOptions,
+} from './composition.js';
+
 // TTS
 export { type TTSEngineOptions } from './tts/engine.js';
 export { engines } from './tts/engines/index.js';

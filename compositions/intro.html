@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Argo intro composition</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #0f172a; overflow: hidden; }
+  body { display: grid; place-items: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; color: #fff; }
+  /* Layout the end-state: title centered, subtitle below, accent dot top-right.
+     GSAP animates FROM offscreen/invisible to these positions. */
+  .stage { position: relative; width: 100%; height: 100%; display: grid; place-items: center; gap: 24px; grid-template-rows: auto auto; align-content: center; }
+  .title { font-size: 144px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .subtitle { font-size: 32px; opacity: 0.7; letter-spacing: 0.02em; font-weight: 400; }
+  .accent { position: absolute; top: 80px; right: 80px; width: 24px; height: 24px; border-radius: 50%; background: #f472b6; box-shadow: 0 0 80px rgba(244, 114, 182, 0.6); }
+</style>
+</head>
+<body>
+  <div data-composition-id="intro" data-width="1920" data-height="1080" data-duration="3.5">
+    <div class="stage">
+      <div class="accent"></div>
+      <div class="title">Argo</div>
+      <div class="subtitle">Demos as code.</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    // Composition contract: build a paused master timeline that argo's
+    // renderComposition resumes after marking the scene. Determinism: no
+    // Math.random / Date.now / requestAnimationFrame — all motion is pure
+    // function of timeline.time().
+    const tl = gsap.timeline({ paused: true });
+    tl.from('.accent', { scale: 0, opacity: 0, duration: 0.6, ease: 'back.out(2)' }, 0);
+    tl.from('.title', { y: 80, opacity: 0, duration: 0.9, ease: 'power3.out' }, 0.2);
+    tl.from('.subtitle', { y: 40, opacity: 0, duration: 0.7, ease: 'power2.out' }, 0.5);
+    // Hold then exit (renderComposition handles cleanup; this just animates
+    // the visible window before the scene ends).
+    tl.to('.title', { letterSpacing: '-0.02em', duration: 1.2, ease: 'sine.inOut' }, 1.0);
+    tl.to(['.title', '.subtitle', '.accent'], { opacity: 0, duration: 0.5, ease: 'power2.in' }, 3.0);
+
+    window.__timelines = window.__timelines || {};
+    window.__timelines['intro'] = tl;
+    window.__compositionReady = Promise.resolve();
+  </script>
+</body>
+</html>
