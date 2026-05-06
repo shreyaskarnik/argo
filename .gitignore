@@ -21,9 +21,15 @@ skills/argo-guide-workspace/
 videos/clips/
 
 # Hyperframes-installed blocks — install via `npx hyperframes add <block>` per
-# project (see demos/composition-iphone.demo.ts for the install command).
-# Blocks are version-pinned by hyperframes' CLI; tracking them here would
-# fork the upstream artifacts.
+# project (see demos/composition-trio.demo.ts for the install command). Blocks
+# are version-pinned by hyperframes' CLI; tracking them here would fork the
+# upstream artifacts.
 models/
+compositions/apple-*
+compositions/blue-sweater-*
 compositions/vfx-*
 compositions/experimental-*
+compositions/components/
+assets/joe-sai-avatar.png
+assets/sfx-production.wav
+assets/sfx/
