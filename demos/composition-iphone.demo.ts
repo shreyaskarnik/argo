@@ -3,9 +3,12 @@
 // shapes — shared composition contract and renderComposition embedding —
 // against a real hyperframes block (not a hand-rolled sample).
 //
-// Block install (one-time):
-//   /opt/homebrew/opt/node@22/bin/node node_modules/hyperframes/dist/cli.js \
-//     add vfx-iphone-device
+// Block install (one-time, requires Node 22+ for the hyperframes CLI):
+//   PATH="/opt/homebrew/opt/node@22/bin:$PATH" \
+//     npx hyperframes add vfx-iphone-device
+//
+// Drops `compositions/vfx-iphone-device.html` plus `models/{iphone,macbook}.glb`
+// + texture PNGs into the project. These are gitignored — install per checkout.
 import { writeFileSync, appendFileSync } from 'node:fs';
 import { test } from '@argo-video/cli';
 import { renderComposition } from '@argo-video/cli';

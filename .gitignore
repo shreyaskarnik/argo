@@ -19,3 +19,11 @@ assets/ref-voice.wav
 *.bak
 skills/argo-guide-workspace/
 videos/clips/
+
+# Hyperframes-installed blocks — install via `npx hyperframes add <block>` per
+# project (see demos/composition-iphone.demo.ts for the install command).
+# Blocks are version-pinned by hyperframes' CLI; tracking them here would
+# fork the upstream artifacts.
+models/
+compositions/vfx-*
+compositions/experimental-*
