@@ -31,6 +31,11 @@
     "gsap": "^3.15.0",
     "kokoro-js": "^1.2.1"
   },
+  "overrides": {
+    "kokoro-js": {
+      "@huggingface/transformers": "$@huggingface/transformers"
+    }
+  },
   "optionalDependencies": {
     "@elevenlabs/elevenlabs-js": "^2.0.0",
     "@google/genai": "^1.0.0",
