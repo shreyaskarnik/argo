@@ -292,6 +292,7 @@ export async function record(demoName: string, options: RecordOptions): Promise<
           ARGO_DEFAULT_PLACEMENT: options.defaultPlacement ?? '',
           ARGO_ALLOW_RAW_GSAP: options.allowRawGsap ? '1' : '',
           ARGO_SCENE_DURATIONS_PATH: path.resolve(path.join('.argo', demoName, '.scene-durations.json')),
+          ARGO_TRANSCRIPT_PATH: path.resolve(path.join('.argo', demoName, '.scene-transcripts.json')),
           ARGO_OVERLAYS_PATH: path.resolve(path.join(options.demosDir, `${demoName}.scenes.json`)),
         },
       }, (error, stdout, stderr) => {

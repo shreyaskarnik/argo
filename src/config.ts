@@ -7,10 +7,26 @@ export type { TTSEngine };
 
 // ---- Types ----
 
+/** Options for the optional Whisper-based word-level transcription pass.
+ *  `true` accepts defaults; an object overrides model or language. */
+export type TranscribeOption =
+  | boolean
+  | {
+      /** HuggingFace Hub model id. Default `onnx-community/whisper-base.en`. */
+      model?: string;
+      /** Source language hint (e.g., 'en', 'fr'). Auto-detect if omitted. */
+      language?: string;
+    };
+
 export interface TTSConfig {
   defaultVoice: string;
   defaultSpeed: number;
   engine?: TTSEngine;
+  /** Run Whisper STT over each generated TTS clip to produce word-level
+   *  timestamps. Off by default in v0.38.0 — opt in to enable
+   *  `narration.wordTiming(scene)` and the `narration.transcript.json`
+   *  public artifact. */
+  transcribe?: TranscribeOption;
 }
 
 export type BrowserEngine = 'chromium' | 'webkit' | 'firefox';

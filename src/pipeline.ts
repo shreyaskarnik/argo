@@ -135,6 +135,7 @@ export async function runPipeline(
     engine: config.tts.engine,
     projectRoot: '.',
     defaults: { voice: config.tts.defaultVoice, speed: config.tts.defaultSpeed },
+    transcribe: config.tts.transcribe,
   });
 
   const isSilent = clipResults.length === 0;
@@ -146,6 +147,18 @@ export async function runPipeline(
   }
   const sceneDurationsPath = join(argoDir, '.scene-durations.json');
   writeFileSync(sceneDurationsPath, JSON.stringify(sceneDurations, null, 2), 'utf-8');
+
+  // Write the scene-relative transcript sidecar so demo scripts can use
+  // narration.wordTiming(scene) during recording. Only emitted when
+  // transcription was enabled and produced data; the absolute-time
+  // public artifact (narration.transcript.json) is written later, after
+  // alignment.
+  let sceneTranscriptsPath: string | undefined;
+  if (clipResults.some((c) => c.wordTimings)) {
+    const sceneTranscripts = buildSceneRelativeTranscript(clipResults, config.tts.transcribe);
+    sceneTranscriptsPath = join(argoDir, '.scene-transcripts.json');
+    writeFileSync(sceneTranscriptsPath, JSON.stringify(sceneTranscripts, null, 2), 'utf-8');
+  }
 
   // Note: AI music generation (MusicGen) is a preview-only feature.
   // Users generate + audition clips in the browser (WebGPU), then save
@@ -235,6 +248,19 @@ export async function runPipeline(
     writeFileSync(join(argoDir, 'narration-aligned.wav'), alignedWav);
     overflowMs = aligned.overflowMs;
     tailPadMs = overflowMs > 0 ? overflowMs + 100 : undefined;
+
+    // Aggregate per-clip word timings into recording-absolute time, keyed
+    // by scene. Public artifact consumed by subtitles, compositions, and
+    // the preview UI. Only emitted when transcription was enabled and
+    // produced data — silently skipped otherwise.
+    if (clipResults.some((c) => c.wordTimings)) {
+      const transcript = buildAggregateTranscript(clipResults, aligned.placements, config.tts.transcribe);
+      writeFileSync(
+        join(argoDir, 'narration.transcript.json'),
+        JSON.stringify(transcript, null, 2),
+        'utf-8',
+      );
+    }
 
     if (tailPadMs !== undefined) {
       console.warn(
@@ -665,4 +691,73 @@ export async function runPipeline(
   }
 
   return outputPath;
+}
+
+interface AggregateTranscript {
+  version: 1;
+  model: string;
+  language?: string;
+  scenes: Record<string, Array<{ text: string; start: number; end: number }>>;
+}
+
+/** Build the scene-relative transcript sidecar — same shape as the
+ *  aggregate, but timestamps stay clip-relative so they're meaningful
+ *  during recording (when we don't yet know the placement offsets). */
+function buildSceneRelativeTranscript(
+  clipResults: Array<{ scene: string; wordTimings?: Array<{ text: string; start: number; end: number }> }>,
+  transcribeCfg: unknown,
+): AggregateTranscript {
+  const scenes: AggregateTranscript['scenes'] = {};
+  for (const clip of clipResults) {
+    if (!clip.wordTimings) continue;
+    scenes[clip.scene] = clip.wordTimings.map((w) => ({
+      text: w.text,
+      start: +w.start.toFixed(3),
+      end: +w.end.toFixed(3),
+    }));
+  }
+  const cfg = (typeof transcribeCfg === 'object' && transcribeCfg !== null
+    ? transcribeCfg as { model?: string; language?: string }
+    : {});
+  return {
+    version: 1,
+    model: cfg.model ?? 'Xenova/whisper-base.en',
+    ...(cfg.language ? { language: cfg.language } : {}),
+    scenes,
+  };
+}
+
+/** Combine per-clip word-level transcripts into one scene-keyed map with
+ *  recording-absolute timestamps. Each clip's words land at
+ *  `placement.startMs/1000 + word.start` so consumers can map a video
+ *  time directly to a word without knowing which clip it came from. */
+function buildAggregateTranscript(
+  clipResults: Array<{ scene: string; wordTimings?: Array<{ text: string; start: number; end: number }> }>,
+  placements: Array<{ scene: string; startMs: number; endMs: number }>,
+  transcribeCfg: unknown,
+): AggregateTranscript {
+  const scenes: AggregateTranscript['scenes'] = {};
+  const placementByScene = new Map(placements.map((p) => [p.scene, p]));
+
+  for (const clip of clipResults) {
+    if (!clip.wordTimings) continue;
+    const placement = placementByScene.get(clip.scene);
+    if (!placement) continue;
+    const offsetSec = placement.startMs / 1000;
+    scenes[clip.scene] = clip.wordTimings.map((w) => ({
+      text: w.text,
+      start: +(offsetSec + w.start).toFixed(3),
+      end: +(offsetSec + w.end).toFixed(3),
+    }));
+  }
+
+  const cfg = (typeof transcribeCfg === 'object' && transcribeCfg !== null
+    ? transcribeCfg as { model?: string; language?: string }
+    : {});
+  return {
+    version: 1,
+    model: cfg.model ?? 'Xenova/whisper-base.en',
+    ...(cfg.language ? { language: cfg.language } : {}),
+    scenes,
+  };
 }
