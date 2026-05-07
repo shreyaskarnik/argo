@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Argo launch outro</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #0f172a; overflow: hidden; }
+  body { display: grid; place-items: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; color: #fff; }
+  .stage { position: relative; width: 100%; height: 100%; display: grid; place-items: center; gap: 32px; grid-template-rows: auto auto auto; align-content: center; }
+  .logo { font-size: 144px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #f472b6 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .tagline { font-size: 28px; opacity: 0.65; font-weight: 400; }
+  .url-pill { padding: 14px 28px; border: 1.5px solid rgba(255,255,255,0.18); border-radius: 999px; font-size: 22px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: rgba(255,255,255,0.85); letter-spacing: 0.02em; }
+  .ring { position: absolute; width: 880px; height: 880px; border-radius: 50%; border: 1px solid rgba(96, 165, 250, 0.18); }
+</style>
+</head>
+<body>
+  <div data-composition-id="argo-launch-outro" data-width="1920" data-height="1080" data-duration="3">
+    <div class="stage">
+      <div class="ring"></div>
+      <div class="logo">Argo</div>
+      <div class="tagline">Demos as code.</div>
+      <div class="url-pill">npx argo init</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.from('.ring', { scale: 0.6, opacity: 0, duration: 1.2, ease: 'expo.out' }, 0);
+    tl.from('.logo', { scale: 0.85, opacity: 0, duration: 0.8, ease: 'back.out(1.6)' }, 0.15);
+    tl.from('.tagline', { y: 20, opacity: 0, duration: 0.6, ease: 'power2.out' }, 0.5);
+    tl.from('.url-pill', { y: 18, opacity: 0, duration: 0.6, ease: 'power3.out' }, 0.8);
+    tl.to('.ring', { rotation: 90, duration: 2.2, ease: 'sine.inOut' }, 0.5);
+    tl.to(['.ring', '.logo', '.tagline', '.url-pill'], { opacity: 0, duration: 0.4, ease: 'power2.in' }, 2.6);
+
+    window.__timelines = window.__timelines || {};
+    window.__timelines['argo-launch-outro'] = tl;
+    window.__compositionReady = Promise.resolve();
+  </script>
+</body>
+</html>

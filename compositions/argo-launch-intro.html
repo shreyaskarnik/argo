@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Argo launch intro</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #0f172a; overflow: hidden; }
+  body { display: grid; place-items: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; color: #fff; }
+  .stage { position: relative; width: 100%; height: 100%; display: grid; place-items: center; gap: 28px; grid-template-rows: auto auto auto; align-content: center; padding: 0 80px; box-sizing: border-box; }
+  .eyebrow { font-size: 22px; letter-spacing: 0.32em; opacity: 0.55; text-transform: uppercase; font-weight: 600; }
+  .title { font-size: 184px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #f472b6 100%); -webkit-background-clip: text; background-clip: text; color: transparent; text-align: center; }
+  .subtitle { font-size: 36px; opacity: 0.75; letter-spacing: 0.01em; font-weight: 400; }
+  .accent-l { position: absolute; top: 96px; left: 96px; width: 16px; height: 16px; border-radius: 50%; background: #60a5fa; box-shadow: 0 0 60px rgba(96, 165, 250, 0.6); }
+  .accent-r { position: absolute; bottom: 96px; right: 96px; width: 16px; height: 16px; border-radius: 50%; background: #f472b6; box-shadow: 0 0 60px rgba(244, 114, 182, 0.6); }
+</style>
+</head>
+<body>
+  <div data-composition-id="argo-launch-intro" data-width="1920" data-height="1080" data-duration="4">
+    <div class="stage">
+      <div class="accent-l"></div>
+      <div class="accent-r"></div>
+      <div class="eyebrow">Now demoing</div>
+      <div class="title">Argo</div>
+      <div class="subtitle">Playwright in. Launch assets out.</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    // Paused master timeline — Argo's renderComposition resumes it after
+    // marking the scene. Determinism: no Math.random / Date.now / rAF, all
+    // motion is a pure function of timeline.time().
+    const tl = gsap.timeline({ paused: true });
+    tl.from('.accent-l', { scale: 0, opacity: 0, duration: 0.6, ease: 'back.out(2.2)' }, 0);
+    tl.from('.accent-r', { scale: 0, opacity: 0, duration: 0.6, ease: 'back.out(2.2)' }, 0.1);
+    tl.from('.eyebrow', { y: 24, opacity: 0, duration: 0.5, ease: 'power2.out' }, 0.2);
+    tl.from('.title', { y: 100, opacity: 0, duration: 0.9, ease: 'expo.out' }, 0.3);
+    tl.from('.subtitle', { y: 30, opacity: 0, duration: 0.7, ease: 'power2.out' }, 0.7);
+    tl.to('.title', { letterSpacing: '-0.025em', duration: 1.6, ease: 'sine.inOut' }, 1.2);
+    tl.to(['.accent-l', '.accent-r'], { boxShadow: '0 0 100px rgba(255,255,255,0.4)', duration: 1.2, ease: 'sine.inOut', stagger: 0.1 }, 1.4);
+    tl.to(['.eyebrow', '.title', '.subtitle', '.accent-l', '.accent-r'], { opacity: 0, y: -16, duration: 0.5, ease: 'power2.in', stagger: 0.04 }, 3.4);
+
+    window.__timelines = window.__timelines || {};
+    window.__timelines['argo-launch-intro'] = tl;
+    window.__compositionReady = Promise.resolve();
+  </script>
+</body>
+</html>

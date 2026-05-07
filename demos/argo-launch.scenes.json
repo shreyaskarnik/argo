@@ -1,0 +1,5 @@
+[
+  { "scene": "intro" },
+  { "scene": "hero", "text": "This is Argo. Playwright in. Launch assets out." },
+  { "scene": "outro" }
+]
