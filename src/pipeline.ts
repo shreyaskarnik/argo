@@ -38,6 +38,28 @@ export interface PipelineOptions {
 }
 
 /**
+ * Read the per-demo composition audio sidecar written by `renderComposition`
+ * for each hyperframes-block <audio> child. Returns one entry per audio track
+ * with its absolute path + scene-relative start time. Empty array if the
+ * sidecar doesn't exist (no compositions in the demo, or none had audio).
+ */
+function readCompositionAudioSidecar(argoDir: string): Array<{ src: string; startMs: number; volume?: number }> {
+  const sidecar = join(argoDir, '.composition-audio.jsonl');
+  if (!existsSync(sidecar)) return [];
+  const tracks: Array<{ src: string; startMs: number; volume?: number }> = [];
+  for (const line of readFileSync(sidecar, 'utf-8').split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const parsed = JSON.parse(line) as { src?: string; startMs?: number; volume?: number };
+      if (parsed.src && typeof parsed.startMs === 'number') {
+        tracks.push({ src: parsed.src, startMs: parsed.startMs, volume: parsed.volume });
+      }
+    } catch { /* malformed line — skip */ }
+  }
+  return tracks;
+}
+
+/**
  * Discover all demo names in the demos directory by looking for `.scenes.json` files.
  */
 export function discoverDemos(demosDir: string): string[] {
@@ -336,6 +358,10 @@ export async function runPipeline(
     loudnorm: config.export.audio?.loudnorm,
     musicPath: config.export.audio?.music,
     musicVolume: config.export.audio?.musicVolume,
+    // Composition audio sidecar (written by renderComposition for each
+    // <audio> child of a hyperframes block). Each entry gets adelayed to
+    // its scene start in the export mix.
+    extraAudioTracks: readCompositionAudioSidecar(argoDir),
     watermark: config.export.watermark,
     sharpen: config.export.sharpen,
     frame: config.export.frame,

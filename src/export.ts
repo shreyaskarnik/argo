@@ -50,6 +50,14 @@ export interface ExportOptions {
   musicPath?: string;
   /** Music volume level (0.0 to 1.0). Default: 0.15. Mixed at a constant level. */
   musicVolume?: number;
+  /** Extra audio tracks (typically from hyperframes compositions whose
+   * `<audio>` elements aren't captured by CDP screencast). Each track is
+   * delayed to its `startMs`, volume-scaled, and amix'd with the narration. */
+  extraAudioTracks?: Array<{
+    src: string;
+    startMs: number;
+    volume?: number;
+  }>;
   /** Post-export camera moves (zoom/pan) recorded during Playwright session. */
   cameraMoves?: CameraMove[];
   /** Resolved freeze-frame holds — applied BEFORE transitions (they change the timeline). */
@@ -259,6 +267,17 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     musicInputIdx = nextInput++;
     args.push('-stream_loop', '-1', '-i', musicPath);
   }
+
+  // Extra audio tracks (typically from hyperframes compositions whose
+  // <audio> children play SFX during the GSAP timeline). Each track gets
+  // its own ffmpeg input, gets adelayed to its scene start, volume-scaled,
+  // then amix'd with narration in the audio mixing block below.
+  const extraAudioTracks = (options.extraAudioTracks ?? []).filter((t) => existsSync(t.src));
+  const extraAudioInputs = extraAudioTracks.map((t) => {
+    const idx = nextInput++;
+    args.push('-i', t.src);
+    return { ...t, inputIdx: idx };
+  });
 
   // Build video filter chain
   const filterParts: string[] = [];
@@ -582,8 +601,41 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     }
   }
 
+  // Extra audio tracks (composition SFX) — adelay each to its scene start,
+  // apply volume, then amix all surviving audio sources together. Done AFTER
+  // the music mix so loudnorm picks up the full mix.
+  if (extraAudioInputs.length > 0) {
+    const extraLabels: string[] = [];
+    for (let i = 0; i < extraAudioInputs.length; i++) {
+      const t = extraAudioInputs[i];
+      const vol = t.volume ?? 0.7;
+      const delayMs = Math.max(0, Math.round(t.startMs));
+      const label = `xa${i}`;
+      filterParts.push(
+        `[${t.inputIdx}:a]adelay=${delayMs}|${delayMs},volume=${vol}[${label}]`,
+      );
+      extraLabels.push(`[${label}]`);
+    }
+    if (audioSource) {
+      // Mix existing narration/music with extras
+      const inputs = [`[${audioSource}]`, ...extraLabels].join('');
+      filterParts.push(
+        `${inputs}amix=inputs=${1 + extraLabels.length}:duration=longest:dropout_transition=0,volume=${1 + extraLabels.length * 0.5}[xamixed]`,
+      );
+      audioSource = 'xamixed';
+    } else {
+      // No prior audio — extras become the only audio. amix them together.
+      const inputs = extraLabels.join('');
+      filterParts.push(
+        `${inputs}amix=inputs=${extraLabels.length}:duration=longest:dropout_transition=0[xamixed]`,
+      );
+      audioSource = 'xamixed';
+    }
+  }
+  const hasExtraAudio = extraAudioInputs.length > 0;
+
   // Track whether we have any audio output (narration, music, or both)
-  const hasAnyAudio = hasAudio || hasMusic;
+  const hasAnyAudio = hasAudio || hasMusic || hasExtraAudio;
 
   // Audio loudnorm — must be added before filter_complex is finalized
   let useLoudnormSimple = false;

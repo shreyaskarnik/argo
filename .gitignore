@@ -33,3 +33,17 @@ compositions/components/
 assets/joe-sai-avatar.png
 assets/sfx-production.wav
 assets/sfx/
+
+# Hyperframes-installed AI agent skills (`hyperframes skills` install).
+# These are version-pinned by their CLI and would fork the upstream.
+# Argo's own argo-guide skill stays tracked in skills/argo-guide and
+# .agents/skills/argo-guide (symlinks).
+.agents/skills/*
+!.agents/skills/argo-guide
+.claude/skills/
+skills/*
+!skills/argo-guide
+skills-lock.json
+
+# Hyperframes website-capture output — regenerable via `hyperframes capture`.
+argo-showcase-captured/

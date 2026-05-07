@@ -128,7 +128,7 @@ export async function record(demoName: string, options: RecordOptions): Promise<
   // jpeg-stitch and webm leaves the other format on disk, and downstream code
   // that auto-detects the input file (preview, clip extraction) can pick the
   // wrong one — silently exporting last run's video.
-  for (const stale of ['video.mp4', 'video.webm', '.engine-discard.webm']) {
+  for (const stale of ['video.mp4', 'video.webm', '.engine-discard.webm', '.composition-audio.jsonl']) {
     const stalePath = path.join(argoDir, stale);
     if (existsSync(stalePath)) {
       try { unlinkSync(stalePath); } catch { /* best-effort */ }

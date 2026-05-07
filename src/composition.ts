@@ -22,8 +22,8 @@
 // asset paths (textures, GLTF models, fonts) resolve normally — `setContent`
 // with embedded HTML breaks every external reference.
 
-import { readFileSync, existsSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { readFileSync, existsSync, appendFileSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
 import type { Page } from '@playwright/test';
 import type { NarrationTimeline } from './narration.js';
 import { startCompositionServer } from './composition-server.js';
@@ -138,6 +138,51 @@ export async function renderComposition(
     }
 
     narration.mark(opts.scene);
+
+    // Crossover audio: hyperframes blocks bring sound effects (sfx-production.wav,
+    // background music tracks, etc.) as <audio> children that play on the GSAP
+    // timeline. CDP screencast captures video only — audio output is invisible
+    // to Argo's recording engine. To get the composition's audio into the
+    // final mp4, register each <audio src> with a sidecar manifest the
+    // pipeline reads at mix time. Paths are relative to serverRoot (which
+    // matches the on-disk project layout when compositions live in
+    // `compositions/`), so the pipeline can resolve them as project-root paths.
+    //
+    // v1 approximation: assume all <audio> elements play from the scene's
+    // start. A future version could instrument HTMLAudioElement.prototype.play
+    // to record actual play timestamps. Most hyperframes blocks fire their
+    // SFX as the timeline kicks off, so this is usually right.
+    const argoOutputDir = process.env.ARGO_OUTPUT_DIR;
+    if (argoOutputDir) {
+      const audioRefs = await page.evaluate(() => {
+        const seen = new Set<string>();
+        const refs: { src: string }[] = [];
+        document.querySelectorAll('audio').forEach((a) => {
+          const direct = a.getAttribute('src');
+          const fromSource = a.querySelector('source')?.getAttribute('src') ?? null;
+          const src = direct || fromSource;
+          if (src && !seen.has(src)) {
+            seen.add(src);
+            refs.push({ src });
+          }
+        });
+        return refs;
+      });
+      if (audioRefs.length > 0) {
+        const sidecar = join(argoOutputDir, '.composition-audio.jsonl');
+        const startMs = narration.getTimings()[opts.scene] ?? 0;
+        for (const ref of audioRefs) {
+          // src is browser-relative (from a page served with <base href="/">,
+          // i.e. effectively project-root-relative). Resolve to absolute path
+          // via serverRoot so the pipeline can read the file directly.
+          const absSrc = resolve(root, ref.src.replace(/^\/+/, ''));
+          appendFileSync(
+            sidecar,
+            JSON.stringify({ scene: opts.scene, src: absSrc, startMs, durationMs }) + '\n',
+          );
+        }
+      }
+    }
 
     // Resume the registered timeline. Look up by scene name, fall back to
     // playing all registered timelines (compositions with a single master).
