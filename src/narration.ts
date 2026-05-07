@@ -587,6 +587,57 @@ export class NarrationTimeline {
     const words = transcript?.scenes[scene];
     return words ? words.map((w) => ({ ...w })) : [];
   }
+
+  /**
+   * Return how many milliseconds remain (from "now") until `target`
+   * is spoken inside `scene`. Useful for syncing visual effects to
+   * specific words instead of dividing a scene into even beats:
+   *
+   *   narration.mark('voiceover');
+   *   const t = narration.atWord('voiceover', 'Kokoro');
+   *   if (t !== null) await page.waitForTimeout(t);
+   *   dimAround(page, '#engine-kokoro', { duration: 800 });
+   *
+   * Matching is case-insensitive and ignores trailing punctuation
+   * (Whisper preserves periods/commas attached to words). Returns
+   * the FIRST occurrence after `options.afterMs` (default 0). If the
+   * target word has already been spoken — or the transcript is
+   * missing, the word isn't found, or the scene hasn't been marked —
+   * returns null. Callers should fall back to even-beat scheduling.
+   */
+  atWord(
+    scene: string,
+    target: string,
+    options?: { afterMs?: number; occurrence?: number },
+  ): number | null {
+    if (this.startTime === null) return null;
+    const markMs = this.timings.get(scene);
+    if (markMs === undefined) return null;
+
+    const words = this.wordTiming(scene);
+    if (words.length === 0) return null;
+
+    const normalized = target.toLowerCase().replace(/[^\w']/g, '');
+    const wantedOccurrence = options?.occurrence ?? 1;
+    const afterMs = options?.afterMs ?? 0;
+
+    let seen = 0;
+    for (const w of words) {
+      const wMs = w.start * 1000;
+      if (wMs < afterMs) continue;
+      const norm = w.text.toLowerCase().replace(/[^\w']/g, '');
+      if (norm !== normalized) continue;
+      seen++;
+      if (seen < wantedOccurrence) continue;
+
+      const elapsedInSceneMs = (Date.now() - this.startTime) - markMs;
+      const remaining = wMs - elapsedInSceneMs;
+      // Negative means we missed it — return null so the caller can
+      // skip the cue rather than firing late.
+      return remaining > 0 ? Math.ceil(remaining) : null;
+    }
+    return null;
+  }
 }
 
 export interface WordTiming {

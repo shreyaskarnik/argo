@@ -4,7 +4,7 @@ export default defineConfig({
   baseURL: 'http://127.0.0.1:8976',
   demosDir: 'demos',
   outputDir: 'videos',
-  tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
+  tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0, transcribe: true },
   video: {
     width: 1920,
     height: 1080,
