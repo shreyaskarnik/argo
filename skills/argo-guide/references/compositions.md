@@ -108,6 +108,15 @@ tl.from('.subtitle', { y: 40, opacity: 0, duration: 0.6, ease: 'power2.out' }, 0
 
 ---
 
+## Hand-roll vs import: choosing wisely
+
+For each composition scene, ask: **is this generic polish, or specific to my product?**
+
+- **Generic polish** — animated logo reveals, kinetic title cards, lower-thirds, follow cards, 3D device frames around a recording. The Hyperframes catalog has these battle-tested. Importing wins on: motion design quality, accessibility/contrast already validated, brand-tunable through their props/CSS variables, version-pinned by their CLI. **Hand-rolling these is almost never the right call** — you'll spend hours re-authoring what's already shipped, and the result will look worse than the catalog block at a similar effort budget.
+- **Specific to your product** — the wedge thesis, before/after framing of *your* particular workflow, schematic explainers of *your* architecture, custom comparisons with named competitors. The catalog can't have these — they're unique to your story. Hand-roll a minimal composition (30-60 lines of HTML+GSAP) following the contract above.
+
+When in doubt: search the catalog first. If a block is close enough, import it and tune. Only hand-roll when no block fits the *concept* you're trying to communicate.
+
 ## Importing Hyperframes blocks
 
 Hyperframes ships a catalog of blocks compatible with the exact same contract:
@@ -208,10 +217,10 @@ For dedicated background music across an entire demo (independent of any composi
 
 ## Reference: when this pays off
 
-The canonical case for mixed compositions + recording:
+Three real patterns from existing Argo work:
 
-- **Argo's existing showcase** records the real product across 11 capability clusters (~3 min). The hand-rolled `#hero` HTML and `#cta` HTML *visualize* the brand framing. Replacing those two scenes with hyperframes-grade compositions while keeping the recorded middle is the canonical "Plan B" demo — the recorded app dressed up for launch.
-- **The wedge thesis** ("your demo is a Playwright script, your launch video shouldn't be a screen recording") is fundamentally a *concept*. A composition with side-by-side mockups conveys it in 4 seconds; a recording can't.
-- **Logo outros and "Get Started" CTAs** with kinetic typography. Hyperframes' `logo-outro` block is dramatically more polished than what fits in an Argo overlay.
+- **Brand intros and outros via the catalog**: instead of writing your own animated Argo logo, `npx hyperframes add logo-outro` gets you a polished animated logo reveal in 5 seconds. The block is generic enough to brand-tune, polished enough to put at the start of a launch video. This is the most leveraged use of the catalog — every demo benefits from a stronger first/last impression, and hand-rolling that level of polish is rarely worth it.
+- **Argo's existing showcase** records the real product across 11 capability clusters (~3 min). The hand-rolled `#hero` HTML and `#cta` HTML *visualize* the brand framing. Replacing those two scenes with imported catalog blocks (or composition scenes following the same contract) while keeping the recorded middle is the canonical "Plan B" demo — the recorded app dressed up for launch.
+- **The wedge thesis** ("your demo is a Playwright script, your launch video shouldn't be a screen recording") is fundamentally a *concept* specific to Argo's positioning. The catalog can't have this; you hand-roll a small composition with side-by-side mockups. 4 seconds of authored motion conveys the idea more cleanly than any recording could.
 
-Don't over-rotate. The recording IS the demo. Compositions just frame it.
+Don't over-rotate. The recording IS the demo. Compositions just frame it. The catalog is your shortcut to brand-grade frames.

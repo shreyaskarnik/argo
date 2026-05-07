@@ -463,6 +463,18 @@ test('mydemo', async ({ page, narration }) => {
 });
 ```
 
+**Hand-roll vs import from the catalog:**
+
+- For **specific concepts** that only your product would visualize (wedge thesis, custom comparison, schematic for your specific architecture), hand-roll a small composition. 30-60 lines of HTML+GSAP usually does it.
+- For **generic polish moments** (animated logo intros/outros, kinetic title cards, lower-thirds, follow cards), reach for the Hyperframes catalog instead of writing your own. The blocks are battle-tested, brand-tunable, and ship with motion design no one wants to re-author. Examples: `logo-outro` for an animated logo reveal, `apple-money-count` for kinetic counters, `blue-sweater-intro-video` for AI-creator intros, `vfx-iphone-device` for "your app inside a real iPhone screen" (3D, needs Canary).
+
+```bash
+PATH="/opt/homebrew/opt/node@22/bin:$PATH" npx hyperframes add logo-outro
+# drops compositions/logo-outro.html + any model/asset files into the project
+```
+
+The catalog is at <https://hyperframes.heygen.com/catalog/>. Most blocks work on stable chromium; 3D/WebGL ones need `experimentalCanvasDrawElement: true` + `browserChannel: 'chrome-canary'`. See `references/compositions.md` for the import workflow.
+
 **Composition contract** (compatible with hyperframes blocks — `npx hyperframes add <name>` works):
 
 ```html
