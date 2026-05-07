@@ -35,6 +35,11 @@ async function enterScene(
 
 test('showcase', async ({ page, narration }) => {
   test.setTimeout(300_000);
+  // Wait until `word` is next spoken in `scene`, or `fb` ms when the
+  // transcript is unavailable or the word isn't in it.
+  const waitForWord = (scene: string, word: string, fb: number) =>
+    page.waitForTimeout(narration.atWord(scene, word) ?? fb);
+
   await page.goto('/showcase.html');
   trackCursor(page, narration);
   cursorHighlight(page, { color: '#60a5fa', radius: 18 });
@@ -65,29 +70,25 @@ test('showcase', async ({ page, narration }) => {
 
   await enterScene(page, narration, '#voiceover', 'voiceover');
   await withOverlay(page, 'voiceover', async () => {
-    // Each engine card lights up the moment its name is spoken. Anchor words
-    // come from the Whisper transcript (.argo/showcase/.scene-transcripts.json),
-    // not the original manifest text — Kokoro pronounces "Kokoro" as "cochro"
-    // and "OpenAI" as "opening eye", so anchors match what was actually heard.
-    // Gemini and Sarvam aren't named in narration; they fire in the gaps.
-    const wait = (word: string, fb: number) =>
-      page.waitForTimeout(narration.atWord('voiceover', word) ?? fb);
+    // Anchor words are Whisper transcript spellings, not manifest text —
+    // Kokoro speaks "Kokoro" as "cochro" and "OpenAI" as "opening eye".
     const dim = 900;
-    await wait('cochro', 3000);
+    await waitForWord('voiceover', 'cochro', 3000);
     dimAround(page, '#engine-kokoro', { duration: dim });
-    await wait('hugging', 1300);
+    await waitForWord('voiceover', 'hugging', 1300);
     dimAround(page, '#engine-transformers', { duration: dim });
-    await wait('opening', 1900);
+    await waitForWord('voiceover', 'opening', 1900);
     dimAround(page, '#engine-openai', { duration: dim });
-    await wait('11', 1100);
+    await waitForWord('voiceover', '11', 1100);
     dimAround(page, '#engine-elevenlabs', { duration: dim });
+    // Gemini and Sarvam aren't named in narration — fill the gap.
     await page.waitForTimeout(700);
     dimAround(page, '#engine-gemini', { duration: dim });
     await page.waitForTimeout(800);
     dimAround(page, '#engine-sarvam', { duration: dim });
-    await wait('MLX', 1200);
+    await waitForWord('voiceover', 'MLX', 1200);
     dimAround(page, '#engine-mlx', { duration: dim });
-    await wait('Audio', 700);
+    await waitForWord('voiceover', 'Audio', 700);
     focusRing(page, '#voiceover-config', { color: '#22d3ee', duration: 1200 });
     await page.waitForTimeout(1000);
     await resetCamera(page);
@@ -108,28 +109,20 @@ test('showcase', async ({ page, narration }) => {
   });
 
   await enterScene(page, narration, '#camera-effects', 'camera');
-  // Each effect fires the instant its name is spoken — when the narrator
-  // says "Spotlight", the spotlight cue lights up; "focus", focus ring;
-  // "dim", dim-around; etc. Anchors match the Whisper transcript words
-  // (the narration enumerates all seven by name, so this scene aligns
-  // perfectly without gap-fill). Falls back to even-paced beats if
-  // transcripts are unavailable.
-  const cameraWait = (word: string, fb: number) =>
-    page.waitForTimeout(narration.atWord('camera', word) ?? fb);
-  await cameraWait('Spotlight', 3000);
+  await waitForWord('camera', 'Spotlight', 3000);
   spotlight(page, '#effect-spotlight', { duration: 1400, padding: 10 });
-  await cameraWait('focus', 1500);
+  await waitForWord('camera', 'focus', 1500);
   focusRing(page, '#effect-focus-ring', { color: '#fb7185', duration: 1200 });
-  await cameraWait('dim', 1100);
+  await waitForWord('camera', 'dim', 1100);
   dimAround(page, '#effect-dim-around', { duration: 1100 });
-  await cameraWait('highlight', 1100);
+  await waitForWord('camera', 'highlight', 1100);
   focusRing(page, '#effect-cursor', { color: '#60a5fa', duration: 1200 });
-  await cameraWait('zoom', 1200);
+  await waitForWord('camera', 'zoom', 1200);
   // Post-export zoom on the zoomTo card itself — meta!
   zoomTo(page, '#effect-zoom', { narration, scale: 1.5, duration: 1500, fadeIn: 300, holdMs: 900 });
-  await cameraWait('motion', 1500);
+  await waitForWord('camera', 'motion', 1500);
   focusRing(page, '#effect-motion-blur', { color: '#a78bfa', duration: 1100 });
-  await cameraWait('confetti', 1500);
+  await waitForWord('camera', 'confetti', 1500);
   showConfetti(page, { spread: 'rain', duration: 1500, pieces: 130 });
   await page.waitForTimeout(1200);
   await resetCamera(page);
