@@ -72,6 +72,7 @@ import { showOverlay, withOverlay } from '@argo-video/cli';
 | `showOverlay(page, scene, durationMs)` | Show manifest overlay for N ms, then auto-remove. |
 | `withOverlay(page, scene, action)` | Show manifest overlay during an async action, auto-remove when done. |
 | `demoType(page, selectorOrLocator, text, delay?)` | Character-by-character typing (60ms default). Accepts CSS selector or Playwright Locator. |
+| `renderComposition(page, narration, htmlPath, opts)` | Render a self-contained HTML composition (Hyperframes-shaped, paused GSAP timeline + `data-duration`) as a scene. **Use for content the real app can't show** — title cards, abstract concepts, comparisons, brand intros/outros. See "Mixing in Compositions" below. |
 
 ### Camera & Effects
 
@@ -420,6 +421,66 @@ In the preview editor: scrub the timeline, click "Add scene at current time" to 
 
 This enables the "record externally, post-produce in Argo" workflow — useful for desktop apps, mobile screen recordings, or any video source outside Playwright.
 
+### Mixing in Compositions (when recording isn't the right tool)
+
+Argo's strength is recording the **real running app**. But some scenes communicate better as authored motion graphics — concepts the product can't show on its own. `renderComposition(page, narration, htmlPath, { scene })` mounts a self-contained HTML composition as a scene in your demo, sandwiched between recorded scenes.
+
+**Default to recording. Reach for a composition when:**
+
+- **The content is conceptual or abstract** — "the wedge thesis", before/after framing, side-by-side comparisons, the *idea* of how the product fits in a workflow. A real recording would be forced.
+- **You need a brand moment** — title cards, logo intros, kinetic-text outros, "now showing" interstitials between major sections. Argo's overlay templates handle simple cases; compositions handle the polished ones.
+- **You're comparing things the recording can't capture together** — code-as-source vs screen-recorder side-by-side, before/after states of an external product, hypothetical workflows.
+- **The visual is fundamentally a motion graphic** — animated stats counters, kinetic typography, schematic explainers, data visualizations of the product's story.
+
+**Stick with recording when** the content is the actual product UI, real interactions, real network state, or anything that benefits from being demonstrably real (not idealized).
+
+**The pattern**:
+
+```typescript
+import { test } from '@argo-video/cli';
+import { renderComposition } from '@argo-video/cli';
+
+test('mydemo', async ({ page, narration }) => {
+  // Composition intro — bookends the recorded portion with brand polish
+  await renderComposition(page, narration, 'compositions/intro.html', { scene: 'intro' });
+
+  // Recorded app demo — the bulk of the video, what only Argo can do
+  await page.goto('/');
+  narration.mark('hero');
+  // ... regular Argo recording with overlays / camera effects
+  await page.waitForTimeout(8000);
+
+  // Optional intermediate composition for a concept that doesn't capture well
+  await renderComposition(page, narration, 'compositions/the-wedge.html', { scene: 'wedge' });
+
+  // Back to recorded app for the next major section
+  await page.goto('/preview');
+  narration.mark('preview');
+  // ...
+
+  // Composition outro
+  await renderComposition(page, narration, 'compositions/outro.html', { scene: 'outro' });
+});
+```
+
+**Composition contract** (compatible with hyperframes blocks — `npx hyperframes add <name>` works):
+
+```html
+<div data-composition-id="intro" data-width="1920" data-height="1080" data-duration="4">
+  <!-- visible content here -->
+</div>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<script>
+  const tl = gsap.timeline({ paused: true });
+  // ... tweens defining the 4-second arc ...
+  window.__timelines = window.__timelines || {};
+  window.__timelines['intro'] = tl;
+  window.__compositionReady = Promise.resolve();  // optional gate for async loads
+</script>
+```
+
+`renderComposition` waits for the timeline to register, marks the scene, plays the timeline, then holds for `data-duration`. Audio elements inside the composition (`<audio>` children) are auto-detected and mixed into the final mp4 alongside Argo's TTS narration. See `references/compositions.md` for the full contract, the hyperframes catalog, and integration patterns.
+
 ---
 
 ## Gotchas
@@ -451,6 +512,7 @@ Read these when you need deeper guidance on specific topics:
 - **`references/tts-engines.md`** — Engine selection, voice cloning, phonetic spelling per engine, cloud API keys
 - **`references/config-and-quality.md`** — Full config options, dark mode recording, Playwright tricks for demos, 4K export, browser quality
 - **`references/init-from-conversion.md`** — Converting Playwright tests, post-conversion LLM workflow, scene detection heuristics
+- **`references/compositions.md`** — `renderComposition` + Hyperframes block import, contract, when to mix authored motion with recordings, mixed-demo patterns, audio sidecar
 - **`examples/basic.demo.ts`** — Complete working demo script template
 - **`examples/basic.scenes.json`** — Matching scenes manifest template
 
