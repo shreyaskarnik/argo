@@ -8,6 +8,7 @@ import { isGsapMotion } from './gsap-motion.js';
 import { runGsapEntrance, runGsapExit, gsapExitWallMs } from './gsap-runtime.js';
 import { loadOverlayFromManifest } from './manifest-loader.js';
 import { getBlock, isValidBlockName } from '../blocks/index.js';
+import { applyComponent, removeComponent } from '../hf/apply-component.js';
 
 export type { OverlayCue, OverlayManifestEntry, Zone, TemplateType, MotionPreset } from './types.js';
 export type { SceneEntry } from './types.js';
@@ -110,6 +111,14 @@ export async function showOverlay(
     opts = options;
   }
 
+  if (cue.type === 'hf-component') {
+    // Full-frame component — bypasses zone/theme/template machinery.
+    await applyComponent(page, cue.name, { params: cue.params });
+    await page.waitForTimeout(durationMs);
+    await removeComponent(page, cue.name);
+    return;
+  }
+
   const zone: Zone = cue.placement ?? getConfigDefaultPlacement() ?? 'bottom-center';
   const motion = resolveMotion(cue);
   const theme = await resolveTheme(page, cue, zone, opts?.autoBackground);
@@ -177,6 +186,15 @@ export async function withOverlay(
     cue = resolveCue(scene, cueOrAction);
     action = actionOrOptions as () => Promise<void>;
     opts = options;
+  }
+
+  if (cue.type === 'hf-component') {
+    await applyComponent(page, cue.name, { params: cue.params });
+    try {
+      return await action();
+    } finally {
+      await removeComponent(page, cue.name);
+    }
   }
 
   const zone: Zone = cue.placement ?? getConfigDefaultPlacement() ?? 'bottom-center';

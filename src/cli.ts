@@ -92,6 +92,7 @@ export function createProgram(): Command {
       const browser = (cmdOpts.browser as BrowserEngine) ?? config.video.browser;
       await record(demo, {
         demosDir: config.demosDir,
+        blocksDir: config.blocksDir,
         baseURL,
         video: { width: config.video.width, height: config.video.height },
         browser,

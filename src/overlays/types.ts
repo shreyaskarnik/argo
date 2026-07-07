@@ -98,7 +98,21 @@ export interface CustomBlockCue {
   autoBackground?: boolean;
 }
 
-export type OverlayCue = LowerThirdCue | HeadlineCardCue | CalloutCue | ImageCardCue | ArrowCue | CustomBlockCue;
+export interface HfComponentCue {
+  type: 'hf-component';
+  /** Installed component name under blocksDir (see `argo add`). */
+  name: string;
+  /** CSS custom property overrides, e.g. { '--vignette-size': '40%' }. */
+  params?: Record<string, string>;
+  /** Accepted for manifest uniformity but ignored — components are full-frame. */
+  placement?: Zone;
+  /** Accepted for manifest uniformity but ignored — components are full-frame. */
+  motion?: MotionPreset;
+  /** Accepted for manifest uniformity but ignored — components are full-frame. */
+  autoBackground?: boolean;
+}
+
+export type OverlayCue = LowerThirdCue | HeadlineCardCue | CalloutCue | ImageCardCue | ArrowCue | CustomBlockCue | HfComponentCue;
 
 export type OverlayManifestEntry = OverlayCue & {
   scene: string;

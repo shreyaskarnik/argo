@@ -77,7 +77,7 @@ export function discoverDemos(demosDir: string): string[] {
  * Run the pipeline for all demos in the demosDir.
  */
 export async function runBatchPipeline(
-  config: Pick<ArgoConfig, 'baseURL' | 'demosDir' | 'outputDir' | 'tts' | 'video' | 'export' | 'overlays'>,
+  config: Pick<ArgoConfig, 'baseURL' | 'demosDir' | 'blocksDir' | 'outputDir' | 'tts' | 'video' | 'export' | 'overlays'>,
   pipelineOpts?: PipelineOptions,
 ): Promise<string[]> {
   const demos = discoverDemos(config.demosDir);
@@ -108,7 +108,7 @@ export async function runBatchPipeline(
 
 export async function runPipeline(
   demoName: string,
-  config: Pick<ArgoConfig, 'baseURL' | 'demosDir' | 'outputDir' | 'tts' | 'video' | 'export' | 'overlays'>,
+  config: Pick<ArgoConfig, 'baseURL' | 'demosDir' | 'blocksDir' | 'outputDir' | 'tts' | 'video' | 'export' | 'overlays'>,
   pipelineOpts?: PipelineOptions,
 ): Promise<string> {
   if (!config.baseURL) {
@@ -171,6 +171,7 @@ export async function runPipeline(
   console.log('🎬 Rolling camera...');
   const { timingPath, videoPath } = await record(demoName, {
     demosDir: config.demosDir,
+    blocksDir: config.blocksDir,
     baseURL: config.baseURL,
     video: { width: config.video.width, height: config.video.height, fps: config.video.fps },
     browser: config.video.browser,
@@ -526,6 +527,7 @@ export async function runPipeline(
       console.log('🎬 Rolling camera...');
       const variantRecord = await record(demoName, {
         demosDir: config.demosDir,
+        blocksDir: config.blocksDir,
         baseURL: config.baseURL,
         video: { width: variant.video.width, height: variant.video.height, fps: config.video.fps },
         browser: config.video.browser,

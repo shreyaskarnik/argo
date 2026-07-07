@@ -7,6 +7,8 @@ import { normalizeDeviceScaleFactor, type BrowserEngine, type ShowActionsConfig 
 
 export interface RecordOptions {
   demosDir: string;
+  /** Directory containing installed hyperframes components (see `argo add`). */
+  blocksDir?: string;
   baseURL: string;
   video: { width: number; height: number; fps?: number };
   browser?: BrowserEngine;
@@ -294,6 +296,7 @@ export async function record(demoName: string, options: RecordOptions): Promise<
           ARGO_SCENE_DURATIONS_PATH: path.resolve(path.join('.argo', demoName, '.scene-durations.json')),
           ARGO_TRANSCRIPT_PATH: path.resolve(path.join('.argo', demoName, '.scene-transcripts.json')),
           ARGO_OVERLAYS_PATH: path.resolve(path.join(options.demosDir, `${demoName}.scenes.json`)),
+          ARGO_BLOCKS_DIR: path.resolve(options.blocksDir ?? 'blocks'),
         },
       }, (error, stdout, stderr) => {
         clearInterval(progressPoll);
