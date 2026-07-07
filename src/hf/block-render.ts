@@ -99,10 +99,11 @@ export async function renderBlockFrames(opts: RenderBlockFramesOptions): Promise
 
       const requestedSec = opts.durationMs / 1000;
       for (let i = 0; i < N; i++) {
-        // Sample each frame at its center instant, not its leading edge —
-        // otherwise a single-frame window (N=1) always lands on t=0, which
-        // can coincide with a timeline's initial (pre-animated) state.
-        const tVideo = (i + 0.5) / opts.fps;
+        // Edge-inclusive sampling (matches shader-render.ts): the last frame
+        // lands exactly at the requested window end so the block's final
+        // composed state is captured. N === 1 degenerates to t=0 (usually the
+        // pre-animation state), so a single frame samples the window midpoint.
+        const tVideo = N === 1 ? requestedSec / 2 : (i / (N - 1)) * requestedSec;
         const tBlock = opts.holdLastFrame
           ? Math.min(tVideo, nativeDurationSec)
           : (tVideo * nativeDurationSec) / requestedSec;
