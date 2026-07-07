@@ -13,6 +13,7 @@ export const SHADER_NAMES = [
   'crosswarp', 'swirl', 'ripple', 'luma-mask', 'light-leak',
   'domain-warp', 'ridged-burn', 'thermal-distortion', 'swirl-vortex',
   'whip-pan', 'gravitational-lens', 'cinematic-zoom', 'chromatic-split', 'flash-through-white',
+  'sdf-iris', 'ripple-waves',
 ] as const;
 export type ShaderName = (typeof SHADER_NAMES)[number];
 
