@@ -111,7 +111,17 @@ Static v1 blocks: `x-post`, `macos-notification`, `yt-lower-third`, `data-chart`
 
 Animated blocks (ship with `defaultMotion` using GSAP): `instagram-follow` (pulsing Follow button), `tiktok-follow` (rotating avatar ring + side slide), `reddit-post` (upvote card, simple entrance), `logo-outro` (scale-in end-card), `flowchart` (stacked nodes + arrows revealed with stagger), `app-showcase` (hero card with floating icon loop), `ui-3d-reveal` (perspective tilt-to-flat reveal of a screenshot). These use `BlockDefinition.defaultMotion` — a cue-level `motion` still overrides. Inspired by hyperframes blocks of the same names (Apache-2.0); implementations are original. Selector hooks used by motion loops/staggers: `.argo-ig-follow-btn`, `.argo-tt-ring`, `.argo-app-hero`, `.argo-3d-image`, `.argo-flow-node, .argo-flow-arrow`.
 
-Folder format is designed for a future `argo add <block>` command (not shipped yet).
+These built-in blocks ship inside the package (`src/blocks/`) — distinct from the hyperframes registry items installed into `blocksDir` by `argo add` (see HyperFrames Catalog below).
+
+### HyperFrames Catalog (`src/hf/`)
+
+`argo add <name>` installs blocks/components from the hyperframes registry (default `https://raw.githubusercontent.com/heygen-com/hyperframes/main/registry`, override via `--registry <url>` or config `registry.url`) into `blocksDir` (config, default `blocks/`, git-tracked). `argo add --list` (+ `--json`) browses the registry. Registry examples (`hyperframes:example`) are not installable. Item files are stored verbatim in native hyperframes format at `blocks/<name>/` plus a `registry-item.json` sidecar. Modules: `registry-client.ts` (fetch-injectable client — unit tests never touch the network), `add.ts` (`installItem`/`listItems`, path-traversal guards on item names and file paths), `component.ts` (snippet parser + CSS param validators), `apply-component.ts` (page injection).
+
+Overlay cue: `{ "type": "hf-component", "name": "vignette", "params": { "--vignette-size": "40%" } }` — full-frame injection (fixed, pointer-events none, high z-index) that bypasses the zone/theme/template machinery; duration comes from `showOverlay`. Script API: `applyComponent(page, name, { params?, blocksDir? })` / `removeComponent(page, name)` exported from the package — persists until removed. `params` are validated CSS custom properties (`--kebab-case` names, conservative value allowlist — no `url()`, `;{}<>`, control chars). Injection uses the same no-op `page.evaluate()` render fence as overlays and the same disposal-error-swallowing pattern as `showConfetti`.
+
+Trust model: components are trusted-at-install (user ran `argo add`, files are git-reviewable); only runtime `params` are validated. Component `<script>`s run via `new Function()` and may be blocked by strict CSP on the recorded page — logged as a warning, not a failure. Caveat: `caption-*` components install fine but word-level timing support is future work (STT alignment).
+
+`argo validate` checks that referenced hf-components are installed (`blocks/<name>/<name>.html` exists) and validates `export.transition.accent` as a 6-digit hex color.
 
 ### Effects (`src/effects.ts`)
 
@@ -191,8 +201,9 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - `argo record/export/pipeline/validate` take bare demo names (e.g., `argo pipeline example`)
 - `argo pipeline --all` runs the full pipeline for every demo discovered in `demosDir` (finds all `.scenes.json` files)
 - `argo pipeline [demo]` — demo argument is optional when `--all` is used
-- `argo validate <demo>` checks scene name consistency between script and scenes manifest, validates overlay fields (no TTS/recording)
+- `argo validate <demo>` checks scene name consistency between script and scenes manifest, validates overlay fields, checks hf-component installs, and validates `export.transition.accent` hex (no TTS/recording)
 - `argo clip <demo> <scene>` extracts a scene clip from an exported MP4 using chapter markers. `--format gif` produces a palette-optimized GIF. Clips go to `videos/clips/`. Useful for release notes and docs.
+- `argo add <name>` installs a hyperframes registry item into `blocksDir`; `argo add --list` (+ `--json`) browses; `--registry <url>` overrides the registry (also config `registry.url`). Item names share the demo-name validation regex (path-traversal guard).
 - `--base-url <url>` flag on `record` and `pipeline` overrides `config.baseURL`
 - `--headed` flag on `record` and `pipeline` runs the browser in visible mode
 - `--all` flag on `pipeline` runs all demos in batch (sequential execution, continues on failure)
@@ -245,6 +256,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - `ARGO_SCENE_DURATIONS_PATH` — path to `.scene-durations.json` (loaded by narration fixture)
 - `ARGO_OVERLAYS_PATH` — path to `.scenes.json` manifest (loaded by overlay functions for manifest-based resolution)
 - `ARGO_AUTO_BACKGROUND` — set to `'1'` when config `overlays.autoBackground` is true
+- `ARGO_BLOCKS_DIR` — blocks directory for installed hyperframes items (loaded by `applyComponent`/hf-component cues). Set by `record()` from `config.blocksDir` at all three call sites: pipeline primary, pipeline variants, and CLI `argo record`.
 - `ARGO_ALLOW_RAW_GSAP` — set to `'1'` when config `overlays.allowRawGsap` is true. Re-checked by the runtime before executing `motion.raw` (defense in depth against inline cues that skip the validator).
 - `ARGO_OUTPUT_DIR` — output directory for timing JSON
 - `DEBUG` — when set (e.g., `DEBUG=pw:api`), Playwright debug output is forwarded to stderr even on success

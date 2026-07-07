@@ -126,6 +126,8 @@ export default defineConfig({
   baseURL: 'http://localhost:3000',
   demosDir: 'demos',
   outputDir: 'videos',
+  blocksDir: 'blocks',              // where `argo add` installs hyperframes registry items (git-tracked)
+  // registry: { url: 'https://raw.githubusercontent.com/heygen-com/hyperframes/main/registry' },
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
   video: {
     width: 1920, height: 1080, fps: 30,
@@ -219,12 +221,14 @@ argo tts generate <manifest>       Generate TTS clips from manifest
 argo export <demo>                 Merge video + audio to MP4
 argo pipeline <demo>               Run all steps end-to-end
 argo pipeline --all                Run pipeline for every demo in demosDir
-argo validate <demo>               Check scene name consistency (no TTS/recording)
+argo validate <demo>               Check scenes, overlays, installed components (no TTS/recording)
 argo preview <demo>                Browser-based editor for voiceover, overlays, timing
 argo preview                       Multi-demo dashboard (lists all demos with status)
 argo clip <demo> <scene>            Extract a scene clip from exported video
 argo clip <demo> <scene> --format gif  Extract as palette-optimized GIF
 argo import <video-file>           Import external video for post-production
+argo add <name>                    Install a block/component from the hyperframes registry into blocksDir
+argo add --list                    Browse available registry items (add --json for machine-readable)
 argo doctor                        Check environment (ffmpeg, Playwright, config)
 argo --config <path> <command>     Use a custom config file
 
@@ -234,6 +238,8 @@ Options:
   --headed                         Run browser in visible mode
   --all                            Run pipeline for all demos
   --port <number>                  Preview server port (default: auto)
+  --registry <url>                 Override the registry URL for `argo add`
+  --json                           Machine-readable output for `argo add --list`
 ```
 
 ### Overlay Blocks
@@ -279,6 +285,37 @@ Argo ships 12 curated overlay blocks for demo narratives. Reference them from `.
 | `app-showcase` | Back-eased hero entrance + slow floating icon loop |
 | `ui-3d-reveal` | Perspective tilt-to-flat reveal with a subtle wobble loop |
 
+### Catalog (`argo add`)
+
+Install ready-made overlays and components from the [hyperframes](https://github.com/heygen-com/hyperframes) registry:
+
+```bash
+argo add --list                     # browse available items
+argo add --list --json              # machine-readable
+argo add vignette                   # install into blocksDir (default: blocks/)
+argo add vignette --registry <url>  # use a different registry for one install
+```
+
+Installed items land in `blocksDir` (default `blocks/`, git-tracked — review before committing) as `blocks/<name>/<file>` plus a `registry-item.json` sidecar recording what was fetched. Registry examples aren't installable via `argo add` — install those with the hyperframes CLI instead.
+
+Use an installed component full-frame via the `hf-component` overlay cue:
+
+```json
+{ "scene": "intro", "text": "…", "overlay": { "type": "hf-component", "name": "vignette", "params": { "--vignette-size": "40%" } } }
+```
+
+`params` are CSS custom properties applied to the injected component (validated — not arbitrary CSS). The component is shown for `showOverlay`'s duration and bypasses the zone/placement system (it's full-frame, not a templated overlay).
+
+Or drive it manually from the script for effects that should persist across scenes:
+
+```ts
+import { applyComponent, removeComponent } from '@argo-video/cli';
+await applyComponent(page, 'grain-overlay');   // persists until removed
+await removeComponent(page, 'grain-overlay');
+```
+
+> **Note:** `caption-*` components install like any other item but don't yet support word-level timing (future work). Components can ship a `<script>`, but strict CSP on the recorded page may block it — a warning is logged, the recording still succeeds.
+
 ### GSAP motion (advanced)
 
 Every overlay supports two kinds of `motion`: a named CSS preset (`none`, `fade-in`, `slide-in`) or a declarative GSAP motion object with `in`, `out`, and `loop` phases. `showOverlay(page, scene, durationMs)` auto-times the exit so the visible window matches `durationMs`:
@@ -314,6 +351,7 @@ import { showConfetti } from '@argo-video/cli';
 import { spotlight, focusRing, dimAround, zoomTo, resetCamera } from '@argo-video/cli';
 import { cursorHighlight, resetCursor } from '@argo-video/cli';
 import { showCaption, hideCaption, withCaption } from '@argo-video/cli';
+import { applyComponent, removeComponent } from '@argo-video/cli';
 import { defineConfig, demosProject, engines } from '@argo-video/cli';
 ```
 
@@ -338,6 +376,8 @@ import { defineConfig, demosProject, engines } from '@argo-video/cli';
 | `showCaption(page, scene, text, durationMs)` | Show a simple text caption |
 | `withCaption(page, scene, text, action)` | Show caption during an async action |
 | `hideCaption(page)` | Remove caption |
+| `applyComponent(page, name, opts?)` | Inject an installed hyperframes component (`argo add`) full-frame; persists until removed. `opts: { params?, blocksDir? }` |
+| `removeComponent(page, name)` | Remove a component applied via `applyComponent` |
 | `narration.mark(scene)` | Record a scene timestamp |
 | `narration.durationFor(scene, opts?)` | Compute hold duration from TTS clip length (remaining time from now) |
 | `narration.sceneDuration(scene, opts?)` | Full scene duration — stable, non-decreasing (for overlay display) |

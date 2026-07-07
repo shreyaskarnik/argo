@@ -187,7 +187,7 @@ Key fields: `scene` (required, matches `mark()`), `text` (spoken narration — o
 
 ### Overlay Templates
 
-Five types, each with a `type` discriminant. All support `placement`, `motion`, and `autoBackground`.
+Five zone-based template types, each with a `type` discriminant. All support `placement`, `motion`, and `autoBackground`. (Two more cue types exist: `block` — see Overlay blocks below — and `hf-component` — full-frame hyperframes components, see HyperFrames components below.)
 
 - **`lower-third`**: `{ type: 'lower-third', text: '...' }` — text banner
 - **`headline-card`**: `{ type: 'headline-card', title: '...', kicker: '...', body: '...' }` — large card
@@ -245,6 +245,31 @@ Argo ships 12 ready-to-use blocks for narrative inserts. Reference via `overlay:
 
 See `demos/blocks-showcase.demo.ts` for a full example. Block sources live under `src/blocks/<name>/` with a `block.json` schema and a `template.ts` exporting the `BlockDefinition` (+ optional `defaultMotion`). Animated blocks credit HyperFrames (Apache-2.0) for inspiration in their `block.json`.
 
+### HyperFrames components (`argo add`)
+
+Beyond the built-in blocks, install full-frame components (vignettes, grain, glows) from the hyperframes registry:
+
+```bash
+npx argo add --list          # browse registry items (--json for machine-readable)
+npx argo add vignette        # installs into blocksDir (default blocks/, git-tracked)
+```
+
+Reference an installed component with the `hf-component` cue type:
+
+```json
+{ "scene": "intro", "overlay": { "type": "hf-component", "name": "vignette", "params": { "--vignette-size": "40%" } } }
+```
+
+`hf-component` cues are **full-frame** — they bypass zones/placement/motion; duration comes from `showOverlay`. `params` are validated CSS custom properties. For effects that should persist across scenes, use the script API instead:
+
+```typescript
+import { applyComponent, removeComponent } from '@argo-video/cli';
+await applyComponent(page, 'grain-overlay');   // persists until removed
+await removeComponent(page, 'grain-overlay');
+```
+
+Config: `blocksDir` (install location, default `blocks/`) and `registry: { url }` (registry override; also `--registry <url>` per-invocation). `argo validate` errors if a referenced component isn't installed. Caveats: `caption-*` components install but lack word-timing support (future); component `<script>`s may be blocked by strict CSP on the recorded page (warning, not failure); components are trusted-at-install — review `blocks/` before committing.
+
 ### How Overlays Get Triggered
 
 Overlays need **two things** to appear in the video:
@@ -281,6 +306,8 @@ npx argo clip <name> <scene>                # Extract a scene as MP4 clip
 npx argo clip <name> <scene> --format gif   # Extract as GIF (for release notes, docs)
 npx argo import <video-file>                 # Import external video for post-production
 npx argo import <video-file> --demo <name>   # Import with custom demo name
+npx argo add <name>                          # Install hyperframes registry item into blocksDir
+npx argo add --list                          # Browse registry items (--json for machine-readable)
 npx argo init                               # Scaffold example demo + config
 npx argo init --from tests/spec.ts          # Convert existing Playwright test
 ```
@@ -473,7 +500,7 @@ PATH="/opt/homebrew/opt/node@22/bin:$PATH" npx hyperframes add logo-outro
 # drops compositions/logo-outro.html + any model/asset files into the project
 ```
 
-The catalog is at <https://hyperframes.heygen.com/catalog/>. Most blocks work on stable chromium; 3D/WebGL ones need `experimentalCanvasDrawElement: true` + `browserChannel: 'chrome-canary'`. See `references/compositions.md` for the import workflow.
+The catalog is at <https://hyperframes.heygen.com/catalog/>. Most blocks work on stable chromium; 3D/WebGL ones need `experimentalCanvasDrawElement: true` + `browserChannel: 'chrome-canary'`. See `references/compositions.md` for the import workflow. For full-frame **components** (vignettes, grain, glows) applied over the recorded page, use `npx argo add <name>` and the `hf-component` cue instead — see "HyperFrames components" above.
 
 **Composition contract** (compatible with hyperframes blocks — `npx hyperframes add <name>` works):
 
