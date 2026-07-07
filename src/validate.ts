@@ -67,7 +67,7 @@ export async function validateDemo(options: ValidateOptions): Promise<ValidateRe
       if (!Array.isArray(scenes)) {
         errors.push(`Scenes manifest must be a JSON array`);
       } else {
-        const validTypes = new Set(['lower-third', 'headline-card', 'callout', 'image-card', 'arrow', 'block', 'hf-component']);
+        const validTypes = new Set(['lower-third', 'headline-card', 'callout', 'image-card', 'arrow', 'block', 'hf-component', 'hf-block']);
         const validPlacements = new Set(['bottom-center', 'top-left', 'top-right', 'bottom-left', 'bottom-right', 'center']);
         const validMotions = new Set(['none', 'fade-in', 'slide-in']);
 
@@ -119,21 +119,34 @@ export async function validateDemo(options: ValidateOptions): Promise<ValidateRe
                 errors.push(`Scene "${entry.scene}" overlay: "props" object is required when type="block"`);
               }
             }
-            // Validate hf-component-specific fields
-            if (ov.type === 'hf-component') {
+            // Validate hf-component / hf-block fields — both install to the same
+            // blocksDir/<name>/<name>.html layout.
+            if (ov.type === 'hf-component' || ov.type === 'hf-block') {
               if (!ov.name || typeof ov.name !== 'string') {
-                errors.push(`Scene "${entry.scene}" overlay: hf-component requires a "name" field`);
+                errors.push(`Scene "${entry.scene}" overlay: ${ov.type} requires a "name" field`);
               } else if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(ov.name)) {
-                errors.push(`Scene "${entry.scene}" overlay: invalid hf-component name "${ov.name}"`);
+                errors.push(`Scene "${entry.scene}" overlay: invalid ${ov.type} name "${ov.name}"`);
               } else {
                 const blocksDir = options.blocksDir ?? 'blocks';
                 const componentFile = join(blocksDir, ov.name, `${ov.name}.html`);
                 if (!existsSync(componentFile)) {
                   errors.push(
-                    `Scene "${entry.scene}" overlay: hf-component "${ov.name}" is not installed ` +
+                    `Scene "${entry.scene}" overlay: ${ov.type} "${ov.name}" is not installed ` +
                       `(missing ${componentFile}). Run: argo add ${ov.name}`,
                   );
                 }
+              }
+            }
+            // Validate hf-block fit shape
+            if (ov.type === 'hf-block' && ov.fit !== undefined && ov.fit !== 'cover') {
+              const fit = ov.fit;
+              if (
+                typeof fit !== 'object' || fit === null ||
+                typeof fit.x !== 'number' || typeof fit.y !== 'number' || typeof fit.scale !== 'number'
+              ) {
+                errors.push(
+                  `Scene "${entry.scene}" overlay: hf-block "fit" must be 'cover' or { x, y, scale } with numeric fields`,
+                );
               }
             }
           }

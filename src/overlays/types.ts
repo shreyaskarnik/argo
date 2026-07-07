@@ -112,7 +112,27 @@ export interface HfComponentCue {
   autoBackground?: boolean;
 }
 
-export type OverlayCue = LowerThirdCue | HeadlineCardCue | CalloutCue | ImageCardCue | ArrowCue | CustomBlockCue | HfComponentCue;
+export interface HfBlockCue {
+  type: 'hf-block';
+  /** Installed block name under blocksDir (see `argo add`). */
+  name: string;
+  /** Block-specific param overrides passed through to the pre-render step. */
+  params?: Record<string, string>;
+  /** Duration of the export-time cutaway in ms. */
+  durationMs?: number;
+  /** How the rendered block frame is fit into the timeline. Default: 'cover'. */
+  fit?: 'cover' | { x: number; y: number; scale: number };
+  /** Hold the last rendered frame instead of looping/collapsing. */
+  holdLastFrame?: boolean;
+  /** Accepted for manifest uniformity but ignored — blocks are composited at export time. */
+  placement?: Zone;
+  /** Accepted for manifest uniformity but ignored — blocks are composited at export time. */
+  motion?: MotionPreset;
+  /** Accepted for manifest uniformity but ignored — blocks are composited at export time. */
+  autoBackground?: boolean;
+}
+
+export type OverlayCue = LowerThirdCue | HeadlineCardCue | CalloutCue | ImageCardCue | ArrowCue | CustomBlockCue | HfComponentCue | HfBlockCue;
 
 export type OverlayManifestEntry = OverlayCue & {
   scene: string;

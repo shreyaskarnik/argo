@@ -119,6 +119,13 @@ export async function showOverlay(
     return;
   }
 
+  if (cue.type === 'hf-block') {
+    // Export-time cutaway — nothing is injected during recording, but the
+    // wait preserves the demo script's scene pacing.
+    await page.waitForTimeout(durationMs);
+    return;
+  }
+
   const zone: Zone = cue.placement ?? getConfigDefaultPlacement() ?? 'bottom-center';
   const motion = resolveMotion(cue);
   const theme = await resolveTheme(page, cue, zone, opts?.autoBackground);
@@ -195,6 +202,10 @@ export async function withOverlay(
     } finally {
       await removeComponent(page, cue.name);
     }
+  }
+
+  if (cue.type === 'hf-block') {
+    return await action();
   }
 
   const zone: Zone = cue.placement ?? getConfigDefaultPlacement() ?? 'bottom-center';

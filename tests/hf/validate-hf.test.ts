@@ -90,6 +90,34 @@ describe('validate: hf-component + accent', () => {
     expect(result.errors.filter((e) => /accent/i.test(e))).toEqual([]);
   });
 
+  it('accepts an installed hf-block and errors on a missing one', async () => {
+    writeManifest({ type: 'hf-block', name: 'vignette' }); // fixture dir reused — any installed name works
+    const ok = await validateDemo({
+      demoName: 'd',
+      demosDir: join(tmp, 'demos'),
+      blocksDir: join(tmp, 'blocks'),
+    });
+    expect(ok.errors.filter((e) => e.includes('hf-block'))).toEqual([]);
+
+    writeManifest({ type: 'hf-block', name: 'logo-outro' });
+    const missing = await validateDemo({
+      demoName: 'd',
+      demosDir: join(tmp, 'demos'),
+      blocksDir: join(tmp, 'blocks'),
+    });
+    expect(missing.errors.some((e) => /logo-outro[\s\S]*argo add/.test(e))).toBe(true);
+  });
+
+  it('errors on a malformed hf-block fit', async () => {
+    writeManifest({ type: 'hf-block', name: 'vignette', fit: { x: 1 } });
+    const result = await validateDemo({
+      demoName: 'd',
+      demosDir: join(tmp, 'demos'),
+      blocksDir: join(tmp, 'blocks'),
+    });
+    expect(result.errors.some((e) => /fit/.test(e))).toBe(true);
+  });
+
   it('accepts a valid transition accent without leading #', async () => {
     writeManifest(undefined);
     const result = await validateDemo({
