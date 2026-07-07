@@ -353,6 +353,9 @@ export function createProgram(): Command {
         demoName: demo,
         demosDir: config.demosDir,
         allowRawGsap: config.overlays.allowRawGsap,
+        blocksDir: config.blocksDir,
+        transitionAccent:
+          config.export.transition?.type === 'shader' ? config.export.transition.accent : undefined,
       });
 
       for (const err of result.errors) {
