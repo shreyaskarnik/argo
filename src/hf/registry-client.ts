@@ -53,10 +53,16 @@ export async function fetchRegistryIndex(
   registryUrl: string,
   fetchImpl: FetchLike = fetch,
 ): Promise<RegistryIndexItem[]> {
-  const raw = await fetchText(`${registryUrl}/registry.json`, fetchImpl);
-  const parsed = JSON.parse(raw) as { items?: RegistryIndexItem[] };
+  const url = `${registryUrl}/registry.json`;
+  const raw = await fetchText(url, fetchImpl);
+  let parsed: { items?: RegistryIndexItem[] };
+  try {
+    parsed = JSON.parse(raw) as { items?: RegistryIndexItem[] };
+  } catch {
+    throw new Error(`Malformed JSON from registry at ${url} — got non-JSON response`);
+  }
   if (!Array.isArray(parsed.items)) {
-    throw new Error(`Malformed registry index: expected an "items" array at ${registryUrl}/registry.json`);
+    throw new Error(`Malformed registry index: expected an "items" array at ${url}`);
   }
   return parsed.items;
 }
@@ -67,8 +73,14 @@ export async function fetchRegistryItem(
   name: string,
   fetchImpl: FetchLike = fetch,
 ): Promise<RegistryItem> {
-  const raw = await fetchText(`${registryUrl}/${kind}/${name}/registry-item.json`, fetchImpl);
-  const item = JSON.parse(raw) as RegistryItem;
+  const url = `${registryUrl}/${kind}/${name}/registry-item.json`;
+  const raw = await fetchText(url, fetchImpl);
+  let item: RegistryItem;
+  try {
+    item = JSON.parse(raw) as RegistryItem;
+  } catch {
+    throw new Error(`Malformed JSON from registry at ${url} — got non-JSON response`);
+  }
   if (!item.name || !Array.isArray(item.files)) {
     throw new Error(`Malformed registry-item.json for "${name}": missing name or files`);
   }

@@ -76,4 +76,18 @@ describe('registry client', () => {
     const f = stubFetch({ [`${REG}/registry.json`]: '{"nope": true}' });
     await expect(fetchRegistryIndex(REG, f)).rejects.toThrow(/items/i);
   });
+
+  it('throws a clear error when registry.json returns HTML (proxy/captive portal)', async () => {
+    const f = stubFetch({ [`${REG}/registry.json`]: '<html><body>Captive Portal</body></html>' });
+    await expect(fetchRegistryIndex(REG, f)).rejects.toThrow(/malformed json/i);
+  });
+
+  it('throws a clear error when registry-item.json returns non-JSON', async () => {
+    const f = stubFetch({
+      [`${REG}/blocks/my-block/registry-item.json`]: '<html>Not Found</html>',
+    });
+    await expect(
+      fetchRegistryItem(REG, 'blocks', 'my-block', f),
+    ).rejects.toThrow(/malformed json/i);
+  });
 });

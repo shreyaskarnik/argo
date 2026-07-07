@@ -61,6 +61,21 @@ describe('installItem', () => {
     ).rejects.toThrow(/example.*not installable/i);
   });
 
+  it('rejects unsupported registry types with a clear error', async () => {
+    const routes = {
+      ...ROUTES,
+      [`${REG}/registry.json`]: JSON.stringify({
+        items: [
+          { name: 'vignette', type: 'hyperframes:component' },
+          { name: 'widget-x', type: 'hyperframes:widget' },
+        ],
+      }),
+    };
+    await expect(
+      installItem({ name: 'widget-x', blocksDir: tmp, registryUrl: REG, fetchImpl: stubFetch(routes) }),
+    ).rejects.toThrow(/unsupported registry type.*hyperframes:widget/i);
+  });
+
   it('rejects unknown items pointing at --list', async () => {
     await expect(
       installItem({ name: 'nope', blocksDir: tmp, registryUrl: REG, fetchImpl: stubFetch(ROUTES) }),

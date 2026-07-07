@@ -55,10 +55,13 @@ export async function installItem(opts: {
 
   const kind = kindFromType(entry.type);
   if (!kind) {
-    throw new Error(
-      `"${name}" is a registry example and examples are not installable via argo add. ` +
-        `Use the hyperframes CLI (hyperframes init --example ${name}) instead.`,
-    );
+    if (entry.type === 'hyperframes:example') {
+      throw new Error(
+        `"${name}" is a registry example and examples are not installable via argo add. ` +
+          `Use the hyperframes CLI (hyperframes init --example ${name}) instead.`,
+      );
+    }
+    throw new Error(`"${name}" has unsupported registry type "${entry.type}" — cannot install.`);
   }
 
   const item = await fetchRegistryItem(registryUrl, kind, name, fetchImpl);
