@@ -440,16 +440,23 @@ Transition types: `fade-through-black`, `dissolve` (quicker dip-to-black, not a 
 Pre-rendered WebGL shader transitions between scenes, cached by content hash.
 
 ```js
-export: {
-  transition: {
-    type: 'shader',
-    shader: 'crosswarp',   // crosswarp | swirl | ripple | luma-mask | light-leak
-    durationMs: 800,
+export default defineConfig({
+  export: {
+    transition: {
+      type: 'shader',
+      shader: 'ridged-burn',
+      durationMs: 2000,
+      accent: '#0ea5e9', // tints edge glow/burn in accent-aware shaders
+    },
   },
-}
+});
 ```
 
-Shaders are adapted from [gl-transitions.com](https://gl-transitions.com) (MIT). First export launches headless Chromium to pre-render shader frames; cached at `.argo/<demo>/shaders/<hash>/` so subsequent exports skip the browser launch.
+16 shaders are available: `crosswarp`, `swirl`, `ripple`, `luma-mask`, `light-leak`, `domain-warp`, `ridged-burn`, `thermal-distortion`, `swirl-vortex`, `whip-pan`, `gravitational-lens`, `cinematic-zoom`, `chromatic-split`, `flash-through-white`, `sdf-iris`, `ripple-waves`.
+
+The first five are adapted from [gl-transitions.com](https://gl-transitions.com) (MIT); the remaining 11 are ported from [hyperframes](https://github.com/heygen-com/hyperframes) (Apache-2.0). First export launches headless Chromium to pre-render shader frames; cached at `.argo/<demo>/shaders/<hash>/` so subsequent exports skip the browser launch.
+
+`export.transition.accent` (default `'#0ea5e9'`) tints edge glow/burn in accent-aware shaders: `domain-warp`, `ridged-burn`, `thermal-distortion`, `sdf-iris`, `ripple-waves`.
 
 See `demos/shaders-showcase.demo.ts` for a complete example.
 

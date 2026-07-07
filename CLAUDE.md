@@ -65,9 +65,9 @@ Both the primary export path and blur-fill format variants (1:1, 9:16) are encod
 
 Pre-rendered WebGL shader transitions. At export time, a pre-pass extracts two boundary frames per scene boundary (last frame of outgoing, first frame of incoming) via ffmpeg, then Playwright Chromium renders the GLSL shader at each of `N = D × fps` progress values, producing a PNG sequence. `buildShaderSpliceFilter` generates a filter_complex three-segment concat (`scene_a + PNG_seq + scene_b`) that replaces the fade window.
 
-Cache key: `sha256(shader, durationMs, fps, width, height, sha256(aPng), sha256(bPng))`. Cached at `.argo/<demo>/shaders/<hash>/`. Second export with unchanged boundaries hits cache with no browser launch.
+Cache key: `sha256(shader, durationMs, fps, width, height, sha256(aPng), sha256(bPng), accent)`. Cached at `.argo/<demo>/shaders/<hash>/`. Second export with unchanged boundaries hits cache with no browser launch.
 
-Shaders live in `src/transitions/shaders/*.glsl`. Build step copies `.glsl` files to `dist/` (tsc does not). v1 ships: `crosswarp`, `swirl`, `ripple`, `luma-mask`, `light-leak` — adapted from gl-transitions.com (MIT).
+Shaders live in `src/transitions/shaders/*.glsl`. Build step copies `.glsl` files to `dist/` (tsc does not). v1 ships: `crosswarp`, `swirl`, `ripple`, `luma-mask`, `light-leak` — adapted from gl-transitions.com (MIT), plus 11 hyperframes ports (Apache-2.0): `domain-warp`, `ridged-burn`, `thermal-distortion`, `swirl-vortex`, `whip-pan`, `gravitational-lens`, `cinematic-zoom`, `chromatic-split`, `flash-through-white`, `sdf-iris`, `ripple-waves`. `export.transition.accent` (default `'#0ea5e9'`) tints accent-aware shaders: `domain-warp`, `ridged-burn`, `thermal-distortion`, `sdf-iris`, `ripple-waves`.
 
 Per-boundary shader selection is NOT supported in v1 — `export.transition.shader` applies to all boundaries. Future work: a sidecar for per-boundary overrides.
 
