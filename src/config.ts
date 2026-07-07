@@ -98,6 +98,9 @@ export interface ShaderTransitionConfig {
   type: 'shader';
   shader: ShaderName;
   durationMs?: number;
+  /** Accent hex color tinting edge-glow/burn effects in shaders that use it
+   *  (e.g. ridged-burn, domain-warp, sdf-iris). Default '#0ea5e9'. */
+  accent?: string;
 }
 
 export type TransitionConfig = FilterTransitionConfig | ShaderTransitionConfig;

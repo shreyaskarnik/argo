@@ -439,6 +439,7 @@ export async function runPipeline(
       height: exportSize.height,
       fps: config.video?.fps ?? 30,
       cacheDir: join(argoDir, 'shaders'),
+      accent: shaderTransition.accent,
     });
     // Remap boundarySec from pre-trim back to post-trim for the filter_complex splice
     exportOptions.shaderTransitions = rendered.map((r, i) => ({
@@ -648,6 +649,7 @@ export async function runPipeline(
           height: variant.video.height,
           fps: config.video?.fps ?? 30,
           cacheDir: join('.argo', variantSubdir, 'shaders'),
+          accent: shaderTransition.accent,
         });
         // Remap boundarySec to post-trim for the filter_complex splice
         variantShaderTransitions = variantRendered.map((r, i) => ({

@@ -1082,6 +1082,7 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
               height: ec?.outputHeight ?? 720,
               fps: ec?.fps ?? 30,
               cacheDir: join(demoDir, 'shaders'),
+              accent: shaderTransition.accent,
             });
             // Remap boundarySec to post-trim for the filter_complex splice
             previewShaderTransitions = rendered.map((r, i) => ({

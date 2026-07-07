@@ -6,13 +6,14 @@ import { promisify } from 'node:util';
 import { chromium, type Browser } from '@playwright/test';
 import { buildShaderPageHtml } from './shader-page.html.js';
 import { SHADERS, type ShaderName } from './shaders/index.js';
+import { deriveAccentColors, DEFAULT_ACCENT } from './accent.js';
 
 const execFileP = promisify(execFile);
 
 /**
  * Content hash keying the shader render cache. Includes every input that can
- * affect output: shader source, timing parameters, resolution, and the content
- * of the two boundary frames.
+ * affect output: shader source, timing parameters, resolution, the content
+ * of the two boundary frames, and the accent color.
  */
 export function computeShaderHash(
   shader: string,
@@ -22,10 +23,11 @@ export function computeShaderHash(
   height: number,
   aPngPath: string,
   bPngPath: string,
+  accentHex: string = DEFAULT_ACCENT,
 ): string {
   const aHash = createHash('sha256').update(readFileSync(aPngPath)).digest('hex');
   const bHash = createHash('sha256').update(readFileSync(bPngPath)).digest('hex');
-  const parts = [shader, durationMs, fps, width, height, aHash, bHash].join('|');
+  const parts = [shader, durationMs, fps, width, height, aHash, bHash, accentHex].join('|');
   return createHash('sha256').update(parts).digest('hex').slice(0, 16);
 }
 
@@ -69,6 +71,8 @@ export interface RenderShaderFramesOptions {
   outputDir: string;
   /** Reusable browser — pass one across multiple boundaries for performance. */
   browser?: Browser;
+  /** Accent hex for shaders using accent uniforms. Default DEFAULT_ACCENT. */
+  accent?: string;
 }
 
 /**
@@ -95,7 +99,12 @@ export async function renderShaderFrames(opts: RenderShaderFramesOptions): Promi
   try {
     const page = await browser.newPage({ viewport: { width: opts.width, height: opts.height } });
     try {
-      const html = buildShaderPageHtml(opts.width, opts.height, SHADERS[opts.shader]);
+      const html = buildShaderPageHtml(
+        opts.width,
+        opts.height,
+        SHADERS[opts.shader],
+        deriveAccentColors(opts.accent),
+      );
       await page.setContent(html, { waitUntil: 'load' });
 
       const glError = await page.evaluate(() => (window as any).__glError as string | undefined);
@@ -156,6 +165,8 @@ export async function renderShaderTransitions(opts: {
   height: number;
   fps: number;
   cacheDir: string;
+  /** Accent hex for shaders using accent uniforms. Default DEFAULT_ACCENT. */
+  accent?: string;
 }): Promise<ShaderTransitionRenderResult[]> {
   if (opts.boundaries.length === 0) return [];
 
@@ -177,7 +188,7 @@ export async function renderShaderTransitions(opts: {
 
   // Determine cache hits / misses
   const plan = extracted.map(({ aPath, bPath, spec }) => {
-    const hash = computeShaderHash(opts.shader, spec.durationMs, opts.fps, opts.width, opts.height, aPath, bPath);
+    const hash = computeShaderHash(opts.shader, spec.durationMs, opts.fps, opts.width, opts.height, aPath, bPath, opts.accent ?? DEFAULT_ACCENT);
     const pngDir = pathJoin(opts.cacheDir, hash);
     const N = Math.max(1, Math.round((spec.durationMs * opts.fps) / 1000));
     const cached = existsSyncFs(pngDir) && readdirSync(pngDir).filter(f => f.endsWith('.png')).length === N;
@@ -211,6 +222,7 @@ export async function renderShaderTransitions(opts: {
           durationMs: p.spec.durationMs,
           outputDir: p.pngDir,
           browser,
+          accent: opts.accent,
         });
       }
       results.push({

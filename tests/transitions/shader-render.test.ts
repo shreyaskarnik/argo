@@ -191,3 +191,52 @@ describe('renderShaderTransitions', () => {
     rmSync(tmp, { recursive: true, force: true });
   }, 120000);
 });
+
+describe('computeShaderHash accent', () => {
+  let tmp: string;
+  beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'argo-shader-accent-')); });
+  afterEach(() => { rmSync(tmp, { recursive: true, force: true }); });
+
+  it('different accent produces a different hash', async () => {
+    const { computeShaderHash } = await import('../../src/transitions/shader-render.js');
+    const a = join(tmp, 'a.png');
+    const b = join(tmp, 'b.png');
+    writeFileSync(a, Buffer.from([1, 2, 3]));
+    writeFileSync(b, Buffer.from([4, 5, 6]));
+    const h1 = computeShaderHash('crosswarp', 800, 30, 640, 360, a, b, '#0ea5e9');
+    const h2 = computeShaderHash('crosswarp', 800, 30, 640, 360, a, b, '#ff0000');
+    expect(h1).not.toBe(h2);
+  });
+
+  it('omitted accent equals DEFAULT_ACCENT hash', async () => {
+    const { computeShaderHash } = await import('../../src/transitions/shader-render.js');
+    const { DEFAULT_ACCENT } = await import('../../src/transitions/accent.js');
+    const a = join(tmp, 'a.png');
+    const b = join(tmp, 'b.png');
+    writeFileSync(a, Buffer.from([1, 2, 3]));
+    writeFileSync(b, Buffer.from([4, 5, 6]));
+    expect(computeShaderHash('crosswarp', 800, 30, 640, 360, a, b))
+      .toBe(computeShaderHash('crosswarp', 800, 30, 640, 360, a, b, DEFAULT_ACCENT));
+  });
+});
+
+describe('buildShaderPageHtml uniforms', () => {
+  it('embeds accent values and resolution setup', async () => {
+    const { buildShaderPageHtml } = await import('../../src/transitions/shader-page.html.js');
+    const { deriveAccentColors } = await import('../../src/transitions/accent.js');
+    const html = buildShaderPageHtml(640, 360, 'void main(){}', deriveAccentColors('#ff8000'));
+    expect(html).toContain('accentDark');
+    expect(html).toContain('resolution');
+    expect(html).toContain('gl.uniform2f');
+  });
+
+  it('accepts a shader-variant config with accent at compile time', () => {
+    const cfg: TransitionConfig = {
+      type: 'shader',
+      shader: 'crosswarp',
+      durationMs: 800,
+      accent: '#ff8000',
+    };
+    expect(cfg.type).toBe('shader');
+  });
+});

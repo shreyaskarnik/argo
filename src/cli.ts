@@ -253,6 +253,7 @@ export function createProgram(): Command {
           height: exportSize.height,
           fps: config.video?.fps ?? 30,
           cacheDir: `.argo/${demo}/shaders`,
+          accent: shaderTransition.accent,
         });
         // Remap boundarySec to post-trim for the filter_complex splice
         shaderTransitions = rendered.map((r, i) => ({
