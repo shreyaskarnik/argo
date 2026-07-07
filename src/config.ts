@@ -233,6 +233,10 @@ export interface ArgoConfig {
   baseURL?: string;
   demosDir: string;
   outputDir: string;
+  /** Directory where `argo add` installs hyperframes registry items. Default 'blocks'. */
+  blocksDir: string;
+  /** Registry override for `argo add`. Defaults to the hyperframes GitHub registry. */
+  registry?: { url?: string };
   tts: TTSConfig;
   video: VideoConfig;
   export: ExportConfig;
@@ -253,6 +257,7 @@ export type UserConfig = Partial<
 const DEFAULTS: ArgoConfig = {
   demosDir: 'demos',
   outputDir: 'videos',
+  blocksDir: 'blocks',
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
   video: { width: 1920, height: 1080, fps: 30, browser: 'chromium' as BrowserEngine, deviceScaleFactor: 1 },
   export: { preset: 'slow', crf: 16 },

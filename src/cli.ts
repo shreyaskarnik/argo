@@ -372,6 +372,55 @@ export function createProgram(): Command {
     });
 
   program
+    .command('add [name]')
+    .description('Install a block or component from the hyperframes registry into blocksDir')
+    .option('--list', 'list available registry items instead of installing')
+    .option('--json', 'machine-readable output')
+    .option('--registry <url>', 'override the registry URL')
+    .action(async (name: string | undefined, cmdOpts: { list?: boolean; json?: boolean; registry?: string }) => {
+      const { installItem, listItems } = await import('./hf/add.js');
+      const configPath = program.opts().config;
+      const config = await loadConfigForDemo(undefined, configPath);
+      const registryUrl = cmdOpts.registry ?? config.registry?.url;
+
+      if (cmdOpts.list) {
+        const items = await listItems({ registryUrl });
+        if (cmdOpts.json) {
+          console.log(JSON.stringify(items, null, 2));
+        } else {
+          for (const item of items) {
+            console.log(`${item.type.replace('hyperframes:', '').padEnd(10)} ${item.name}`);
+          }
+          console.log(`\n${items.length} items. Install with: argo add <name>`);
+        }
+        return;
+      }
+
+      if (!name) {
+        console.error('Usage: argo add <name>  (or argo add --list)');
+        process.exitCode = 1;
+        return;
+      }
+
+      try {
+        const result = await installItem({ name, blocksDir: config.blocksDir, registryUrl });
+        if (cmdOpts.json) {
+          console.log(JSON.stringify(result, null, 2));
+        } else {
+          console.log(`Installed ${result.kind === 'components' ? 'component' : 'block'} "${result.name}" → ${result.targetDir}/`);
+          for (const f of result.files) console.log(`  ${f}`);
+          if (result.kind === 'components') {
+            console.log(`\nUse it in a scene: "overlay": { "type": "hf-component", "name": "${result.name}" }`);
+            console.log(`Or in a demo script: await applyComponent(page, '${result.name}')`);
+          }
+        }
+      } catch (err) {
+        console.error((err as Error).message);
+        process.exitCode = 1;
+      }
+    });
+
+  program
     .command('doctor')
     .description('Check environment: ffmpeg, Playwright, config, assets')
     .action(async () => {
