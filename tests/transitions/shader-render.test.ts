@@ -21,8 +21,11 @@ try {
 }
 
 describe('shader registry', () => {
-  it('ships exactly the v1 five shaders', () => {
-    expect(SHADER_NAMES).toEqual(['crosswarp', 'swirl', 'ripple', 'luma-mask', 'light-leak']);
+  it('ships the v1 five plus the hyperframes ports', () => {
+    expect(SHADER_NAMES).toEqual([
+      'crosswarp', 'swirl', 'ripple', 'luma-mask', 'light-leak',
+      'domain-warp', 'ridged-burn', 'thermal-distortion', 'swirl-vortex',
+    ]);
   });
 
   it('each shader has non-empty GLSL source', () => {
@@ -239,4 +242,36 @@ describe('buildShaderPageHtml uniforms', () => {
     };
     expect(cfg.type).toBe('shader');
   });
+});
+
+describe('every registered shader compiles and renders', () => {
+  let tmp: string;
+  beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'argo-shader-smoke-')); });
+  afterEach(() => { rmSync(tmp, { recursive: true, force: true }); });
+
+  it.skipIf(!hasFfmpeg)('renders one frame per shader without GL errors', async () => {
+    const { renderShaderFrames } = await import('../../src/transitions/shader-render.js');
+    const { chromium } = await import('playwright');
+    // two tiny solid-color PNG fixtures via ffmpeg
+    const a = join(tmp, 'a.png');
+    const b = join(tmp, 'b.png');
+    await execFileP('ffmpeg', ['-y', '-f', 'lavfi', '-i', 'color=red:s=64x36', '-frames:v', '1', a]);
+    await execFileP('ffmpeg', ['-y', '-f', 'lavfi', '-i', 'color=blue:s=64x36', '-frames:v', '1', b]);
+    const browser = await chromium.launch({
+      args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blacklist'],
+    });
+    try {
+      for (const shader of SHADER_NAMES) {
+        const outDir = join(tmp, shader);
+        const n = await renderShaderFrames({
+          shader, aPng: a, bPng: b, width: 64, height: 36,
+          fps: 30, durationMs: 66, outputDir: outDir, browser,
+        });
+        expect(n, shader).toBeGreaterThanOrEqual(1);
+        expect(existsSync(join(outDir, 'frame_0000.png')), shader).toBe(true);
+      }
+    } finally {
+      await browser.close();
+    }
+  }, 120_000);
 });

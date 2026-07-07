@@ -9,16 +9,15 @@ function loadShader(name: string): string {
   return readFileSync(path, 'utf-8');
 }
 
-export const SHADER_NAMES = ['crosswarp', 'swirl', 'ripple', 'luma-mask', 'light-leak'] as const;
+export const SHADER_NAMES = [
+  'crosswarp', 'swirl', 'ripple', 'luma-mask', 'light-leak',
+  'domain-warp', 'ridged-burn', 'thermal-distortion', 'swirl-vortex',
+] as const;
 export type ShaderName = (typeof SHADER_NAMES)[number];
 
-export const SHADERS: Record<ShaderName, string> = {
-  'crosswarp': loadShader('crosswarp'),
-  'swirl': loadShader('swirl'),
-  'ripple': loadShader('ripple'),
-  'luma-mask': loadShader('luma-mask'),
-  'light-leak': loadShader('light-leak'),
-};
+export const SHADERS: Record<ShaderName, string> = Object.fromEntries(
+  SHADER_NAMES.map((name) => [name, loadShader(name)]),
+) as Record<ShaderName, string>;
 
 export function isValidShaderName(name: string): name is ShaderName {
   return (SHADER_NAMES as readonly string[]).includes(name);
