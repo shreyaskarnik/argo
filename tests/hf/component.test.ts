@@ -62,4 +62,10 @@ describe('param safety', () => {
     expect(isSafeCssVarName('color')).toBe(false);
     expect(isSafeCssVarName('--bad;inject')).toBe(false);
   });
+
+  it('rejects values containing raw control characters', () => {
+    expect(isSafeCssValue('a\x00b')).toBe(false);
+    expect(isSafeCssValue('a\tb')).toBe(false);
+    expect(isSafeCssValue('a\nb')).toBe(false);
+  });
 });
