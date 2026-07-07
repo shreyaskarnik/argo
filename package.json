@@ -34,7 +34,12 @@
   "overrides": {
     "kokoro-js": {
       "@huggingface/transformers": "$@huggingface/transformers"
-    }
+    },
+    "ws": "^8.21.0",
+    "form-data": "^4.0.6",
+    "vite": "^7.3.5",
+    "esbuild": "^0.28.1",
+    "protobufjs": "^7.6.3"
   },
   "optionalDependencies": {
     "@elevenlabs/elevenlabs-js": "^2.0.0",
@@ -60,6 +65,6 @@
     "@types/node": "^25.5.0",
     "playwright": "^1.59.1",
     "typescript": "^5.5.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.2.6"
   }
 }

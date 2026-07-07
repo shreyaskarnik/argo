@@ -7,11 +7,14 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       id-token: write
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      # Prevent apt-get / playwright --with-deps stalling on a prompt.
+      DEBIAN_FRONTEND: noninteractive
     steps:
       - uses: actions/checkout@v6
 

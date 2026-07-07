@@ -5,10 +5,18 @@ on:
     branches: [main]
   pull_request:
 
+# Keep apt-get / playwright --with-deps from stalling on an interactive
+# prompt (the root cause of past 6h CI hangs on the browser-install step).
+env:
+  DEBIAN_FRONTEND: noninteractive
+
 jobs:
   unit:
     name: Unit tests
     runs-on: ubuntu-latest
+    # A stalled apt/playwright install should fail fast, not burn the full
+    # 6h default job budget. The unit suite itself runs in seconds.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -25,6 +33,7 @@ jobs:
     name: ci-smoke (${{ matrix.browser }})
     needs: unit
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
