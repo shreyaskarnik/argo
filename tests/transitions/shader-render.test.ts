@@ -25,6 +25,7 @@ describe('shader registry', () => {
     expect(SHADER_NAMES).toEqual([
       'crosswarp', 'swirl', 'ripple', 'luma-mask', 'light-leak',
       'domain-warp', 'ridged-burn', 'thermal-distortion', 'swirl-vortex',
+      'whip-pan', 'gravitational-lens', 'cinematic-zoom', 'chromatic-split', 'flash-through-white',
     ]);
   });
 

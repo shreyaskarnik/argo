@@ -12,6 +12,7 @@ function loadShader(name: string): string {
 export const SHADER_NAMES = [
   'crosswarp', 'swirl', 'ripple', 'luma-mask', 'light-leak',
   'domain-warp', 'ridged-burn', 'thermal-distortion', 'swirl-vortex',
+  'whip-pan', 'gravitational-lens', 'cinematic-zoom', 'chromatic-split', 'flash-through-white',
 ] as const;
 export type ShaderName = (typeof SHADER_NAMES)[number];
 
