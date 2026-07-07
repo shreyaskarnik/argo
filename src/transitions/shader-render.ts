@@ -27,7 +27,7 @@ export function computeShaderHash(
 ): string {
   const aHash = createHash('sha256').update(readFileSync(aPngPath)).digest('hex');
   const bHash = createHash('sha256').update(readFileSync(bPngPath)).digest('hex');
-  const parts = [shader, durationMs, fps, width, height, aHash, bHash, accentHex].join('|');
+  const parts = [shader, durationMs, fps, width, height, aHash, bHash, accentHex.trim().toLowerCase()].join('|');
   return createHash('sha256').update(parts).digest('hex').slice(0, 16);
 }
 

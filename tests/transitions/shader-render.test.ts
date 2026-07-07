@@ -223,6 +223,16 @@ describe('computeShaderHash accent', () => {
     expect(computeShaderHash('crosswarp', 800, 30, 640, 360, a, b))
       .toBe(computeShaderHash('crosswarp', 800, 30, 640, 360, a, b, DEFAULT_ACCENT));
   });
+
+  it('accent hex case does not change the hash', async () => {
+    const { computeShaderHash } = await import('../../src/transitions/shader-render.js');
+    const a = join(tmp, 'a.png');
+    const b = join(tmp, 'b.png');
+    writeFileSync(a, Buffer.from([1, 2, 3]));
+    writeFileSync(b, Buffer.from([4, 5, 6]));
+    expect(computeShaderHash('crosswarp', 800, 30, 640, 360, a, b, '#0EA5E9'))
+      .toBe(computeShaderHash('crosswarp', 800, 30, 640, 360, a, b, '#0ea5e9'));
+  });
 });
 
 describe('buildShaderPageHtml uniforms', () => {
