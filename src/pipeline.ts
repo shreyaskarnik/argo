@@ -21,6 +21,7 @@ import { resolveExportSize, type ArgoConfig } from './config.js';
 import { getVideoDurationMs } from './media.js';
 import { buildOverlayPngsForImport } from './overlays/render-to-png.js';
 import { renderShaderTransitions } from './transitions/shader-render.js';
+import { resolveHfBlockCues, renderHfBlocks } from './hf/block-render.js';
 // Note: MusicGen (AI music generation) is a preview-only feature — runs in browser via WebGPU.
 // Pipeline uses saved WAV files via audio.music config path.
 import {
@@ -285,7 +286,12 @@ export async function runPipeline(
   // Read per-scene playback speeds from scenes manifest
   const manifestPath = `${config.demosDir}/${demoName}.scenes.json`;
   const sceneSpeeds: SceneSpeedMap = {};
-  let rawManifest: Array<{ scene?: string; playbackSpeed?: number; post?: Array<{ type?: string; atMs?: number; durationMs?: number }> }> = [];
+  let rawManifest: Array<{
+    scene?: string;
+    playbackSpeed?: number;
+    post?: Array<{ type?: string; atMs?: number; durationMs?: number }>;
+    overlay?: { type?: string; [k: string]: unknown };
+  }> = [];
   try {
     rawManifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
     for (const entry of rawManifest) {
@@ -447,6 +453,17 @@ export async function runPipeline(
       ...r,
       boundarySec: finalPlacements[i + 1].startMs / 1000,
     }));
+  }
+
+  // hf-block cutaways — pre-render installed hyperframes blocks (cache-hit cheap)
+  const hfBlockCues = resolveHfBlockCues(rawManifest, finalPlacements);
+  if (hfBlockCues.length > 0) {
+    exportOptions.hfBlocks = await renderHfBlocks({
+      cues: hfBlockCues,
+      blocksDir: config.blocksDir,
+      cacheDir: join(argoDir, 'hf-blocks'),
+      fps: config.video?.fps ?? 30,
+    });
   }
 
   const outputPath = await exportVideo(exportOptions);
@@ -660,6 +677,19 @@ export async function runPipeline(
         }));
       }
 
+      // hf-block cutaways for this variant — same manifest (outer `rawManifest`,
+      // still overlay-typed here — the text-only shadow above is try-block scoped),
+      // own placements + cache dir.
+      const variantHfBlockCues = resolveHfBlockCues(rawManifest, variantPlacements);
+      const variantHfBlocks = variantHfBlockCues.length > 0
+        ? await renderHfBlocks({
+          cues: variantHfBlockCues,
+          blocksDir: config.blocksDir,
+          cacheDir: join('.argo', variantSubdir, 'hf-blocks'),
+          fps: config.video?.fps ?? 30,
+        })
+        : undefined;
+
       const variantOutputPath = await exportVideo({
         demoName: variantSubdir,
         argoDir: '.argo',
@@ -686,6 +716,7 @@ export async function runPipeline(
         freezeSpecs: variantResolvedFreezes.length > 0 ? variantResolvedFreezes : undefined,
         overlayPngs: variantOverlayPngs,
         shaderTransitions: variantShaderTransitions,
+        hfBlocks: variantHfBlocks,
         encoder: config.export.encoder,
         encoderDefault: 'cpu',
       });

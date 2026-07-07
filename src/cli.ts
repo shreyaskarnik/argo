@@ -29,6 +29,7 @@ import { applySpeedRampToTimeline, type Segment, type SceneSpeedMap } from './sp
 import { scaleCameraMoves, shiftCameraMoves, type CameraMove } from './camera-move.js';
 import { resolveFreezes, adjustPlacementsForFreezes, totalFreezeDurationMs, type FreezeSpec } from './freeze.js';
 import { renderShaderTransitions } from './transitions/shader-render.js';
+import { resolveHfBlockCues, renderHfBlocks } from './hf/block-render.js';
 import type { Placement } from './tts/align.js';
 
 function validateDemoName(name: string): string {
@@ -263,6 +264,21 @@ export function createProgram(): Command {
         }));
       }
 
+      // hf-block cutaways — pre-render installed hyperframes blocks (cache-hit cheap)
+      let hfBlocks: import('./hf/block-filter.js').RenderedHfBlock[] | undefined;
+      if (placements && placements.length > 0 && existsSync(manifestPath)) {
+        const hfManifestEntries = readScenesManifest(manifestPath);
+        const hfBlockCues = resolveHfBlockCues(hfManifestEntries, placements);
+        if (hfBlockCues.length > 0) {
+          hfBlocks = await renderHfBlocks({
+            cues: hfBlockCues,
+            blocksDir: config.blocksDir,
+            cacheDir: `.argo/${demo}/hf-blocks`,
+            fps: config.video?.fps ?? 30,
+          });
+        }
+      }
+
       await exportVideo({
         demoName: demo,
         argoDir: '.argo',
@@ -305,6 +321,7 @@ export function createProgram(): Command {
         freezeSpecs: resolvedFreezes.length > 0 ? resolvedFreezes : undefined,
         overlayPngs,
         shaderTransitions,
+        hfBlocks,
         encoder: config.export.encoder,
         encoderDefault: 'cpu',
       });
@@ -515,6 +532,7 @@ export function createProgram(): Command {
             sharpen: config.export.sharpen,
             frame: config.export.frame,
             motionBlur: config.export.motionBlur,
+            blocksDir: config.blocksDir,
           },
         });
         console.log(`\nArgo Dashboard running at: ${url}`);
@@ -554,6 +572,7 @@ export function createProgram(): Command {
           sharpen: config.export.sharpen,
           frame: config.export.frame,
           motionBlur: config.export.motionBlur,
+          blocksDir: config.blocksDir,
         },
       });
       console.log(`\nArgo Preview running at: ${url}`);
