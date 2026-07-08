@@ -12,7 +12,9 @@ export default defineConfig({
     fps: 30,
     browser: 'chromium',
     captureMode: 'jpeg-stitch',
-    jpegQuality: 95,
+    // q88 (not 95): the catalog scene captures a playing video preview —
+    // q95 frames of video noise saturate the stitch writer.
+    jpegQuality: 88,
     showActions: false,
   },
   export: {

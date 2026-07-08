@@ -119,6 +119,29 @@
   .stat .n { font-size: clamp(44px, 4.6vw, 76px); font-weight: 800; letter-spacing: -0.03em; color: var(--accent-bright); }
   .stat .l { margin-top: 6px; font-size: 16px; color: var(--muted); letter-spacing: 0.04em; }
 
+  .shader-grid {
+    margin-top: 46px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    max-width: 1080px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 17px;
+  }
+  .shader-grid span {
+    padding: 14px 18px;
+    border-radius: 10px;
+    background: rgba(245, 247, 250, 0.04);
+    border: 1px solid rgba(245, 247, 250, 0.09);
+    color: var(--muted);
+    text-align: center;
+  }
+  .shader-grid span.hot {
+    color: var(--accent-bright);
+    border-color: rgba(14, 165, 233, 0.5);
+    background: rgba(14, 165, 233, 0.10);
+  }
+
   /* outro backdrop — intentionally quiet; the logo-outro block composites over it */
   #outro { align-items: center; text-align: center; }
   #outro .sub { margin-top: 18px; }
@@ -138,6 +161,47 @@
   <h1>Record the <span class="glow">real thing.</span></h1>
   <p class="sub"><strong>Argo</strong> drives your actual product with Playwright, narrates it with local AI voiceover, directs the camera, and exports a polished MP4 — <strong>one command, end to end</strong>.</p>
   <code class="cmd"><span class="p">$</span> argo pipeline my-demo</code>
+</section>
+
+<section id="overlays">
+  <div class="kicker">Argo overlays</div>
+  <h1>Five templates.<br /><span class="glow">Plus blocks.</span></h1>
+  <p class="sub">Lower-thirds, headline cards, callouts, arrows, image cards — and a curated block catalog. All GSAP-animated, all driven from a <strong>JSON manifest</strong>.</p>
+</section>
+
+<section id="camera">
+  <div class="kicker">Camera direction</div>
+  <h1>Direct the <span class="glow">viewer's eye.</span></h1>
+  <div class="pillars" style="grid-template-columns: 1fr 1fr; max-width: 1080px; gap: 28px; margin-top: 44px;">
+    <div class="pillar" id="cam-spotlight"><span class="tag">spotlight()</span><h3>Spotlight</h3><p>Dim everything but the point of interest.</p></div>
+    <div class="pillar" id="cam-focus"><span class="tag">focusRing()</span><h3>Focus ring</h3><p>Draw a pulsing ring around any element.</p></div>
+    <div class="pillar" id="cam-dim"><span class="tag">dimAround()</span><h3>Dim around</h3><p>Fade the page back, keep the subject lit.</p></div>
+    <div class="pillar" id="cam-zoom"><span class="tag">zoomTo()</span><h3>Post-export zoom</h3><p>Frame-exact ffmpeg zoompan — no DOM tricks.</p></div>
+  </div>
+</section>
+
+<section id="components">
+  <div class="kicker">HyperFrames components</div>
+  <h1 class="shimmer-sweep-target">Film grade,<br /><span class="glow">one install.</span></h1>
+  <p class="sub">Vignette. Grain. Shimmer. Installed from the catalog with <strong>argo add</strong>, injected live into the recording — watch this very footage change.</p>
+</section>
+
+<section id="effects">
+  <div class="kicker">Effects &amp; freeze</div>
+  <h1>Ship-it <span class="glow">moments.</span></h1>
+  <p class="sub">Confetti bursts, emoji rain — and when the moment lands, argo can <strong>freeze the frame</strong> in the export while the narration keeps going.</p>
+</section>
+
+<section id="shaders">
+  <div class="kicker">Shader transitions</div>
+  <h1>Sixteen <span class="glow">shaders.</span></h1>
+  <p class="sub">Every cut in this video is <strong>ridged-burn</strong> — ported from the HyperFrames shader library, tinted with this brand's accent.</p>
+  <div class="shader-grid">
+    <span>crosswarp</span><span>swirl</span><span>ripple</span><span>luma-mask</span>
+    <span>light-leak</span><span>domain-warp</span><span class="hot">ridged-burn</span><span>thermal-distortion</span>
+    <span>swirl-vortex</span><span>whip-pan</span><span>gravitational-lens</span><span>cinematic-zoom</span>
+    <span>chromatic-split</span><span>flash-through-white</span><span>sdf-iris</span><span>ripple-waves</span>
+  </div>
 </section>
 
 <section id="better">
