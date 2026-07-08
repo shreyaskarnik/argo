@@ -123,6 +123,16 @@ Trust model: components are trusted-at-install (user ran `argo add`, files are g
 
 `argo validate` checks that referenced hf-components are installed (`blocks/<name>/<name>.html` exists) and validates `export.transition.accent` as a 6-digit hex color.
 
+**`hf-block` cutaway cue** (`src/hf/block-render.ts`, `src/hf/block-filter.ts`): `{ type: 'hf-block', name, params?, durationMs?, fit?: 'cover' | {x,y,scale}, holdLastFrame? }`. Unlike `hf-component` (live DOM injection), `hf-block` is a no-op at recording time — it only paces the wait, nothing is injected into the page. The block's paused GSAP timeline is rendered later, at export time, by a dedicated headless Chromium pre-pass (`renderBlockFrames`) that loads the installed `blocks/<name>/<name>.html`, waits for the hyperframes convention `window.__timelines[<id>] = { duration(), pause(), seek(t) }` to register, then seeks it frame-by-frame and screenshots each frame with `omitBackground: true` for an alpha PNG sequence. `holdLastFrame` pins the timeline at its native duration instead of linearly retiming the whole animation into the window; sampling is edge-inclusive (last frame lands exactly at the window end) with an N=1 midpoint fallback.
+
+Content-addressed cache at `.argo/<demo>/hf-blocks/<hash>/` — `computeBlockHash(blockHtml, params, durationMs, fps, width, height)` — a cache hit skips the Chromium launch entirely (`renderHfBlocks` in `block-render.ts` shares one browser instance lazily across cache misses in a batch, mirroring the shader-render pre-pass pattern).
+
+`resolveHfBlockCues(rawManifest, placements)` anchors each cue to its scene's placement window: `endMs = startMs + (durationMs ?? windowMs)`, capped at the placement's own `endMs` unless the requested duration overshoots — in which case it's allowed to run into the gap after the scene, capped at the next placement's `startMs` (uncapped on the last scene; ffmpeg's `enable=between(t,...)` window is naturally clipped by the video's total duration regardless). Scenes with no matching placement are skipped with a warning, same as overlays/subtitles.
+
+Compositing (`buildHfBlockFilters`) adds one `-framerate`/`image2` input per cue and an `enable`-gated `overlay` with `eof_action=pass` — applied immediately after camera moves and overlay PNGs, before the frame effect/watermark (same layer priority as overlay PNGs). It's a pure cutaway: `-shortest` and total output duration are unaffected.
+
+Wired at all four export paths: pipeline primary, pipeline variants, CLI `argo export`, and `argo preview` export (`PreviewExportConfig` gained `blocksDir`). Blocks need network access at export time — real registry blocks load GSAP + Google Fonts from CDNs during the pre-render pass, so offline exports of demos with `hf-block` cues will fail at that step. **Known limitation:** `hf-block` + `export.speedRamp` is untested and can misalign windows — `resolveHfBlockCues` anchors windows to post-ramp scene placements (the same ones subtitles/chapters use), but the ramp's dead-time compression (`computeSegments` in `src/speed-ramp.ts`) is computed independently in source-timeline coordinates before cues are resolved. Avoid combining the two until this is verified end-to-end.
+
 ### Effects (`src/effects.ts`)
 
 `showConfetti(page, opts?)` — non-blocking by default (fire-and-forget safe). Injects a canvas-based confetti animation via `page.evaluate()`. Two spread modes: `burst` (Raycast-style, center-top fan) and `rain` (full-width fall). `emoji: '🎃'` or `emoji: ['🎄', '⭐']` renders emoji characters instead of colored rectangles. Set `wait: true` to block until animation completes. Errors from page/context disposal are swallowed; all other errors surface as warnings.
@@ -331,6 +341,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - ffmpeg `gradients` source filter rejects negative `x0/y0/x1/y1` values — angle-to-coordinate conversion can produce negatives for certain angles. Always clamp.
 - `narration.mark()` does sync `appendFileSync` which can trigger app re-renders on the same event loop tick — overlay injection fence mitigates but apps with very aggressive DOM updates may still need manual `waitForTimeout()` after `mark()`.
 - `-shortest` must be skipped when frame PNG overlay is present — PNG has 0 duration and truncates the entire output.
+- `hf-block` cutaway cues are not validated in combination with `export.speedRamp` — cue windows are resolved from post-ramp placements while the ramp's gap-compression segments are computed independently in source-timeline coordinates, which can misalign the block window against the retimed video. Don't combine them until this is revisited.
 
 ## Security Invariants
 

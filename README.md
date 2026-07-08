@@ -316,6 +316,28 @@ await removeComponent(page, 'grain-overlay');
 
 > **Note:** `caption-*` components install like any other item but don't yet support word-level timing (future work). Components can ship a `<script>`, but strict CSP on the recorded page may block it — a warning is logged, the recording still succeeds.
 
+Use an installed **block** as an export-time cutaway with the `hf-block` overlay cue:
+
+```json
+{
+  "scene": "outro",
+  "overlay": {
+    "type": "hf-block",
+    "name": "logo-outro",
+    "params": { "--brand-color": "#6366f1" },
+    "durationMs": 2000,
+    "fit": "cover",
+    "holdLastFrame": false
+  }
+}
+```
+
+`hf-block` is fundamentally different from `hf-component`: during recording it's a no-op (just paces the wait, nothing is injected into the page), and the block's GSAP timeline is rendered afterward — at export time — in a separate headless Chromium pass that seeks the block's `window.__timelines` entry frame-by-frame and screenshots it with a transparent background. The resulting PNG sequence is composited over the recording as a cutaway overlay (an `enable`-gated ffmpeg `overlay`), so it never changes the video's total duration. Frames are cached by content hash at `.argo/<demo>/hf-blocks/<hash>/` — an unchanged block/params/duration/fps/size combo skips the browser launch entirely on the next export.
+
+The window the block plays over defaults to the scene's placement (from mark to the next mark); `durationMs` can shrink that window or extend it into the dead time after the scene (capped at the next scene's start, or left open on the last scene). `fit` is `'cover'` (scaled to fill the frame, the default) or `{ x, y, scale }` for a positioned/scaled placement. `holdLastFrame: true` pins the block's final frame instead of linearly retiming its whole timeline into the window — useful when the window is much shorter than the block's natural animation length.
+
+Because the pre-render pass loads the real block HTML, it needs network access at export time for blocks that pull in GSAP or Google Fonts from a CDN — plan for that in CI/offline export environments. `hf-block` is also not currently compatible with `export.speedRamp`: the cutaway's window is resolved from post-ramp scene placements but the ramp's own dead-time compression is computed independently, so combining the two can misalign the block window against the retimed video. Avoid pairing them until this is revisited.
+
 ### GSAP motion (advanced)
 
 Every overlay supports two kinds of `motion`: a named CSS preset (`none`, `fade-in`, `slide-in`) or a declarative GSAP motion object with `in`, `out`, and `loop` phases. `showOverlay(page, scene, durationMs)` auto-times the exit so the visible window matches `durationMs`:

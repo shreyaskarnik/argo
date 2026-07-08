@@ -187,7 +187,7 @@ Key fields: `scene` (required, matches `mark()`), `text` (spoken narration — o
 
 ### Overlay Templates
 
-Five zone-based template types, each with a `type` discriminant. All support `placement`, `motion`, and `autoBackground`. (Two more cue types exist: `block` — see Overlay blocks below — and `hf-component` — full-frame hyperframes components, see HyperFrames components below.)
+Five zone-based template types, each with a `type` discriminant. All support `placement`, `motion`, and `autoBackground`. (Three more cue types exist: `block` — see Overlay blocks below; `hf-component` — full-frame hyperframes components, see HyperFrames components below; and `hf-block` — export-time hyperframes block cutaways, see HyperFrames blocks below.)
 
 - **`lower-third`**: `{ type: 'lower-third', text: '...' }` — text banner
 - **`headline-card`**: `{ type: 'headline-card', title: '...', kicker: '...', body: '...' }` — large card
@@ -269,6 +269,20 @@ await removeComponent(page, 'grain-overlay');
 ```
 
 Config: `blocksDir` (install location, default `blocks/`) and `registry: { url }` (registry override; also `--registry <url>` per-invocation). `argo validate` errors if a referenced component isn't installed. Caveats: `caption-*` components install but lack word-timing support (future); component `<script>`s may be blocked by strict CSP on the recorded page (warning, not failure); components are trusted-at-install — review `blocks/` before committing.
+
+### HyperFrames blocks (`hf-block`, export-time cutaways)
+
+Installed **blocks** (e.g. `logo-outro`, animated end-cards) can also be used as a scene-anchored cutaway that's pre-rendered and composited at export time, instead of injected live:
+
+```json
+{ "scene": "outro", "overlay": { "type": "hf-block", "name": "logo-outro", "durationMs": 2000, "fit": "cover", "holdLastFrame": false } }
+```
+
+`hf-block` does nothing during recording — no injection, just a pacing wait. At export time, a headless Chromium pre-pass loads the block, seeks its GSAP timeline, and captures an alpha PNG sequence, which is composited over the recording as a cutaway overlay (video duration is unaffected). Frames are cached at `.argo/<demo>/hf-blocks/<hash>/`; an unchanged block/params/duration skips the render on the next export.
+
+The cutaway window defaults to the scene's placement (mark to next mark); `durationMs` can shorten it or extend it into the gap after the scene. `fit` is `'cover'` (default, fills the frame) or `{ x, y, scale }` for a positioned placement. `holdLastFrame: true` freezes the block's last frame instead of stretching its whole animation to fit the window.
+
+Caveats: the pre-render pass needs network access for blocks that load GSAP/fonts from a CDN — offline exports of `hf-block` demos will fail at that step. Not currently compatible with `export.speedRamp` (cutaway windows can misalign with the retimed video) — avoid combining the two.
 
 ### How Overlays Get Triggered
 
