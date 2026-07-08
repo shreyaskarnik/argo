@@ -1,0 +1,52 @@
+[
+  {
+    "scene": "hook",
+    "text": "This video was not edited. It was compiled. A Playwright script recorded it, a local A I voice narrated it, and every transition you are about to see came from a motion catalog.",
+    "speed": 0.94
+  },
+  {
+    "scene": "catalog",
+    "text": "This is Hyper Frames, by Hey Jen. An open source motion library for video: over a hundred and forty blocks, components, and shader transitions, all written in plain H T M L.",
+    "speed": 0.95,
+    "overlay": {
+      "type": "lower-third",
+      "text": "hyperframes.heygen.com — 142 blocks · components · shader transitions",
+      "placement": "bottom-left",
+      "motion": {
+        "type": "gsap",
+        "in": { "from": { "x": -40, "opacity": 0 }, "duration": 0.5, "ease": "power3.out" },
+        "out": { "to": { "opacity": 0 }, "duration": 0.35 }
+      }
+    }
+  },
+  {
+    "scene": "argo",
+    "text": "And this is argo. It drives your real product with Playwright, narrates with local text to speech, directs the camera, and exports a finished video. One command, end to end.",
+    "speed": 0.94
+  },
+  {
+    "scene": "better",
+    "text": "Together they are more than the sum. argo add installs film grain, a cinematic vignette, and branded end cards straight from the Hyper Frames catalog. Watch the grade land on this very footage.",
+    "speed": 0.94,
+    "overlay": {
+      "type": "callout",
+      "text": "argo add vignette grain-overlay",
+      "placement": "top-right",
+      "motion": {
+        "type": "gsap",
+        "in": { "from": { "y": -24, "opacity": 0 }, "duration": 0.45, "ease": "back.out" },
+        "out": { "to": { "opacity": 0 }, "duration": 0.3 }
+      }
+    }
+  },
+  {
+    "scene": "outro",
+    "text": "Every scene boundary in this video was a Hyper Frames shader, rendered by argo's export pipeline. And this end card? A catalog block, pre rendered frame by frame. Demos as code. Motion as catalog.",
+    "speed": 0.93,
+    "overlay": {
+      "type": "hf-block",
+      "name": "logo-outro",
+      "holdLastFrame": true
+    }
+  }
+]

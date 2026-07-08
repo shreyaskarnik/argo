@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Argo × HyperFrames</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --accent: #0ea5e9;
+    --accent-bright: #7dd3fc;
+    --ink: #f5f7fa;
+    --muted: rgba(245, 247, 250, 0.62);
+    --bg: #07090d;
+  }
+  html, body { background: var(--bg); color: var(--ink); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  section {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 8vh 9vw;
+    position: relative;
+  }
+  .kicker {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 26px;
+  }
+  h1 {
+    font-size: clamp(56px, 7.2vw, 118px);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.02;
+    max-width: 15ch;
+  }
+  h1 .dim { color: var(--muted); }
+  h1 .glow { color: var(--accent-bright); }
+  .sub {
+    margin-top: 30px;
+    font-size: clamp(19px, 1.6vw, 26px);
+    line-height: 1.55;
+    color: var(--muted);
+    max-width: 52ch;
+  }
+  .sub strong { color: var(--ink); font-weight: 650; }
+  code.cmd {
+    display: inline-block;
+    margin-top: 34px;
+    padding: 16px 26px;
+    border-radius: 12px;
+    background: rgba(14, 165, 233, 0.09);
+    border: 1px solid rgba(14, 165, 233, 0.35);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: clamp(17px, 1.4vw, 23px);
+    color: var(--accent-bright);
+  }
+  code.cmd .p { color: var(--muted); }
+
+  /* hook backdrop: faint radial wash + grid */
+  #hook::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(1100px 620px at 76% 22%, rgba(14, 165, 233, 0.16), transparent 62%),
+      radial-gradient(800px 520px at 12% 88%, rgba(56, 189, 248, 0.08), transparent 60%);
+    pointer-events: none;
+  }
+  #hook::after {
+    content: "";
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(245,247,250,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(245,247,250,0.035) 1px, transparent 1px);
+    background-size: 72px 72px;
+    mask-image: radial-gradient(900px 600px at 70% 30%, black, transparent 75%);
+    pointer-events: none;
+  }
+
+  /* pillars row on #better */
+  .pillars {
+    margin-top: 54px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 40px;
+    align-items: center;
+    max-width: 1180px;
+  }
+  .pillar {
+    padding: 34px 36px;
+    border-radius: 18px;
+    background: rgba(245, 247, 250, 0.04);
+    border: 1px solid rgba(245, 247, 250, 0.09);
+  }
+  .pillar h3 {
+    font-size: 26px;
+    font-weight: 750;
+    letter-spacing: -0.015em;
+    margin-bottom: 12px;
+  }
+  .pillar p { color: var(--muted); font-size: 18px; line-height: 1.55; }
+  .pillar .tag { font-size: 13px; font-weight: 700; letter-spacing: 0.18em; color: var(--accent); text-transform: uppercase; display: block; margin-bottom: 14px; }
+  .times {
+    font-size: 54px;
+    font-weight: 300;
+    color: var(--accent);
+    text-align: center;
+  }
+
+  .stat-row { margin-top: 46px; display: flex; gap: 64px; }
+  .stat .n { font-size: clamp(44px, 4.6vw, 76px); font-weight: 800; letter-spacing: -0.03em; color: var(--accent-bright); }
+  .stat .l { margin-top: 6px; font-size: 16px; color: var(--muted); letter-spacing: 0.04em; }
+
+  /* outro backdrop — intentionally quiet; the logo-outro block composites over it */
+  #outro { align-items: center; text-align: center; }
+  #outro .sub { margin-top: 18px; }
+  #outro h1 { max-width: none; }
+</style>
+</head>
+<body>
+
+<section id="hook">
+  <div class="kicker">Argo &times; HyperFrames</div>
+  <h1>Product demos,<br /><span class="glow">but cinematic.</span></h1>
+  <p class="sub">This video is <strong>code</strong>. A Playwright script recorded it, an AI voice narrated it, and a motion catalog styled it — <strong>no editor, no timeline, no re-takes</strong>.</p>
+</section>
+
+<section id="argo">
+  <div class="kicker">Meet Argo</div>
+  <h1>Record the <span class="glow">real thing.</span></h1>
+  <p class="sub"><strong>Argo</strong> drives your actual product with Playwright, narrates it with local AI voiceover, directs the camera, and exports a polished MP4 — <strong>one command, end to end</strong>.</p>
+  <code class="cmd"><span class="p">$</span> argo pipeline my-demo</code>
+</section>
+
+<section id="better">
+  <div class="kicker">Better together</div>
+  <h1>Your product. <span class="glow">Their motion.</span></h1>
+  <div class="pillars">
+    <div class="pillar">
+      <span class="tag">Argo brings</span>
+      <h3>The recording</h3>
+      <p>Real app, real interactions, AI narration, camera direction, one-command export.</p>
+    </div>
+    <div class="times">&times;</div>
+    <div class="pillar">
+      <span class="tag">HyperFrames brings</span>
+      <h3>The motion catalog</h3>
+      <p>Shader transitions, film grade, branded end cards — installed with one command.</p>
+    </div>
+  </div>
+  <code class="cmd"><span class="p">$</span> argo add vignette grain-overlay logo-outro</code>
+</section>
+
+<section id="outro">
+  <div class="kicker">Argo &times; HyperFrames</div>
+  <h1>Ship the demo.</h1>
+  <p class="sub">github.com/shreyaskarnik/argo &nbsp;·&nbsp; github.com/heygen-com/hyperframes</p>
+</section>
+
+</body>
+</html>
