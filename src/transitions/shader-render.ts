@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { chromium, type Browser } from '@playwright/test';
 import { buildShaderPageHtml } from './shader-page.html.js';
+import { getVideoDurationMs } from '../media.js';
 import { SHADERS, type ShaderName } from './shaders/index.js';
 import { deriveAccentColors, DEFAULT_ACCENT } from './accent.js';
 
@@ -177,12 +178,25 @@ export async function renderShaderTransitions(opts: {
   mkdirSync(tmpFramesDir, { recursive: true });
   const extracted: Array<{ aPath: string; bPath: string; spec: BoundarySpec }> = [];
   const epsilon = 1 / opts.fps / 2;
+  // Marks are wall-clock but the assembled video can run shorter (dropped
+  // frames under jpeg-stitch), so a late boundary may land past the video's
+  // end — clamp extraction inside the video or ffmpeg emits no frame (ENOENT).
+  const videoDurationSec = getVideoDurationMs(opts.videoPath) / 1000;
+  const maxBoundarySec = Math.max(0, videoDurationSec - 2 / opts.fps);
   for (let i = 0; i < opts.boundaries.length; i++) {
     const b = opts.boundaries[i];
+    let boundarySec = b.boundarySec;
+    if (boundarySec > maxBoundarySec) {
+      console.warn(
+        `Shader boundary ${i} at ${boundarySec.toFixed(2)}s is past the video end ` +
+          `(${videoDurationSec.toFixed(2)}s) — clamping.`,
+      );
+      boundarySec = maxBoundarySec;
+    }
     const aPath = pathJoin(tmpFramesDir, `b${i}_a.png`);
     const bPath = pathJoin(tmpFramesDir, `b${i}_b.png`);
-    await extractBoundaryFrame(opts.videoPath, Math.max(0, b.boundarySec - epsilon), aPath);
-    await extractBoundaryFrame(opts.videoPath, b.boundarySec + epsilon, bPath);
+    await extractBoundaryFrame(opts.videoPath, Math.max(0, boundarySec - epsilon), aPath);
+    await extractBoundaryFrame(opts.videoPath, Math.min(boundarySec + epsilon, maxBoundarySec), bPath);
     extracted.push({ aPath, bPath, spec: b });
   }
 

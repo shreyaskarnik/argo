@@ -287,3 +287,27 @@ describe('every registered shader compiles and renders', () => {
     }
   }, 120_000);
 });
+
+describe('renderShaderTransitions boundary clamping', () => {
+  let tmp: string;
+  beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'argo-shader-clamp-')); });
+  afterEach(() => { rmSync(tmp, { recursive: true, force: true }); });
+
+  it.skipIf(!hasFfmpeg)('clamps a boundary past the video end instead of failing', async () => {
+    const { renderShaderTransitions } = await import('../../src/transitions/shader-render.js');
+    // 2-second test video
+    const video = join(tmp, 'v.mp4');
+    await execFileP('ffmpeg', ['-y', '-f', 'lavfi', '-i', 'color=red:s=64x36:d=2', '-r', '30', video]);
+    // boundary at 5s — well past the 2s video (mark-drift scenario)
+    const results = await renderShaderTransitions({
+      videoPath: video,
+      boundaries: [{ boundarySec: 5, durationMs: 200 }],
+      shader: 'crosswarp',
+      width: 64, height: 36, fps: 30,
+      cacheDir: join(tmp, 'cache'),
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0].frameCount).toBeGreaterThanOrEqual(1);
+    expect(existsSync(join(results[0].pngDir, 'frame_0000.png'))).toBe(true);
+  }, 120_000);
+});

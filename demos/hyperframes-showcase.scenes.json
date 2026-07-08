@@ -1,7 +1,7 @@
 [
   {
     "scene": "hook",
-    "text": "This video was not edited. It was compiled. A Playwright script recorded it, a local A I voice narrated it, and every effect you are about to see is a feature. This is the full tour of argo and Hyper Frames, together.",
+    "text": "This video was not edited. It was choreographed. Every camera move, every beat, every cut you are about to see is code. Playwright drives the browser. Argo directs the film. Hyper Frames supplies the motion. This is the full tour.",
     "speed": 0.94,
     "overlay": {
       "type": "headline-card",
@@ -33,7 +33,7 @@
   },
   {
     "scene": "argo",
-    "text": "And this is argo. It drives your real product with Playwright, narrates with local text to speech, directs the camera, and exports a finished video. One command, end to end."
+    "text": "And this is argo. Not a screen recorder: the full power of Playwright, pointed at film making. Real navigation, real clicks, real waits. Your product, driven exactly the way users drive it, then narrated, directed, and exported. One command, end to end."
   },
   {
     "scene": "voices",
@@ -63,7 +63,7 @@
   },
   {
     "scene": "components",
-    "text": "Components grade the footage itself. A cinematic vignette. Film grain. A shimmer sweep across the headline. Each one installed from the catalog and injected live, while the recorder was rolling."
+    "text": "Components grade the footage itself. A cinematic vignette pulls your eye to the center. A shimmer sweeps across the headline. Installed from the catalog, injected live, while the recorder was rolling."
   },
   {
     "scene": "effects",
@@ -76,7 +76,7 @@
   },
   {
     "scene": "better",
-    "text": "So that is the deal. Argo brings the recording: real product, A I narration, camera direction, one command export. Hyper Frames brings the motion: transitions, film grade, branded end cards. Better together.",
+    "text": "So here is the thesis. This is not just a Playwright video. It is cinematic choreography: carefully crafted with Playwright, composed via Hyper Frames. Argo directs; the catalog performs. Better together.",
     "overlay": {
       "type": "callout",
       "text": "argo add vignette grain-overlay data-chart logo-outro",
@@ -90,7 +90,7 @@
   },
   {
     "scene": "outro",
-    "text": "And this end card? A catalog block. We installed it, opened the H T M L, made it ours, and argo re rendered it automatically. Demos as code. Motion as catalog. Chapters, subtitles, and metadata are already in the file. Go ship one.",
+    "text": "And this end card? A catalog block. We installed it, opened the H T M L, made it ours, and argo re rendered it automatically. Chapters, subtitles, and metadata are already in the file. Crafted with Playwright. Composed via Hyper Frames. Go ship one.",
     "speed": 0.93,
     "overlay": {
       "type": "hf-block",

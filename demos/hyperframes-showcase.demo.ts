@@ -154,9 +154,7 @@ test('hyperframes-showcase', async ({ page, narration }) => {
   const compMs = narration.sceneDuration('components');
   await page.waitForTimeout(Math.floor(compMs * 0.25));
   await applyComponent(page, 'vignette', { params: { '--vignette-size': '50%' } });
-  await page.waitForTimeout(Math.floor(compMs * 0.15));
-  await applyComponent(page, 'grain-overlay');
-  await page.waitForTimeout(Math.floor(compMs * 0.15));
+  await page.waitForTimeout(Math.floor(compMs * 0.3));
   // shimmer-sweep injects masks into .shimmer-sweep-target; the sweep position
   // is a CSS var normally driven by a composition timeline — drive it with a
   // small rAF loop here (two passes).
@@ -206,4 +204,7 @@ test('hyperframes-showcase', async ({ page, narration }) => {
   await page.waitForTimeout(500);
   narration.mark('outro');
   await page.waitForTimeout(narration.durationFor('outro'));
+  // Tail buffer: jpeg-stitch frame drops make the assembled video slightly
+  // shorter than wall-clock, so keep the last mark off the video's edge.
+  await page.waitForTimeout(1500);
 });
