@@ -38,6 +38,9 @@ describe('computeBlockHash', () => {
     expect(computeBlockHash('<html>', undefined, 1000, 30, 320, 180)).toBe(
       computeBlockHash('<html>', {}, 1000, 30, 320, 180),
     );
+    expect(computeBlockHash('<html>', undefined, 1000, 30, 320, 180, true)).not.toBe(
+      computeBlockHash('<html>', undefined, 1000, 30, 320, 180, false),
+    );
   });
 });
 
@@ -83,5 +86,33 @@ describe('renderBlockFrames', () => {
     await expect(
       renderBlockFrames({ blockHtmlPath: blockPath, outputDir: join(tmp, 'out'), durationMs: 200, fps: 5, width: 320, height: 180, browser }),
     ).rejects.toThrow(/__timelines/);
+  }, 60_000);
+
+  it('holdLastFrame produces different pixels than retiming when the window overshoots the native duration', async () => {
+    // FIXTURE_BLOCK's native timeline duration is 2s. Requesting a 4s window
+    // (durationMs: 4000, fps: 2) makes N = round(4000*2/1000) = 8, so the
+    // window overshoots the native 2s duration and the two modes diverge.
+    //
+    // At i=4: tVideo = (4/(N-1)) * requestedSec = (4/7) * 4 = 16/7 ≈ 2.2857s
+    //   - holdLastFrame: tBlock = min(tVideo, nativeDurationSec) = min(2.2857, 2) = 2.0
+    //   - retime:        tBlock = (tVideo * nativeDurationSec) / requestedSec
+    //                            = (2.2857 * 2) / 4 ≈ 1.1429
+    // 2.0 (bar fully extended) vs ~1.1429 (bar ~57% extended) render visibly
+    // different bar widths, so frame_0004.png differs between the two modes.
+    const blockPath = join(tmp, 'hold-vs-retime.html');
+    writeFileSync(blockPath, FIXTURE_BLOCK);
+    const holdDir = join(tmp, 'hold');
+    const retimeDir = join(tmp, 'retime');
+    await renderBlockFrames({
+      blockHtmlPath: blockPath, outputDir: holdDir,
+      durationMs: 4000, fps: 2, width: 320, height: 180, holdLastFrame: true, browser,
+    });
+    await renderBlockFrames({
+      blockHtmlPath: blockPath, outputDir: retimeDir,
+      durationMs: 4000, fps: 2, width: 320, height: 180, holdLastFrame: false, browser,
+    });
+    expect(
+      readFileSync(join(holdDir, 'frame_0004.png')).equals(readFileSync(join(retimeDir, 'frame_0004.png'))),
+    ).toBe(false);
   }, 60_000);
 });

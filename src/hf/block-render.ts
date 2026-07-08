@@ -23,8 +23,9 @@ export function computeBlockHash(
   fps: number,
   width: number,
   height: number,
+  holdLastFrame = false,
 ): string {
-  const parts = [blockHtml, JSON.stringify(params ?? {}), durationMs, fps, width, height].join('|');
+  const parts = [blockHtml, JSON.stringify(params ?? {}), durationMs, fps, width, height, holdLastFrame].join('|');
   return createHash('sha256').update(parts).digest('hex').slice(0, 16);
 }
 
@@ -71,7 +72,15 @@ export async function renderBlockFrames(opts: RenderBlockFramesOptions): Promise
         }, opts.params);
       }
 
-      await page.evaluate(() => document.fonts.ready.then(() => undefined));
+      // Fonts load from CDNs in real blocks — bound the wait so a broken
+      // @font-face can't hang the export; warn and continue with fallbacks.
+      const fontsReady = await Promise.race([
+        page.evaluate(() => document.fonts.ready.then(() => true)),
+        new Promise<boolean>((r) => setTimeout(() => r(false), 10_000)),
+      ]);
+      if (!fontsReady) {
+        console.warn(`[argo] fonts still loading after 10s for ${opts.blockHtmlPath} — rendering with fallback fonts`);
+      }
 
       // Wait for the hyperframes timeline registration convention.
       try {
@@ -259,7 +268,7 @@ export async function renderHfBlocks(opts: RenderHfBlocksOptions): Promise<Rende
       const durationMs = cue.endMs - cue.startMs;
       const frameCount = Math.max(1, Math.round((durationMs * opts.fps) / 1000));
       const blockHtml = readFileSync(blockHtmlPath, 'utf-8');
-      const hash = computeBlockHash(blockHtml, cue.params, durationMs, opts.fps, width, height);
+      const hash = computeBlockHash(blockHtml, cue.params, durationMs, opts.fps, width, height, cue.holdLastFrame);
       const pngDir = join(opts.cacheDir, hash);
       const expectedLastFrame = join(pngDir, `frame_${String(frameCount - 1).padStart(4, '0')}.png`);
 
