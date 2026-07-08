@@ -20,7 +20,10 @@ import { zoomTo, spotlight, focusRing, dimAround, resetCamera } from '@argo-vide
 import { cursorHighlight, resetCursor } from '@argo-video/cli';
 
 test('hyperframes-showcase', async ({ page, narration }) => {
-  test.setTimeout(420_000);
+  // 15 min: the recording is ~3.5 min of content, but a loaded machine can
+  // run the screencast writer 2x+ slower — give slow runs room to finish
+  // rather than dying at the outro (mark-drift clamps handle the rest).
+  test.setTimeout(900_000);
 
   await page.goto('/hyperframes-showcase.html');
   await page.waitForTimeout(700);

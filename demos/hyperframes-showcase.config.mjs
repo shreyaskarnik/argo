@@ -15,6 +15,9 @@ export default defineConfig({
     // q88 (not 95): the catalog scene captures a playing video preview —
     // q95 frames of video noise saturate the stitch writer.
     jpegQuality: 88,
+    // The live-site scenes occasionally wedge the renderer under screencast;
+    // one retry re-runs the demo rather than failing the pipeline.
+    retries: 1,
     showActions: false,
   },
   export: {
@@ -25,6 +28,8 @@ export default defineConfig({
     // Track 1 dogfood: hyperframes-ported shader at every boundary, tinted
     // with the brand accent (domain-warp uses accentDark/accentBright for its
     // edge glow).
-    transition: { type: 'shader', shader: 'domain-warp', durationMs: 2400, accent: '#0ea5e9' },
+    // whip-pan: fast camera-language cut — matches the "choreography" thesis
+    // and never smears on-screen text the way long warps do.
+    transition: { type: 'shader', shader: 'whip-pan', durationMs: 1600, accent: '#0ea5e9' },
   },
 });

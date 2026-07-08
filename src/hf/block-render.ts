@@ -16,6 +16,10 @@ import type { RenderedHfBlock } from './block-filter.js';
  * not need GSAP itself, so test fixtures can register plain objects.
  */
 
+/** Bump when renderBlockFrames' behavior changes what pixels are produced —
+ * salts the cache hash so stale frames from an older renderer never reuse. */
+const RENDERER_VERSION = 2;
+
 export function computeBlockHash(
   blockHtml: string,
   params: Record<string, string> | undefined,
@@ -25,7 +29,7 @@ export function computeBlockHash(
   height: number,
   holdLastFrame = false,
 ): string {
-  const parts = [blockHtml, JSON.stringify(params ?? {}), durationMs, fps, width, height, holdLastFrame].join('|');
+  const parts = [RENDERER_VERSION, blockHtml, JSON.stringify(params ?? {}), durationMs, fps, width, height, holdLastFrame].join('|');
   return createHash('sha256').update(parts).digest('hex').slice(0, 16);
 }
 
@@ -120,9 +124,12 @@ export async function renderBlockFrames(opts: RenderBlockFramesOptions): Promise
           : (tVideo * nativeDurationSec) / requestedSec;
         await page.evaluate((t) => {
           const tls = (window as unknown as {
-            __timelines: Record<string, { seek(t: number): void }>;
+            __timelines: Record<string, { seek(t: number, suppressEvents?: boolean): void }>;
           }).__timelines;
-          tls[Object.keys(tls)[0]].seek(t);
+          // suppressEvents=false: GSAP's seek() default (true) skips callbacks,
+          // but compositions write label text in onUpdate/.call() — without
+          // this, count-up numbers freeze at their initial value (e.g. "0.0%").
+          tls[Object.keys(tls)[0]].seek(t, false);
         }, tBlock);
         await page.screenshot({
           path: join(opts.outputDir, `frame_${String(i).padStart(4, '0')}.png`),
