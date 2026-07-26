@@ -174,8 +174,13 @@ export function buildCameraMoveFilter(
         panYClauses.push(`if(between(in_time\\,${f(panEnd)}\\,${f(nextZoomInEnd)})\\,${f(next.y)}`);
       }
     } else {
-      // Normal zoom-out
-      const progress = `1-(in_time-${f(holdEnd)})/${f(fadeOutSec)}`;
+      // Normal zoom-out.
+      //
+      // The outer parentheses are load-bearing. This is interpolated into
+      // `1+${progress}*${scale-1}`, and ffmpeg's parser binds `*` tighter than `+`,
+      // so without them the clause reads `1 + 1 - ((in_time-H)/D)*(scale-1)` — which
+      // starts at 2.0 instead of `scale`, and ends at `2-(scale-1)` instead of 1.0.
+      const progress = `(1-(in_time-${f(holdEnd)})/${f(fadeOutSec)})`;
       zoomClauses.push(`if(between(in_time\\,${f(holdEnd)}\\,${f(zoomOutEnd)})\\,1+${progress}*${f(scale - 1)}`);
       panXClauses.push(`if(between(in_time\\,${f(holdEnd)}\\,${f(zoomOutEnd)})\\,${f(move.x)}`);
       panYClauses.push(`if(between(in_time\\,${f(holdEnd)}\\,${f(zoomOutEnd)})\\,${f(move.y)}`);

@@ -43,6 +43,85 @@ describe('buildCameraMoveFilter', () => {
     expect(result!.outputLabel).toBe('camfinal');
   });
 
+  /**
+   * Read the `z` expression back out of the filter and evaluate it.
+   *
+   * ffmpeg's `if` and `between` map straight onto JS, and — the property under test
+   * here — the two agree on operator precedence for `+ - * /`. Asserting on values
+   * rather than on substrings is deliberate: issue #31 was a precedence bug that a
+   * substring assertion had locked in place, because the expected text was copied
+   * from the output rather than derived from what the curve should do.
+   */
+  function zoomAt(filter: string, inTime: number): number {
+    const match = filter.match(/zoompan=z='([^']+)'/);
+    if (match === null) throw new Error('no zoompan z expression in filter');
+    const js = match[1].replace(/\\,/g, ',');
+    const IF = (cond: boolean, then: number, otherwise: number): number =>
+      cond ? then : otherwise;
+    const BETWEEN = (x: number, lo: number, hi: number): boolean => x >= lo && x <= hi;
+    return new Function(
+      'in_time',
+      'IF',
+      'BETWEEN',
+      `return ${js.replace(/\bif\(/g, 'IF(').replace(/\bbetween\(/g, 'BETWEEN(')}`,
+    )(inTime, IF, BETWEEN) as number;
+  }
+
+  describe('the zoom curve', () => {
+    // baseMove: starts at 2.0s, 400ms in, 1000ms hold, 400ms out.
+    const zoomInEnd = 2.4;
+    const holdEnd = 3.4;
+    const zoomOutEnd = 3.8;
+
+    function curve(): (t: number) => number {
+      const result = buildCameraMoveFilter([baseMove], 1920, 1080, '[0:v]');
+      expect(result).not.toBeNull();
+      return (t: number) => zoomAt(result!.filter, t);
+    }
+
+    it('zooms in from 1.0 to the requested scale', () => {
+      const z = curve();
+      expect(z(2.0)).toBeCloseTo(1.0, 4);
+      expect(z(2.2)).toBeCloseTo(1.25, 4);
+      expect(z(zoomInEnd)).toBeCloseTo(1.5, 4);
+    });
+
+    it('holds at the requested scale', () => {
+      const z = curve();
+      expect(z(2.9)).toBeCloseTo(1.5, 4);
+      expect(z(holdEnd)).toBeCloseTo(1.5, 4);
+    });
+
+    // The regression. Without the parentheses around `progress` this began at 2.0.
+    it('does not jump when the zoom-out begins', () => {
+      const z = curve();
+      // One millisecond into a 400ms fade the curve may legitimately travel
+      // (scale-1)/400 ≈ 0.00125. The bug moved it by 0.5 in that same instant.
+      expect(Math.abs(z(holdEnd + 0.001) - z(holdEnd))).toBeLessThan(0.002);
+    });
+
+    // And this ended at 2-(scale-1) = 1.65, then snapped to 1.0 as the clause expired.
+    it('zooms out all the way back to 1.0', () => {
+      const z = curve();
+      expect(z(3.6)).toBeCloseTo(1.25, 4);
+      expect(z(zoomOutEnd)).toBeCloseTo(1.0, 4);
+    });
+
+    it('never exceeds the requested scale, at any point in the move', () => {
+      const z = curve();
+      for (let t = 1.9; t <= 4.0; t += 1 / 120) {
+        expect(z(t)).toBeLessThanOrEqual(1.5 + 1e-6);
+      }
+    });
+
+    it('leaves no discontinuity at the end of the move', () => {
+      const z = curve();
+      // The clause expires here and the default (1.0) takes over; the curve has to
+      // have arrived there already, or the last frame of the move is a visible snap.
+      expect(z(zoomOutEnd + 0.001)).toBeCloseTo(z(zoomOutEnd), 3);
+    });
+  });
+
   it('builds unified expression for multiple moves', () => {
     const move2: CameraMove = {
       startMs: 5000,
@@ -101,7 +180,7 @@ describe('buildCameraMoveFilter', () => {
     // Should NOT contain lerp between scales (no connected pan)
     expect(result!.filter).not.toContain('1.5000+(1.3000-1.5000)');
     // Each move zooms out independently
-    expect(result!.filter).toContain('1+1-(in_time');
+    expect(result!.filter).toContain('1+(1-(in_time');
   });
 
   it('does not chain overlapping moves (negative gap)', () => {
