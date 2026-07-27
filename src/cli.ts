@@ -98,6 +98,8 @@ export function createProgram(): Command {
         video: { width: config.video.width, height: config.video.height },
         browser,
         deviceScaleFactor: config.video.deviceScaleFactor,
+        captureMode: config.video.captureMode,
+        jpegQuality: config.video.jpegQuality,
         isMobile: config.video.isMobile,
         hasTouch: config.video.hasTouch,
         contextOptions: config.video.contextOptions,
