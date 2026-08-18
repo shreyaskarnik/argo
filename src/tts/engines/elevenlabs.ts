@@ -69,8 +69,9 @@ export class ElevenLabsEngine implements TTSEngine {
     }
     const mp3Buffer = Buffer.concat(chunks);
 
-    // Convert MP3 to Argo WAV format
+    // Convert MP3 to Argo WAV format. ElevenLabs has no speed parameter, so
+    // the rate change rides along with the conversion.
     const { convertToWav } = await import('../engine.js');
-    return convertToWav(mp3Buffer);
+    return convertToWav(mp3Buffer, options.speed ?? 1);
   }
 }

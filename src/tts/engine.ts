@@ -199,14 +199,86 @@ export function parseWavHeader(wav: Buffer): WavHeader {
   };
 }
 
+/** ffmpeg's `atempo` filter accepts a factor in [0.5, 2.0] per instance and
+ *  errors outside it, so a larger change has to be split across several
+ *  instances whose product is the requested speed. */
+const ATEMPO_MIN = 0.5;
+const ATEMPO_MAX = 2;
+
+/** Widest range the chain will honour, i.e. two `atempo` stages either way.
+ *  Past this the voice stops being intelligible, so a request that far out is
+ *  far more likely a typo than an intent. */
+const SPEED_MIN = ATEMPO_MIN * ATEMPO_MIN;
+const SPEED_MAX = ATEMPO_MAX * ATEMPO_MAX;
+
+/**
+ * Normalise a requested `speed` before it reaches the atempo chain.
+ *
+ * Throws on values the chain cannot converge on: it divides by the stage
+ * factor each pass, so `0`, a negative, or `Infinity` would loop forever —
+ * a hang mid-TTS with no output and no error. `NaN` escapes both loops and
+ * emits a literal `atempo=NaN`, which makes ffmpeg exit non-zero inside
+ * `execFileSync`. Both are misconfiguration, so they fail loudly.
+ *
+ * Merely extreme values are clamped rather than rejected — the intent is
+ * legible even when the number is silly.
+ */
+function guardSpeed(speed: number): number {
+  if (!Number.isFinite(speed) || speed <= 0) {
+    throw new Error(`TTS speed must be a positive finite number, got ${speed}`);
+  }
+  const capped = Math.min(SPEED_MAX, Math.max(SPEED_MIN, speed));
+  if (capped !== speed) {
+    console.warn(`Warning: TTS speed ${speed} clamped to ${capped}`);
+  }
+  return capped;
+}
+
+/** Trim floating-point noise so the filter string stays readable and ffmpeg
+ *  never sees something like `atempo=1.7999999999999998`. */
+function fmt(n: number): string {
+  return String(Number(n.toFixed(6)));
+}
+
+/**
+ * Build the ffmpeg args that change playback rate to `speed`.
+ *
+ * `atempo` rather than `asetrate`: it resamples in the time domain, so the
+ * voice speeds up without shifting pitch. Returns an empty array at 1x so the
+ * default path spawns ffmpeg with no filter at all.
+ */
+export function buildAtempoChain(speed: number): string[] {
+  if (speed === 1) return [];
+  speed = guardSpeed(speed);
+
+  const stages: number[] = [];
+  let remaining = speed;
+  while (remaining > ATEMPO_MAX) {
+    stages.push(ATEMPO_MAX);
+    remaining /= ATEMPO_MAX;
+  }
+  while (remaining < ATEMPO_MIN) {
+    stages.push(ATEMPO_MIN);
+    remaining /= ATEMPO_MIN;
+  }
+  stages.push(remaining);
+
+  return ['-filter:a', stages.map(s => `atempo=${fmt(s)}`).join(',')];
+}
+
 /**
  * Convert arbitrary audio (MP3, OGG, PCM, etc.) to Argo's WAV format
  * (mono, Float32, 24kHz) using ffmpeg.
+ *
+ * `speed` is applied here because engines that render server-side (ElevenLabs,
+ * Gemini) have no native rate control — this conversion is the only place the
+ * rate can change. Engines with their own speed parameter must not use it.
  */
-export function convertToWav(audioBuffer: Buffer): Buffer {
+export function convertToWav(audioBuffer: Buffer, speed = 1): Buffer {
   const { execFileSync } = childProcess;
   const result = execFileSync('ffmpeg', [
     '-i', 'pipe:0',
+    ...buildAtempoChain(speed),
     '-f', 'wav',
     '-acodec', 'pcm_f32le',
     '-ac', '1',
