@@ -12,16 +12,23 @@ env:
 
 jobs:
   unit:
-    name: Unit tests
+    name: Unit tests (node ${{ matrix.node }})
     runs-on: ubuntu-latest
     # A stalled apt/playwright install should fail fast, not burn the full
     # 6h default job budget. The unit suite itself runs in seconds.
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both ends of the supported range. Testing only the top hid a test
+        # that used a Node 22+ API and silently collected zero assertions
+        # everywhere below it.
+        node: [20, 24]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
       # ffmpeg is needed for boundary-frame extraction and shader pre-render.
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: npm install

@@ -87,5 +87,8 @@
     "sarvamai": {
       "optional": true
     }
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
