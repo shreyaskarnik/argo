@@ -66,8 +66,9 @@ export class GeminiEngine implements TTSEngine {
 
     const audioBuffer = Buffer.from(audioPart.inlineData.data, 'base64');
 
-    // Convert to Argo WAV format
+    // Convert to Argo WAV format. Gemini has no speed parameter, so the rate
+    // change rides along with the conversion.
     const { convertToWav } = await import('../engine.js');
-    return convertToWav(audioBuffer);
+    return convertToWav(audioBuffer, options.speed ?? 1);
   }
 }
