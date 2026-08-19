@@ -46,7 +46,7 @@ npm i -D @argo-video/cli
 # Add the TTS engine you want. Engines are optional peer dependencies,
 # so you only pay for the one you use. Run `npx argo doctor` any time to
 # see which engines are installed and the exact command for your setup.
-npm i kokoro-js          # local, free, no API key (~410 MB of ONNX runtime)
+npm i kokoro-js@1        # local, free, no API key (~410 MB of ONNX runtime)
 npm i openai             # cloud, needs OPENAI_API_KEY (~20 MB)
 
 # Initialize project
@@ -352,8 +352,8 @@ import { defineConfig, demosProject, engines } from '@argo-video/cli';
 
 ## Requirements
 
-- **Node.js** >= 18
-- **Playwright** >= 1.40 (peer dependency)
+- **Node.js** >= 20 (Playwright requires it)
+- **Playwright** >= 1.59 (peer dependency)
 - **ffmpeg** — system install required for export
 
 ```bash
@@ -379,13 +379,13 @@ choco install ffmpeg       # Windows
 
    | Engine | Type | Install | Size | API Key |
    |--------|------|---------|------|---------|
-   | `engines.kokoro()` | local | `npm i kokoro-js` | ~410 MB | none |
+   | `engines.kokoro()` | local | `npm i kokoro-js@1` | ~410 MB | none |
    | `engines.mlxAudio()` | local | `pip install mlx-audio` | n/a (Python) | none |
    | `engines.openai()` | cloud | `npm i openai` | ~20 MB | `OPENAI_API_KEY` |
    | `engines.elevenlabs()` | cloud | `npm i @elevenlabs/elevenlabs-js` | ~88 MB | `ELEVENLABS_API_KEY` |
    | `engines.gemini()` | cloud | `npm i @google/genai` | ~36 MB | `GEMINI_API_KEY` |
    | `engines.sarvam()` | cloud | `npm i sarvamai` | ~7 MB | `SARVAM_API_KEY` |
-   | `engines.transformers()` | local | `npm i @huggingface/transformers` | ~380 MB | none |
+   | `engines.transformers()` | local | `npm i @huggingface/transformers@3` | ~380 MB | none |
 
    Sizes are `node_modules` on disk for that package alone in an empty
    project. They do not simply add up, because engines share transitive
@@ -398,7 +398,7 @@ choco install ffmpeg       # Windows
    do not deduplicate and you end up with two copies of the ONNX runtime:
 
    ```bash
-   npm i -g kokoro-js @huggingface/transformers@^3   # one command, ~410 MB
+   npm i -g kokoro-js@1 @huggingface/transformers@3   # one command, ~410 MB
    ```
 
    With **npx**, compose the engine into the same invocation:

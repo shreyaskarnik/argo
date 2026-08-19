@@ -1,4 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
+import { mkdirSync, readdirSync, rmdirSync, rmSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import {
   installCommand,
   isModuleNotFound,
@@ -8,11 +11,33 @@ import {
   detectInstallMode,
   resetInstallModeCache,
   KOKORO_DEP,
-  OPENAI_DEP,
+  TRANSFORMERS_DEP,
   WHISPER_DEP,
+  MUSICGEN_DEP,
+  OPENAI_DEP,
+  ELEVENLABS_DEP,
+  GEMINI_DEP,
+  SARVAM_DEP,
   type OptionalDepSpec,
   type InstallMode,
 } from '../src/optional-deps.js';
+
+/** `src/`, where `isDepInstalled` resolves from. A fixture placed under
+ *  `src/node_modules` is therefore the first thing its probe finds. */
+const SRC_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'src');
+
+/** Every spec Argo ships. Add new engines here so the shell-safety check
+ *  below covers them. */
+const ALL_SPECS: OptionalDepSpec[] = [
+  KOKORO_DEP,
+  TRANSFORMERS_DEP,
+  WHISPER_DEP,
+  MUSICGEN_DEP,
+  OPENAI_DEP,
+  ELEVENLABS_DEP,
+  GEMINI_DEP,
+  SARVAM_DEP,
+];
 
 /** A spec pointing at a package that is deliberately not installed. */
 const MISSING_DEP: OptionalDepSpec = {
@@ -32,9 +57,15 @@ describe('installCommand', () => {
       'global Kokoro names both packages in one command',
       KOKORO_DEP,
       'global',
-      'npm i -g kokoro-js @huggingface/transformers@^3',
+      'npm i -g kokoro-js@1 @huggingface/transformers@3',
     ],
-    ['project Kokoro omits the hoisted transformers', KOKORO_DEP, 'project', 'npm i kokoro-js'],
+    ['project Kokoro omits the hoisted transformers', KOKORO_DEP, 'project', 'npm i kokoro-js@1'],
+    [
+      'transformers specs pin the major kokoro-js shares',
+      WHISPER_DEP,
+      'project',
+      'npm i @huggingface/transformers@3',
+    ],
     [
       'npx composes packages onto the invocation',
       OPENAI_DEP,
@@ -73,11 +104,23 @@ describe('missingDependencyError', () => {
   it('strips version ranges from the package name it reports', () => {
     const spec: OptionalDepSpec = {
       feature: 'test',
-      project: ['some-pkg@^3'],
-      global: ['some-pkg@^3'],
+      project: ['some-pkg@3'],
+      global: ['some-pkg@3'],
     };
     expect(missingDependencyError(spec).message).toContain("'some-pkg'");
-    expect(missingDependencyError(spec).message).not.toContain("'some-pkg@^3'");
+    expect(missingDependencyError(spec).message).not.toContain("'some-pkg@3'");
+  });
+});
+
+describe('install commands are safe to paste', () => {
+  // `^` is a glob operator under zsh's `extendedglob`, where a pasted
+  // `npm i pkg@^3` dies with `no matches found` before npm ever runs. It also
+  // defeats `bareName`, which would leave `pkg@^3` as the name to resolve and
+  // report a present package as missing. Write ranges as `@3`.
+  it.each(ALL_SPECS)('$feature avoids shell metacharacters', (spec) => {
+    for (const entry of [...spec.project, ...spec.global]) {
+      expect(entry).not.toContain('^');
+    }
   });
 });
 
@@ -137,7 +180,50 @@ describe('isDepInstalled', () => {
   });
 
   it('ignores a version range attached to the specifier', () => {
-    expect(isDepInstalled({ ...OPENAI_DEP, project: ['openai@^4'] })).toBe(true);
+    expect(isDepInstalled({ ...OPENAI_DEP, project: ['openai@4'] })).toBe(true);
+  });
+
+  it('still throws when the failure is a bug rather than a resolution', () => {
+    // An empty `project` makes `bareName` throw a bare TypeError. Recovering
+    // from that would hide the mistake behind a confident "installed".
+    expect(() => isDepInstalled({ feature: 'malformed', project: [], global: [] })).toThrow(
+      TypeError,
+    );
+  });
+
+  describe('when the probe itself fails', () => {
+    // A package can be present and still refuse to resolve: an `exports` map
+    // with no condition matching the caller throws
+    // `ERR_PACKAGE_PATH_NOT_EXPORTED`, which is what an interrupted or
+    // mis-published install looks like. Answering "not installed" there would
+    // tell the user to reinstall something they already have, and throwing
+    // would take down `argo doctor`, the command they ran to diagnose it.
+    const FIXTURE = join(SRC_DIR, 'node_modules', 'argo-broken-exports-fixture');
+
+    beforeAll(() => {
+      mkdirSync(FIXTURE, { recursive: true });
+      writeFileSync(
+        join(FIXTURE, 'package.json'),
+        JSON.stringify({ name: 'argo-broken-exports-fixture', exports: { './sub': './sub.js' } }),
+      );
+    });
+    // Remove only what was created. `src/node_modules` is covered by the
+    // repo's `node_modules/` gitignore, so deleting a copy this test did not
+    // make would be both silent and unrecoverable.
+    afterAll(() => {
+      rmSync(FIXTURE, { recursive: true, force: true });
+      const parent = join(SRC_DIR, 'node_modules');
+      if (readdirSync(parent).length === 0) rmdirSync(parent);
+    });
+
+    it('answers "not known to be absent" rather than throwing', () => {
+      const spec: OptionalDepSpec = {
+        feature: 'fixture',
+        project: ['argo-broken-exports-fixture'],
+        global: ['argo-broken-exports-fixture'],
+      };
+      expect(isDepInstalled(spec)).toBe(true);
+    });
   });
 });
 
@@ -145,9 +231,18 @@ describe('detectInstallMode', () => {
   beforeEach(() => resetInstallModeCache());
 
   it('reports project mode when running from the source checkout', () => {
-    // Tests run from src/, which is not inside any node_modules.
+    // Both probes resolve `@argo-video/cli` to this repo's own `dist/`, via
+    // Node's self-reference (the root manifest has both `name` and `exports`),
+    // so they match and the mode is project. Not the `selfEntry === null`
+    // branch, which a source checkout cannot reach for the same reason.
     expect(detectInstallMode()).toBe('project');
   });
+
+  // `detectInstallMode`'s own resolver-failure fallback has no test here: the
+  // self-reference above always wins for Argo's own name, so no fixture under
+  // `src/node_modules` can shadow it, and reproducing it needs a real
+  // installed consumer tree with a broken `exports` map. Verified by hand
+  // there instead: `argo doctor` prints its table rather than exiting 1.
 
   it('caches the result instead of recomputing', () => {
     const first = detectInstallMode();

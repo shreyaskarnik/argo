@@ -26,10 +26,14 @@ export type InstallMode = 'project' | 'global' | 'npx';
 
 const PKG_NAME = '@argo-video/cli';
 
-/** `kokoro-js@^1.2.1` -> `kokoro-js`. Install lists carry version ranges for
- *  the user to paste; resolution and error text want the bare name. */
+/** `kokoro-js@1` -> `kokoro-js`. Install lists carry version ranges for the
+ *  user to paste; resolution and error text want the bare name.
+ *
+ *  Only the digit-led forms the specs actually use are recognised. A range
+ *  written `@^1` would survive into the "bare" name and resolve to nothing,
+ *  which is why the specs are tested for `^` and must not contain it. */
 function bareName(specifier: string): string {
-  return specifier.replace(/@\^?[\d.].*$/, '');
+  return specifier.replace(/@[\d.].*$/, '');
 }
 
 /** Resolve a bare specifier as if from `dir`, or null if it does not resolve.
@@ -58,29 +62,46 @@ export interface OptionalDepSpec {
   global: string[];
 }
 
+// The specs below pin a major, and write it `@3` rather than `@^3`. The two
+// ranges are identical to npm (node-semver normalises both to
+// `>=3.0.0 <4.0.0-0`), but `^` is a glob operator under zsh's `extendedglob`,
+// where the pasted command dies with `no matches found` and never reaches npm.
+// These strings exist to be pasted into a shell, so they avoid the character.
+// The cloud SDKs further down need no pin: their peer ranges are open-ended,
+// so whatever `latest` gives satisfies them.
+//
+// The pin itself is what keeps one ONNX runtime in the tree. `latest` is 4.x,
+// so a bare `npm i @huggingface/transformers` next to an existing kokoro-js
+// re-nests its 3.x copy underneath v4: ~765 MB against ~410 MB. A user who
+// installs Kokoro and later enables `tts.transcribe` reaches that by following
+// the hint printed here. Everything Argo asks of the package (`pipeline`,
+// `AutoTokenizer`, `MusicgenForConditionalGeneration`, word-level Whisper
+// timestamps) is verified on 3.8.1. Drop the pin once kokoro-js moves to v4.
 export const KOKORO_DEP: OptionalDepSpec = {
   feature: 'Kokoro local TTS',
-  project: ['kokoro-js'],
+  // Pinned to the major the peer range allows: an unpinned `npm i kokoro-js`
+  // would resolve to a future v2 and fail ERESOLVE against `^1.2.1`.
+  project: ['kokoro-js@1'],
   // kokoro-js keeps its own transformers copy private in a global tree.
-  global: ['kokoro-js', '@huggingface/transformers@^3'],
+  global: ['kokoro-js@1', '@huggingface/transformers@3'],
 };
 
 export const TRANSFORMERS_DEP: OptionalDepSpec = {
   feature: 'local Transformers.js models',
-  project: ['@huggingface/transformers'],
-  global: ['@huggingface/transformers'],
+  project: ['@huggingface/transformers@3'],
+  global: ['@huggingface/transformers@3'],
 };
 
 export const WHISPER_DEP: OptionalDepSpec = {
   feature: 'Whisper word-level transcription (`tts.transcribe`)',
-  project: ['@huggingface/transformers'],
-  global: ['@huggingface/transformers'],
+  project: ['@huggingface/transformers@3'],
+  global: ['@huggingface/transformers@3'],
 };
 
 export const MUSICGEN_DEP: OptionalDepSpec = {
   feature: 'MusicGen background music generation',
-  project: ['@huggingface/transformers'],
-  global: ['@huggingface/transformers'],
+  project: ['@huggingface/transformers@3'],
+  global: ['@huggingface/transformers@3'],
 };
 
 export const OPENAI_DEP: OptionalDepSpec = {
@@ -135,13 +156,29 @@ export function detectInstallMode(): InstallMode {
     cachedMode = 'npx';
     return cachedMode;
   }
-  const selfEntry = resolveFrom(selfDir, PKG_NAME);
-  if (selfEntry === null) {
-    // Running from a source checkout, not from an installed tree.
+  try {
+    const selfEntry = resolveFrom(selfDir, PKG_NAME);
+    if (selfEntry === null) {
+      // Running from a source checkout, not from an installed tree.
+      cachedMode = 'project';
+      return cachedMode;
+    }
+    cachedMode = resolveFrom(process.cwd(), PKG_NAME) === selfEntry ? 'project' : 'global';
+  } catch (err) {
+    // Resolving Argo's own name can fail without Argo being absent: an
+    // `exports` map with no condition matching the caller throws
+    // `ERR_PACKAGE_PATH_NOT_EXPORTED`, which this package shipped once (see
+    // Publishing in CLAUDE.md). Falling back beats propagating, because
+    // `doctor` calls this before anything else and must still print its
+    // table, and `installCommand` runs inside `importOptional`'s catch, where
+    // a throw here would replace the import failure the user needs to see.
+    //
+    // Same boundary as `isDepInstalled`: only resolution failures recover,
+    // and Node tags every one of those with a `code`. A bug in Argo must not
+    // be absorbed into a confident answer about where it is installed.
+    if (typeof (err as { code?: unknown } | null)?.code !== 'string') throw err;
     cachedMode = 'project';
-    return cachedMode;
   }
-  cachedMode = resolveFrom(process.cwd(), PKG_NAME) === selfEntry ? 'project' : 'global';
   return cachedMode;
 }
 
@@ -211,7 +248,23 @@ export async function importOptional<T>(load: () => Promise<T>, spec: OptionalDe
  *
  *  Only a genuine module-not-found means "absent". A corrupt manifest or a
  *  broken `exports` map throws a different code and must not be reported as
- *  "not installed", or the user reinstalls a package that is already there. */
+ *  "not installed", or the user reinstalls a package that is already there.
+ *
+ *  Reading this as "not known to be absent" is what makes it total. A probe
+ *  can fail on its own: an interrupted `npm i` leaves a truncated
+ *  `package.json` (`ERR_INVALID_PACKAGE_CONFIG`) and an `exports` map with no
+ *  matching condition throws `ERR_PACKAGE_PATH_NOT_EXPORTED`. Neither may
+ *  escape. `importOptional` calls this from inside a `catch`, where a throw
+ *  would replace the real import failure, and `argo doctor` is the command a
+ *  user runs precisely because their install is half-broken. */
 export function isDepInstalled(spec: OptionalDepSpec): boolean {
-  return resolveFrom(dirname(fileURLToPath(import.meta.url)), bareName(spec.project[0])) !== null;
+  try {
+    return resolveFrom(dirname(fileURLToPath(import.meta.url)), bareName(spec.project[0])) !== null;
+  } catch (err) {
+    // Only resolution failures recover. Node tags every one of them with a
+    // `code`; a bug in Argo (a spec with an empty `project`, say) surfaces as
+    // a bare TypeError and must not be answered with "installed".
+    if (typeof (err as { code?: unknown } | null)?.code === 'string') return true;
+    throw err;
+  }
 }

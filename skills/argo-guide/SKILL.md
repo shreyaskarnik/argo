@@ -16,7 +16,7 @@ Argo turns Playwright demo scripts into polished product demo videos with AI voi
 
 ## Prerequisites
 
-**No TTS engine ships by default.** Every engine is an optional peer dependency. Install one before running a pipeline: `npm i kokoro-js` (local, no API key) or `npm i openai` (cloud, needs `OPENAI_API_KEY`). Run `npx argo doctor` to see which engines are present and the exact install command for this project.
+**No TTS engine ships by default.** Every engine is an optional peer dependency. Install one before running a pipeline: `npm i kokoro-js@1` (local, no API key) or `npm i openai` (cloud, needs `OPENAI_API_KEY`). Run `npx argo doctor` to see which engines are present and the exact install command for this project.
 
 1. **`@argo-video/cli`** in `devDependencies` — install with `npm i -D @argo-video/cli` if missing
 2. **`argo.config.mjs`** in project root — scaffold with `npx argo init` if missing (use `.mjs` to avoid ESM warnings)
