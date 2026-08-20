@@ -33,17 +33,30 @@ export class SarvamEngine implements TTSEngine {
   async generate(text: string, options: TTSEngineOptions): Promise<Buffer> {
     if (!text?.trim()) throw new Error('TTS text must not be empty');
 
-    let SarvamAI: any;
+    // `SarvamAIClient` is the client class. The package has no default export
+    // and its `SarvamAI` export is a namespace object, so destructuring either
+    // yields undefined and fails at `new` with an unrelated-looking TypeError.
+    let SarvamAIClient: any;
     try {
       // @ts-ignore — sarvamai is an optional dependency
-      ({ default: SarvamAI } = await import('sarvamai'));
+      ({ SarvamAIClient } = await import('sarvamai'));
     } catch {
       throw new Error(
         "Sarvam TTS engine requires the 'sarvamai' package. Install it with: npm i sarvamai"
       );
     }
 
-    const client = new SarvamAI({ apiSubscriptionKey: this.resolveApiKey() });
+    // The package resolved but does not expose the client — a version skew or
+    // a rename in a future major. Say so, rather than letting `new undefined()`
+    // surface as a TypeError that looks unrelated to the SDK.
+    if (typeof SarvamAIClient !== 'function') {
+      throw new Error(
+        "The installed 'sarvamai' package does not export SarvamAIClient. " +
+        'Argo expects sarvamai >= 1.1. Upgrade with: npm i sarvamai@latest'
+      );
+    }
+
+    const client = new SarvamAIClient({ apiSubscriptionKey: this.resolveApiKey() });
     const response = await client.textToSpeech.convert({
       inputs: [text],
       target_language_code: options.lang ?? 'hi-IN',

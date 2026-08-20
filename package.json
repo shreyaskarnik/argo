@@ -64,6 +64,7 @@
     "@playwright/test": "^1.59.1",
     "@types/node": "^25.5.0",
     "playwright": "^1.59.1",
+    "sarvamai": "^1.1.8",
     "typescript": "^5.5.0",
     "vitest": "^3.2.6"
   }
