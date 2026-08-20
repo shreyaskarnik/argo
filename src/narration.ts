@@ -6,6 +6,7 @@ import type { Writable } from 'node:stream';
 import { schedulePlacements, type Placement } from './tts/align.js';
 import type { CameraMove } from './camera-move.js';
 import { startCdpScreencast, type CdpScreencastHandle } from './cdp-screencast.js';
+import { cursorHighlight, type CursorHighlightOptions } from './cursor.js';
 
 /**
  * Subset of Playwright's Page we depend on — typed structurally so we don't
@@ -142,6 +143,21 @@ export class NarrationTimeline {
     // (record.ts only sets the env var for chromium + captureMode: jpeg-stitch).
     const useCdpDirect = process.env.ARGO_USE_CDP_DIRECT === '1';
 
+    let automaticCursor: CursorHighlightOptions | null = null;
+    const cursorHighlightEnv = process.env.ARGO_CURSOR_HIGHLIGHT;
+    if (cursorHighlightEnv) {
+      try {
+        const parsed = JSON.parse(cursorHighlightEnv) as unknown;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          automaticCursor = parsed as CursorHighlightOptions;
+        } else {
+          throw new Error('expected a JSON object');
+        }
+      } catch (err) {
+        console.warn(`Warning: invalid ARGO_CURSOR_HIGHLIGHT: ${(err as Error).message}`);
+      }
+    }
+
     // Honor ARGO_JPEG_QUALITY for stream-encode mode; caller `options.quality` wins.
     const envQuality = Number(process.env.ARGO_JPEG_QUALITY);
     const quality = options.quality
@@ -258,19 +274,6 @@ export class NarrationTimeline {
     // through; for jpeg-stitch users it's a discardable temp file.
     await page.screencast.start({ path: screencastPath, size, quality, onFrame });
     this._screencastStop = () => page.screencast.stop();
-    this._recordingPage = page;
-
-    // CDP screencast only emits frames on paint. After page.goto() lands,
-    // Chrome can stay paused for the inter-paint window — gap-fill repeats
-    // the last (pre-nav) JPEG and the new page doesn't appear in the video
-    // until the next natural paint (could be seconds on heavy SPAs). Force
-    // a paint right after navigation so CDP unsticks promptly.
-    const navListener = (frame: { parentFrame: () => unknown }): void => {
-      if (frame.parentFrame() !== null) return; // ignore subframe navs
-      this._triggerPaint();
-    };
-    this._navListener = navListener;
-    page.on('framenavigated', navListener);
 
     // Cleanup hook for stream-encode mode — pads to wall-clock, ends stdin,
     // waits for ffmpeg to flush. Called from _closeRecording().
@@ -315,6 +318,33 @@ export class NarrationTimeline {
     }
 
     } // close legacy `else` branch — showActions + timeline anchor below run for both paths.
+
+    this._recordingPage = page;
+
+    // Reinstall the pseudo-cursor after a top-level navigation because the
+    // browser replaces the document (and its overlay/listeners). Waiting for
+    // the injection before nudging paint keeps the first post-navigation frame
+    // from briefly appearing without the cursor overlay.
+    const navListener = (frame: { parentFrame: () => unknown }): void => {
+      if (frame.parentFrame() !== null) return; // ignore subframe navs
+      if (automaticCursor) {
+        void cursorHighlight(
+          page as unknown as Parameters<typeof cursorHighlight>[0],
+          automaticCursor,
+        ).then(() => this._triggerPaint());
+      } else {
+        this._triggerPaint();
+      }
+    };
+    this._navListener = navListener;
+    page.on('framenavigated', navListener);
+
+    if (automaticCursor) {
+      await cursorHighlight(
+        page as unknown as Parameters<typeof cursorHighlight>[0],
+        automaticCursor,
+      );
+    }
 
     // Optional auto-annotation of every Playwright interaction.
     const showActionsEnv = process.env.ARGO_SHOW_ACTIONS;

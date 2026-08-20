@@ -252,6 +252,59 @@ describe('sceneDuration', () => {
   });
 });
 
+describe('automatic cursor highlight', () => {
+  const originalScreencastPath = process.env.ARGO_SCREENCAST_PATH;
+  const originalCursorHighlight = process.env.ARGO_CURSOR_HIGHLIGHT;
+  const originalUseCdpDirect = process.env.ARGO_USE_CDP_DIRECT;
+  const originalStreamOut = process.env.ARGO_STREAM_OUT;
+
+  afterEach(() => {
+    if (originalScreencastPath === undefined) delete process.env.ARGO_SCREENCAST_PATH;
+    else process.env.ARGO_SCREENCAST_PATH = originalScreencastPath;
+    if (originalCursorHighlight === undefined) delete process.env.ARGO_CURSOR_HIGHLIGHT;
+    else process.env.ARGO_CURSOR_HIGHLIGHT = originalCursorHighlight;
+    if (originalUseCdpDirect === undefined) delete process.env.ARGO_USE_CDP_DIRECT;
+    else process.env.ARGO_USE_CDP_DIRECT = originalUseCdpDirect;
+    if (originalStreamOut === undefined) delete process.env.ARGO_STREAM_OUT;
+    else process.env.ARGO_STREAM_OUT = originalStreamOut;
+  });
+
+  it('injects the configured pseudo-cursor and restores it after top-level navigation', async () => {
+    process.env.ARGO_SCREENCAST_PATH = 'cursor-test.webm';
+    process.env.ARGO_CURSOR_HIGHLIGHT = JSON.stringify({ color: '#22c55e', radius: 18 });
+    delete process.env.ARGO_USE_CDP_DIRECT;
+    delete process.env.ARGO_STREAM_OUT;
+
+    let navigationListener: ((frame: { parentFrame: () => unknown }) => void) | undefined;
+    const evaluate = vi.fn().mockResolvedValue(undefined);
+    const page = {
+      screencast: {
+        start: vi.fn().mockResolvedValue(undefined),
+        stop: vi.fn().mockResolvedValue(undefined),
+        showActions: vi.fn().mockResolvedValue(undefined),
+      },
+      evaluate,
+      on: vi.fn((_event, listener) => { navigationListener = listener; }),
+      off: vi.fn(),
+      context: vi.fn(),
+    };
+
+    const timeline = new NarrationTimeline();
+    await timeline.startRecording(page as never);
+
+    const cursorCalls = () => evaluate.mock.calls.filter((call) => call[1]?.id === 'argo-cursor-highlight');
+    expect(cursorCalls()).toHaveLength(1);
+    expect(cursorCalls()[0][1]).toEqual(expect.objectContaining({ color: '#22c55e', radius: 18 }));
+
+    navigationListener?.({ parentFrame: () => null });
+    await vi.waitFor(() => expect(cursorCalls()).toHaveLength(2));
+
+    await timeline._closeRecording();
+    expect(page.screencast.stop).toHaveBeenCalledTimes(1);
+    expect(page.off).toHaveBeenCalledWith('framenavigated', navigationListener);
+  });
+});
+
 describe('_closeRecording', () => {
   it('throws when stream finalization fails', async () => {
     const timeline = new NarrationTimeline();

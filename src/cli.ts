@@ -104,6 +104,7 @@ export function createProgram(): Command {
         autoBackground: config.overlays?.autoBackground,
         defaultPlacement: config.overlays?.defaultPlacement,
         showActions: config.video.showActions,
+        cursorHighlight: config.video.cursorHighlight,
         sceneThumbnails: config.video.sceneThumbnails,
         headed: cmdOpts.headed,
       });

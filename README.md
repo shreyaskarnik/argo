@@ -132,6 +132,7 @@ export default defineConfig({
     browser: 'chromium',         // chromium with jpeg-stitch is the highest-quality path (v0.35+)
     captureMode: 'jpeg-stitch',  // CDP-direct paint-time capture; auto-downgrades on webkit/firefox
     deviceScaleFactor: 2,        // 4K supersample → lanczos downscale; auto-clamps to 1 on non-chromium
+    cursorHighlight: true,       // pseudo-cursor ring that follows mouse movement in the recording
   },
   export: {
     preset: 'slow', crf: 16,
@@ -145,6 +146,11 @@ export default defineConfig({
   },
 });
 ```
+
+Set `video.cursorHighlight` to `true` for the default pseudo-cursor, or pass
+`{ color, radius, pulse, clickRipple, opacity }` to customize it. Argo injects
+the overlay when recording starts and restores it after top-level navigation,
+so demo scripts do not need to call `cursorHighlight()` themselves.
 
 > **Tip:** Use `browser: 'webkit'` for sharper video on macOS. Chromium has a [known video capture quality issue](https://github.com/microsoft/playwright/issues/31424). Set `deviceScaleFactor: 2` for retina-quality recordings (captured at 2x, downscaled with lanczos in export).
 
@@ -333,7 +339,7 @@ import { defineConfig, demosProject, engines } from '@argo-video/cli';
 | `dimAround(page, selector, opts?)` | Fade sibling elements to highlight target |
 | `zoomTo(page, selector, opts?)` | Scale viewport centered on target. Pass `{ narration }` for overlay-safe ffmpeg post-export zoom (recommended). |
 | `resetCamera(page)` | Clear all active camera effects |
-| `cursorHighlight(page, opts?)` | Persistent cursor ring with pulse + click ripple. Options: `color`, `radius`, `pulse`, `clickRipple`, `opacity` |
+| `cursorHighlight(page, opts?)` | Manually enable a persistent cursor ring with pulse + click ripple. For recording-wide automatic setup, use `video.cursorHighlight`. Options: `color`, `radius`, `pulse`, `clickRipple`, `opacity` |
 | `resetCursor(page)` | Remove cursor highlight |
 | `showCaption(page, scene, text, durationMs)` | Show a simple text caption |
 | `withCaption(page, scene, text, action)` | Show caption during an async action |
