@@ -316,6 +316,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - ~~`zoomTo` transforms `documentElement`~~ — FIXED: post-export camera moves (`narration` option) use ffmpeg `zoompan` — overlays are already burned into the video and unaffected. Legacy browser-side `zoomTo` (without `narration`) still has this issue.
 - OpenAI engine requests raw PCM (`response_format: 'pcm'`) and converts to Float32 directly — do not use `convertToWav` (ffmpeg pipe introduces 0xFFFFFFFF data size artifacts).
 - `convertToWav` (ffmpeg pipe to stdout) writes WAV with `0xFFFFFFFF` data size — `parseWavHeader` falls back to actual buffer length. All engines using `convertToWav` are affected.
+- Gemini TTS returns headerless PCM (`audio/L16;codec=pcm;rate=24000`), which `ffmpeg -i pipe:0` cannot sniff. Pass `parseRawAudioMime(mimeType)` as `convertToWav`'s third argument. The rate must come from the response: a wrong one does not error, it pitches and stretches the voice. Little-endian despite RFC 2586 specifying network byte order, matching what Google actually sends.
 - Showcase demo video hosted via GitHub gist comment upload: https://gist.github.com/shreyaskarnik/6a0996942a96528a984010f36de76079
 - `tsc` build may silently fail if `tsconfig.json` is missing — verify it exists before trusting `npm run build` output
 - `dissolve` transition is a shorter dip-to-black, not a true crossfade blend. A real crossfade would require ffmpeg `xfade` with re-encoded segment pairs — impractical for continuous recordings.

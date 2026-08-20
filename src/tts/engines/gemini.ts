@@ -68,7 +68,14 @@ export class GeminiEngine implements TTSEngine {
 
     // Convert to Argo WAV format. Gemini has no speed parameter, so the rate
     // change rides along with the conversion.
-    const { convertToWav } = await import('../engine.js');
-    return convertToWav(audioBuffer, options.speed ?? 1);
+    //
+    // The TTS models answer with raw PCM (`audio/L16;codec=pcm;rate=24000`),
+    // which carries no header for ffmpeg to recognise, so the format is read
+    // off the media type and passed through. Reading the rate rather than
+    // assuming 24kHz keeps this correct if a model ever returns another one:
+    // guessing wrong does not fail, it pitches and stretches the voice.
+    const { convertToWav, parseRawAudioMime } = await import('../engine.js');
+    const inputFormat = parseRawAudioMime(audioPart.inlineData.mimeType);
+    return convertToWav(audioBuffer, options.speed ?? 1, inputFormat);
   }
 }
