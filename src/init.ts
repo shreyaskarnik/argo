@@ -100,6 +100,7 @@ export default defineConfig({
     fps: 30,
     browser: 'webkit',         // webkit > firefox > chromium for video quality on macOS
     // deviceScaleFactor: 2,   // 2x capture + lanczos downscale (known issue with webkit — enable after fix)
+    // cursorHighlight: true,  // show a pseudo-cursor throughout the recording
   },
   export: {
     preset: 'slow',            // slower = smaller file, higher quality

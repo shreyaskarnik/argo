@@ -4,6 +4,7 @@ import path from 'node:path';
 import { startAssetServer, type AssetServer } from './asset-server.js';
 import { loadOverlayManifest, hasImageAssets } from './overlays/manifest.js';
 import { normalizeDeviceScaleFactor, type BrowserEngine, type ShowActionsConfig } from './config.js';
+import type { CursorHighlightOptions } from './cursor.js';
 
 export interface RecordOptions {
   demosDir: string;
@@ -22,6 +23,8 @@ export interface RecordOptions {
   argoSubdir?: string;
   /** Auto-annotate Playwright interactions in the recording. */
   showActions?: boolean | ShowActionsConfig;
+  /** Render a pseudo-cursor highlight that follows mouse movement. */
+  cursorHighlight?: boolean | CursorHighlightOptions;
   /** Capture a JPEG per scene mark for the preview scrubber. Default: true. */
   sceneThumbnails?: boolean;
   /** Capture all frames as JPEGs and stitch in post for higher quality. */
@@ -241,6 +244,15 @@ export async function record(demoName: string, options: RecordOptions): Promise<
         showActionsEnv = JSON.stringify(options.showActions);
       }
 
+      // `{}` selects cursorHighlight() defaults; an empty string keeps the
+      // pseudo-cursor disabled for backward compatibility.
+      let cursorHighlightEnv = '';
+      if (options.cursorHighlight === true) {
+        cursorHighlightEnv = '{}';
+      } else if (options.cursorHighlight && typeof options.cursorHighlight === 'object') {
+        cursorHighlightEnv = JSON.stringify(options.cursorHighlight);
+      }
+
       // Per-scene thumbs: default ON. Pass '0' to opt out, anything else (including '') means on.
       const sceneThumbsEnv = options.sceneThumbnails === false ? '0' : '1';
       const thumbsDir = path.resolve(path.join(argoDir, 'thumbs'));
@@ -271,6 +283,7 @@ export async function record(demoName: string, options: RecordOptions): Promise<
           ARGO_SCREENCAST_WIDTH: String(options.video.width * normalizeDeviceScaleFactor(options.deviceScaleFactor)),
           ARGO_SCREENCAST_HEIGHT: String(options.video.height * normalizeDeviceScaleFactor(options.deviceScaleFactor)),
           ARGO_SHOW_ACTIONS: showActionsEnv,
+          ARGO_CURSOR_HIGHLIGHT: cursorHighlightEnv,
           ARGO_SCENE_THUMBS: sceneThumbsEnv,
           ARGO_THUMBS_DIR: thumbsDir,
           ARGO_LIVE_FRAME_PATH: path.resolve(path.join(argoDir, '.live-frame.jpg')),

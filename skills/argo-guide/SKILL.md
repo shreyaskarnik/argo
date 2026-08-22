@@ -88,7 +88,7 @@ All camera effects are **non-blocking by default** (fire-and-forget safe). All a
 | `zoomTo(page, target, opts?)` | Scale viewport centered on target. Pass `{ narration }` for overlay-safe ffmpeg post-export zoom (recommended). Without `narration`, falls back to browser-side CSS transforms (overlays scale with the page). |
 | `resetCamera(page)` | Clear all active camera effects |
 | `showConfetti(page, opts?)` | Confetti burst. `spread: 'burst'` (center-top fan) or `'rain'` (full-width fall). `emoji: '🎃'` or `emoji: ['🎃', '👻']` renders emoji instead of colored rectangles. |
-| `cursorHighlight(page, opts?)` | Persistent ring following cursor. Remove with `resetCursor(page)`. |
+| `cursorHighlight(page, opts?)` | Manually enable a persistent ring following cursor. Remove with `resetCursor(page)`. Use `video.cursorHighlight` for recording-wide automatic setup. |
 
 Derive camera durations from `narration.durationFor()` so effects track voiceover timing:
 **Effect timing pattern**: Derive beat durations from `durationFor()` so effects stay synchronized with voiceover. Subtract any setup wait time before dividing:

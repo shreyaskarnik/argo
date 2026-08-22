@@ -51,6 +51,12 @@ describe('defineConfig', () => {
     expect(config.video.fps).toBe(30);
   });
 
+  it('preserves automatic cursor highlight options', () => {
+    const cursorHighlight = { color: '#ff0000', radius: 24, clickRipple: false };
+    const config = defineConfig({ video: { cursorHighlight } });
+    expect(config.video.cursorHighlight).toEqual(cursorHighlight);
+  });
+
   it('normalizes deviceScaleFactor to a positive integer', () => {
     const rounded = defineConfig({ video: { deviceScaleFactor: 1.6 } });
     const clamped = defineConfig({ video: { deviceScaleFactor: 0.4 } });
