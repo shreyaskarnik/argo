@@ -6,7 +6,7 @@ import type { Writable } from 'node:stream';
 import { schedulePlacements, type Placement } from './tts/align.js';
 import type { CameraMove } from './camera-move.js';
 import { startCdpScreencast, type CdpScreencastHandle } from './cdp-screencast.js';
-import { cursorHighlight, type CursorHighlightOptions } from './cursor.js';
+import { cursorHighlight, ensureCursorHighlight, type CursorHighlightOptions } from './cursor.js';
 
 /**
  * Subset of Playwright's Page we depend on — typed structurally so we don't
@@ -319,22 +319,36 @@ export class NarrationTimeline {
 
     } // close legacy `else` branch — showActions + timeline anchor below run for both paths.
 
+    // Set for BOTH capture paths (CDP-direct and legacy). This also enables
+    // `_triggerPaint()` from `mark()` on the chromium + jpeg-stitch path, where
+    // it was previously a silent no-op because `_recordingPage` stayed null.
     this._recordingPage = page;
 
-    // Reinstall the pseudo-cursor after a top-level navigation because the
-    // browser replaces the document (and its overlay/listeners). Waiting for
-    // the injection before nudging paint keeps the first post-navigation frame
-    // from briefly appearing without the cursor overlay.
+    // CDP screencast only emits frames on paint. After page.goto() lands,
+    // Chrome can stay paused for the inter-paint window — gap-fill repeats
+    // the last (pre-nav) JPEG and the new page doesn't appear in the video
+    // until the next natural paint (could be seconds on heavy SPAs). Force
+    // a paint right after navigation so CDP unsticks promptly.
+    //
+    // When the automatic pseudo-cursor is on we also reinstall it, because a
+    // cross-document navigation replaces the document (and its overlay and
+    // listeners). `ensureCursorHighlight` no-ops when a ring is already there,
+    // which matters because Playwright emits `framenavigated` for
+    // same-document history navigations too — an unconditional reinstall would
+    // rebuild the ring on every SPA route change, resetting it off-screen until
+    // the next mouse event. The paint nudge deliberately does NOT wait on the
+    // injection (that would defer the very unsticking this listener exists for,
+    // since the evaluate blocks on the new document's execution context); we
+    // nudge again once the cursor lands so it shows up promptly either way.
     const navListener = (frame: { parentFrame: () => unknown }): void => {
       if (frame.parentFrame() !== null) return; // ignore subframe navs
       if (automaticCursor) {
-        void cursorHighlight(
-          page as unknown as Parameters<typeof cursorHighlight>[0],
+        void ensureCursorHighlight(
+          page as unknown as Parameters<typeof ensureCursorHighlight>[0],
           automaticCursor,
-        ).then(() => this._triggerPaint());
-      } else {
-        this._triggerPaint();
+        ).finally(() => this._triggerPaint());
       }
+      this._triggerPaint();
     };
     this._navListener = navListener;
     page.on('framenavigated', navListener);

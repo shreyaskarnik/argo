@@ -303,6 +303,112 @@ describe('automatic cursor highlight', () => {
     expect(page.screencast.stop).toHaveBeenCalledTimes(1);
     expect(page.off).toHaveBeenCalledWith('framenavigated', navigationListener);
   });
+
+  it('nudges paint after navigation without waiting on the cursor injection', async () => {
+    // The framenavigated listener exists to unstick CDP after a navigation.
+    // The cursor evaluate blocks on the new document's execution context, so
+    // the paint nudge must not be chained behind it.
+    process.env.ARGO_SCREENCAST_PATH = 'cursor-paint.webm';
+    process.env.ARGO_CURSOR_HIGHLIGHT = '{}';
+    delete process.env.ARGO_USE_CDP_DIRECT;
+    delete process.env.ARGO_STREAM_OUT;
+
+    let navigationListener: ((frame: { parentFrame: () => unknown }) => void) | undefined;
+    let cursorCallCount = 0;
+    const evaluate = vi.fn((_fn: unknown, arg?: any) => {
+      if (arg?.id === 'argo-cursor-highlight') {
+        cursorCallCount++;
+        // Let the initial install resolve; leave the post-nav one pending.
+        return cursorCallCount === 1 ? Promise.resolve() : new Promise(() => {});
+      }
+      return Promise.resolve();
+    });
+    const page = {
+      screencast: {
+        start: vi.fn().mockResolvedValue(undefined),
+        stop: vi.fn().mockResolvedValue(undefined),
+        showActions: vi.fn().mockResolvedValue(undefined),
+      },
+      evaluate,
+      on: vi.fn((_event, listener) => { navigationListener = listener; }),
+      off: vi.fn(),
+      context: vi.fn(),
+    };
+
+    const timeline = new NarrationTimeline();
+    await timeline.startRecording(page as never);
+
+    const paintCalls = () => evaluate.mock.calls.filter((call) => call.length === 1);
+    const before = paintCalls().length;
+
+    navigationListener?.({ parentFrame: () => null });
+
+    // Paint nudge fired even though the cursor evaluate never settles.
+    expect(paintCalls().length).toBe(before + 1);
+    expect(cursorCallCount).toBe(2);
+
+    await timeline._closeRecording();
+  });
+
+  it('ignores subframe navigations', async () => {
+    process.env.ARGO_SCREENCAST_PATH = 'cursor-subframe.webm';
+    process.env.ARGO_CURSOR_HIGHLIGHT = '{}';
+    delete process.env.ARGO_USE_CDP_DIRECT;
+    delete process.env.ARGO_STREAM_OUT;
+
+    let navigationListener: ((frame: { parentFrame: () => unknown }) => void) | undefined;
+    const evaluate = vi.fn().mockResolvedValue(undefined);
+    const page = {
+      screencast: {
+        start: vi.fn().mockResolvedValue(undefined),
+        stop: vi.fn().mockResolvedValue(undefined),
+        showActions: vi.fn().mockResolvedValue(undefined),
+      },
+      evaluate,
+      on: vi.fn((_event, listener) => { navigationListener = listener; }),
+      off: vi.fn(),
+      context: vi.fn(),
+    };
+
+    const timeline = new NarrationTimeline();
+    await timeline.startRecording(page as never);
+    const callsBefore = evaluate.mock.calls.length;
+
+    navigationListener?.({ parentFrame: () => ({}) });
+    expect(evaluate.mock.calls.length).toBe(callsBefore);
+
+    await timeline._closeRecording();
+  });
+
+  it('warns and stays disabled when ARGO_CURSOR_HIGHLIGHT is not a JSON object', async () => {
+    process.env.ARGO_SCREENCAST_PATH = 'cursor-bad-env.webm';
+    process.env.ARGO_CURSOR_HIGHLIGHT = 'not-json';
+    delete process.env.ARGO_USE_CDP_DIRECT;
+    delete process.env.ARGO_STREAM_OUT;
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const evaluate = vi.fn().mockResolvedValue(undefined);
+    const page = {
+      screencast: {
+        start: vi.fn().mockResolvedValue(undefined),
+        stop: vi.fn().mockResolvedValue(undefined),
+        showActions: vi.fn().mockResolvedValue(undefined),
+      },
+      evaluate,
+      on: vi.fn(),
+      off: vi.fn(),
+      context: vi.fn(),
+    };
+
+    const timeline = new NarrationTimeline();
+    await timeline.startRecording(page as never);
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('invalid ARGO_CURSOR_HIGHLIGHT'));
+    expect(evaluate.mock.calls.filter((c) => c[1]?.id === 'argo-cursor-highlight')).toHaveLength(0);
+    warn.mockRestore();
+
+    await timeline._closeRecording();
+  });
 });
 
 describe('_closeRecording', () => {
