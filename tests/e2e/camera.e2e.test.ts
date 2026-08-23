@@ -31,8 +31,7 @@ describeCameraE2E('E2E: camera effects', () => {
       await page.setContent(FIXTURE);
 
       const box = (await page.locator('#target').boundingBox())!;
-      // Both regions sit well inside their areas, so neither samples the
-      // cutout's edge and the comparison cannot hinge on antialiasing.
+      // Both regions sit clear of the cutout edge, so antialiasing cannot skew it.
       const insideTarget = {
         x: Math.round(box.x + 40),
         y: Math.round(box.y + 25),
@@ -50,13 +49,8 @@ describeCameraE2E('E2E: camera effects', () => {
       const targetAfter = await page.screenshot({ clip: insideTarget });
       const elsewhereAfter = await page.screenshot({ clip: awayFromTarget });
 
-      // Comparing encoded bytes rather than decoded pixels keeps this free of
-      // an image-decoding dependency: identical pixels from the same browser
-      // encode to an identical PNG.
-      //
-      // The second assertion is what stops the first from passing vacuously.
-      // An overlay that failed to render at all would also leave the target
-      // untouched, so the scrim has to be shown to exist somewhere.
+      // Comparing encoded bytes avoids an image-decoding dependency:
+      // identical pixels from the same browser encode to an identical PNG.
       expect(
         targetAfter.equals(targetBefore),
         'spotlight painted over its own target: the cutout did not clear a hole',

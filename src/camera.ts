@@ -114,14 +114,10 @@ export async function spotlight(
 
     const overlay = document.createElement('div');
     overlay.setAttribute(attr, 'spotlight');
-    // The clip-path below cuts the hole with a second ring inside the first.
-    // Its fill-rule is `evenodd` rather than the default `nonzero` because
-    // nonzero only subtracts the inner ring when it winds opposite to the outer
-    // one, and both rings here are written in the same order. Under nonzero the
-    // interior fills instead of clearing, so the overlay paints as a solid
-    // scrim with no hole at all: no error, no warning, just a dark frame for
-    // the whole effect. `evenodd` makes the cutout independent of vertex order,
-    // so reordering these points later stays safe.
+    // `evenodd` because both rings of the cutout are written in the same
+    // winding order, so the default `nonzero` fills the interior instead of
+    // clearing it and the overlay paints as a solid scrim with no hole. It
+    // also keeps the cutout independent of vertex order.
     overlay.style.cssText = `
       position: fixed; inset: 0; z-index: 99990; pointer-events: none;
       background: rgba(0,0,0,${opacity});
@@ -232,9 +228,7 @@ export async function dimAround(
       const padding = 0;
       const overlay = document.createElement('div');
       overlay.setAttribute(attr, 'dim-around');
-      // `evenodd` for the same reason as in spotlight(): both rings of the
-      // cutout are written in the same winding order, and the default
-      // `nonzero` would fill the hole rather than clear it.
+      // `evenodd` for the same reason as in spotlight() above.
       overlay.style.cssText = `
         position: fixed; inset: 0; z-index: 99990; pointer-events: none;
         background: rgba(0,0,0,${1 - dimOpacity});
