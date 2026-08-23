@@ -647,9 +647,8 @@ export class NarrationTimeline {
     if (!words?.length) return null;
 
     const normalized = normalizeWord(target);
-    // An anchor of pure punctuation strips to nothing, and so does any token
-    // of pure punctuation, so without this the first such token in the scene
-    // matches and the caller gets a confident wrong time.
+    // Pure punctuation strips to nothing on both sides, so without this the
+    // first such token in the scene matches and the caller gets a wrong time.
     if (!normalized) return null;
     for (const w of words) {
       if (normalizeWord(w.text) !== normalized) continue;
@@ -662,25 +661,10 @@ export class NarrationTimeline {
 }
 
 /**
- * Strip a transcribed token down to what two spellings of the same word share:
- * case and surrounding punctuation, which Whisper attaches inconsistently.
- *
- * `\p{L}\p{N}` with the `u` flag rather than `\w`, which is ASCII-only: under
- * `\w` every Cyrillic, Han, Devanagari, Greek, Hebrew and Arabic token stripped
- * to the empty string, so they all compared equal and any anchor matched
- * whichever word came first in the scene.
- *
- * `\p{M}` belongs with them. Combining marks are not decoration in every
- * script: Devanagari matras and the virama, Thai vowel and tone marks and
- * Arabic harakat carry the sound, so dropping them collapses distinct words
- * onto each other and "काल" matches "कल".
- *
- * NFC first, because keeping marks means a decomposed spelling stops equalling
- * a precomposed one, and the two are visually identical.
- *
- * Errors here do not announce themselves: a wrong match returns a plausible
- * number, a missed match returns null, and `atWord` already returns null for
- * several legitimate reasons.
+ * `\w` is ASCII-only and strips a non-Latin token to '', so every such
+ * token compares equal. `\p{M}` is needed too: combining marks carry the
+ * sound in Devanagari, Thai and Arabic. NFC first, so decomposed equals
+ * precomposed.
  */
 const normalizeWord = (s: string): string =>
   s.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{M}\p{N}']/gu, '');

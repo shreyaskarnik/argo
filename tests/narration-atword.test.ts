@@ -4,20 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { NarrationTimeline } from '../src/narration.js';
 
-/**
- * `atWord` matched on a token stripped by `[^\w']`, which is ASCII-only. Every
- * Cyrillic, Han and Devanagari word stripped to the empty string, so they all
- * compared equal: asking for any anchor returned the first word in the scene,
- * at a time that looked reasonable and was wrong. Accented Latin was mangled
- * rather than erased, so "Anträge" only matched a caller who also wrote it
- * without the umlaut.
- *
- * The transcript is cached per process on first read, so every case here shares
- * one file with a scene per language.
- */
 const WORDS = (...pairs: Array<[string, number]>) =>
   pairs.map(([text, start]) => ({ text, start, end: start + 0.4 }));
 
+/**
+ * The transcript is cached per process on first read, so every case here shares
+ * one file with a scene per language.
+ */
 const TRANSCRIPT = {
   version: 1,
   model: 'test',
@@ -28,13 +21,11 @@ const TRANSCRIPT = {
     de: WORDS(['Zwei', 1], ['Anträge,', 2], ['genehmigt.', 3]),
     en: WORDS(['Two', 1], ['requests,', 2], ['approved.', 3]),
 
-    // Pairs that differ only by a combining mark. These are the cases that
-    // survived the first fix: dropping \p{M} collapses each pair onto one
-    // spelling, so the anchor lands on whichever came first.
+    // Pairs differing only by a combining mark: without \p{M} each collapses
+    // onto one spelling and the anchor lands on whichever came first.
     hiMarks: WORDS(['कल', 1], ['है', 2], ['काल', 3]),
     thMarks: WORDS(['ไม้', 1], ['คือ', 2], ['ไม่', 3]),
 
-    // A leading token with no letters or digits at all.
     punct: WORDS(['...', 1], ['hello', 2], ['world', 3]),
   },
 };
@@ -62,9 +53,6 @@ function atStartOf(scene: string): NarrationTimeline {
 }
 
 describe('atWord across scripts', () => {
-  // Each case asks for the *third* word. Under the old normalisation every
-  // non-Latin token was equal, so the first word matched and the answer came
-  // back near 1000ms instead of near 3000ms.
   it.each([
     ['ru', 'одобрены'],
     ['zh', '申请'],
@@ -73,14 +61,11 @@ describe('atWord across scripts', () => {
     ['en', 'approved'],
   ])('finds the third word in %s and not the first', (scene, anchor) => {
     const ms = atStartOf(scene).atWord(scene, anchor);
-    expect(ms).not.toBeNull();
     expect(ms).toBeGreaterThan(2500);
     expect(ms).toBeLessThanOrEqual(3000);
   });
 
   it('keeps a diacritic significant instead of stripping it', () => {
-    // "Anträge" must be reachable as written. It also must not be reachable by
-    // an ASCII-folded spelling, which the old behaviour accidentally allowed.
     expect(atStartOf('de').atWord('de', 'Anträge')).toBeGreaterThan(1500);
     expect(atStartOf('de').atWord('de', 'antrge')).toBeNull();
   });
@@ -107,18 +92,14 @@ describe('atWord and combining marks', () => {
   });
 
   it('matches a decomposed anchor against a precomposed transcript', () => {
-    // Visually identical, and a script pulled through a filesystem path or a
-    // copy-paste can carry either. Without an NFC pass this returns null
-    // forever, which is indistinguishable from "the word is already spoken".
+    // A null here is indistinguishable from "the word is already spoken".
     expect(atStartOf('de').atWord('de', 'Anträge'.normalize('NFD'))).toBeGreaterThan(1500);
   });
 
   it('refuses an anchor that strips to nothing', () => {
-    // Both the anchor and the scene's first token normalise to '', so without
-    // a guard they compare equal and the caller gets 1000ms for punctuation.
+    // Anchor and first token both normalise to '', so unguarded they match.
     expect(atStartOf('punct').atWord('punct', '...')).toBeNull();
     expect(atStartOf('punct').atWord('punct', '?!')).toBeNull();
-    // The real words in that scene stay reachable.
     expect(atStartOf('punct').atWord('punct', 'world')).toBeGreaterThan(2500);
   });
 });
