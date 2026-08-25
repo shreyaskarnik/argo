@@ -289,18 +289,13 @@ function mimeParam(params: string[], name: string): string | undefined {
  * Read a raw-PCM media type into the arguments ffmpeg needs to open it.
  *
  * Gemini's TTS models answer with `audio/L16;codec=pcm;rate=24000`: sample data
- * and nothing else, no RIFF header and no magic bytes. Handed to
- * `ffmpeg -i pipe:0` it fails with "Invalid data found when processing input",
- * because there is nothing there to recognise.
+ * and nothing else, so `ffmpeg -i pipe:0` fails with "Invalid data found when
+ * processing input", having nothing to recognise.
  *
- * Little-endian deliberately contradicts the spec: RFC 2586 section 3 defines
- * L16 as network byte order and Google sends little-endian anyway. Getting it
- * wrong is silent, so `tests/tts/raw-pcm-roundtrip.test.ts` decodes a sine
- * through real ffmpeg and fails on a byte-order flip. A provider that actually
- * conformed to the RFC would need `s16be` and must not reuse this blindly.
+ * Little-endian contradicts RFC 2586 section 3, which defines L16 as network
+ * byte order, but it is what Google sends. A conforming provider needs `s16be`.
  *
- * Returns null for anything self-describing (MP3, OGG, WAV), which should go
- * through ffmpeg's own probing instead.
+ * Returns null for self-describing formats, which ffmpeg can probe itself.
  */
 export function parseRawAudioMime(mimeType: string | undefined): RawAudioFormat | null {
   if (!mimeType) return null;

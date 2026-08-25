@@ -1,19 +1,10 @@
 /**
  * The one thing `raw-pcm.test.ts` cannot check: whether the demuxer argv it
- * asserts actually decodes the bytes Gemini sends.
- *
- * Every test there stubs `execFileSync`, so they compare the string 's16le'
- * against the source that produced it and would pass just as happily if the
- * correct answer were 's16be'. Endianness is the one genuinely uncertain
- * decision in the decode fix: RFC 2586 defines L16 as network byte order and
- * Google sends little-endian anyway, so the code deliberately contradicts the
- * spec. Getting it wrong does not raise. It returns full-scale noise at exit
- * 0, and argo derives scene durations from clip length, so the recording is
- * still built around it.
- *
- * A synthesized sine is what makes that falsifiable. Byte-swapped 16-bit
- * samples are not quiet noise, they are near-full-scale, so peak amplitude
- * separates a correct decode from a wrong one by a wide margin.
+ * asserts actually decodes the bytes Gemini sends. Every test there stubs
+ * `execFileSync`, so they compare the string 's16le' against the source that
+ * produced it and would pass just as happily if the answer were 's16be'. This
+ * file decodes a synthesized sine through real ffmpeg instead, where a byte
+ * swap lands near full scale rather than at the 0.25 peak it was handed.
  */
 import { it, expect } from 'vitest';
 import { execFile } from 'node:child_process';
@@ -78,9 +69,7 @@ describeWithCapability(hasFfmpeg, 'an ffmpeg binary')('raw PCM survives a real f
     expect(header.bitsPerSample).toBe(32);
     expect([3, 0xfffe]).toContain(header.audioFormat);
 
-    // The real assertion. A correct s16le decode reproduces the 0.25 peak;
-    // reading the same bytes as s16be scrambles the high and low byte of
-    // every sample and lands near full scale instead.
+    // The real assertion, for the reason at the top of the file.
     const peak = peakAmplitude(wav);
     expect(peak).toBeGreaterThan(0.2);
     expect(peak).toBeLessThan(0.35);

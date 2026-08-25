@@ -12,12 +12,9 @@ export class GeminiEngine implements TTSEngine {
 
   constructor(options?: GeminiEngineOptions) {
     this.apiKey = options?.apiKey ?? '';
-    // Must be a TTS model. `gemini-2.5-flash` and the other general models
-    // answer `responseModalities: ['AUDIO']` with a 400, "This model only
-    // supports text output", so a general default leaves the engine unusable
-    // for anyone who does not pass one. The `native-audio` models are not
-    // candidates either: they expose only `bidiGenerateContent`, the Live API
-    // socket, and this engine calls `generateContent`.
+    // Must be a TTS model: the general ones answer an AUDIO request with 400,
+    // "This model only supports text output". The `native-audio` models are no
+    // use either, they speak only the Live API socket.
     this.model = options?.model ?? 'gemini-3.1-flash-tts-preview';
   }
 
@@ -74,12 +71,6 @@ export class GeminiEngine implements TTSEngine {
 
     // Convert to Argo WAV format. Gemini has no speed parameter, so the rate
     // change rides along with the conversion.
-    //
-    // The TTS models answer with raw PCM (`audio/L16;codec=pcm;rate=24000`),
-    // which carries no header for ffmpeg to recognise, so the format is read
-    // off the media type and passed through. Reading the rate rather than
-    // assuming 24kHz keeps this correct if a model ever returns another one:
-    // guessing wrong does not fail, it pitches and stretches the voice.
     const { convertToWav, parseRawAudioMime } = await import('../engine.js');
     const inputFormat = parseRawAudioMime(audioPart.inlineData.mimeType);
     return convertToWav(audioBuffer, options.speed ?? 1, inputFormat);
