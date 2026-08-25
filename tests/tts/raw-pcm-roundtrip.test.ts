@@ -70,9 +70,13 @@ describeWithCapability(hasFfmpeg, 'an ffmpeg binary')('raw PCM survives a real f
     const header = parseWavHeader(wav);
 
     // Output contract: mono float32 at 24kHz regardless of what came in.
+    // ffmpeg 8 tags float32 as IEEE_FLOAT (3) and ffmpeg 6 as EXTENSIBLE
+    // (0xfffe), so the tag is not the contract. The peak check below reads
+    // the samples as float32 and is what actually pins the format.
     expect(header.sampleRate).toBe(24000);
     expect(header.numChannels).toBe(1);
-    expect(header.audioFormat).toBe(3);
+    expect(header.bitsPerSample).toBe(32);
+    expect([3, 0xfffe]).toContain(header.audioFormat);
 
     // The real assertion. A correct s16le decode reproduces the 0.25 peak;
     // reading the same bytes as s16be scrambles the high and low byte of
