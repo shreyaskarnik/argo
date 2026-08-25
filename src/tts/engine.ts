@@ -288,14 +288,14 @@ function mimeParam(params: string[], name: string): string | undefined {
 /**
  * Read a raw-PCM media type into the arguments ffmpeg needs to open it.
  *
- * Gemini's TTS models answer with `audio/L16;codec=pcm;rate=24000`: sample data
- * and nothing else, so `ffmpeg -i pipe:0` fails with "Invalid data found when
- * processing input", having nothing to recognise.
+ * Raw PCM carries no header, so ffmpeg cannot open it without being told the
+ * format. Gemini's TTS models send `audio/L16;codec=pcm;rate=24000`.
  *
  * Little-endian contradicts RFC 2586 section 3, which defines L16 as network
  * byte order, but it is what Google sends. A conforming provider needs `s16be`.
  *
  * Returns null for self-describing formats, which ffmpeg can probe itself.
+ * Throws for an L16 type carrying no readable rate, which nothing can recover.
  */
 export function parseRawAudioMime(mimeType: string | undefined): RawAudioFormat | null {
   if (!mimeType) return null;
@@ -345,7 +345,6 @@ export function convertToWav(
   inputFormat?: RawAudioFormat | null,
 ): Buffer {
   const { execFileSync } = childProcess;
-  // Sniffing is the default; an explicit format is only for headerless input.
   const inputArgs = inputFormat
     ? ['-f', inputFormat.format, '-ar', String(inputFormat.sampleRate), '-ac', String(inputFormat.channels)]
     : [];
