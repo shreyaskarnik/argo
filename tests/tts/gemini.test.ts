@@ -57,8 +57,7 @@ describe('GeminiEngine.generate', () => {
   });
 
   it('takes the rate from the response rather than assuming one', async () => {
-    // A wrong rate does not fail, it pitches and stretches the voice, so the
-    // engine has to read what it was actually sent.
+    // A wrong rate is silently wrong, so the engine has to read what it was sent.
     generateContent.mockResolvedValue(audioResponse('audio/L16;codec=pcm;rate=16000'));
     const engine = new GeminiEngine({ apiKey: 'test' });
 

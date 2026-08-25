@@ -15,8 +15,7 @@ import { describeWithCapability } from '../helpers/capability.js';
 const execFileP = promisify(execFile);
 
 // CI installs ffmpeg deliberately, so a miss there means the workflow drifted
-// rather than that the host is bare, and this is the one test that decodes
-// real audio rather than asserting argv.
+// rather than that the host is bare.
 let hasFfmpeg = false;
 try {
   await execFileP('ffmpeg', ['-version']);
@@ -69,7 +68,6 @@ describeWithCapability(hasFfmpeg, 'an ffmpeg binary')('raw PCM survives a real f
     expect(header.bitsPerSample).toBe(32);
     expect([3, 0xfffe]).toContain(header.audioFormat);
 
-    // The real assertion, for the reason at the top of the file.
     const peak = peakAmplitude(wav);
     expect(peak).toBeGreaterThan(0.2);
     expect(peak).toBeLessThan(0.35);
@@ -88,9 +86,7 @@ describeWithCapability(hasFfmpeg, 'an ffmpeg binary')('raw PCM survives a real f
   });
 
   it('honours the rate from the media type rather than assuming 24kHz', () => {
-    // A wrong rate does not error, it resamples: declaring 24000 for a 16000
-    // stream yields a clip two thirds the length at 1.5x pitch. Duration is
-    // the observable, and argo builds every wait in the recording from it.
+    // Duration is the observable: a wrong rate resamples rather than erroring.
     const pcm = sineS16LE(SAMPLES, RATE, 440);
 
     const correct = convertToWav(pcm, 1, parseRawAudioMime(`audio/L16;rate=${RATE}`));
