@@ -12,7 +12,13 @@ export class GeminiEngine implements TTSEngine {
 
   constructor(options?: GeminiEngineOptions) {
     this.apiKey = options?.apiKey ?? '';
-    this.model = options?.model ?? 'gemini-2.5-flash';
+    // Must be a TTS model. `gemini-2.5-flash` and the other general models
+    // answer `responseModalities: ['AUDIO']` with a 400, "This model only
+    // supports text output", so a general default leaves the engine unusable
+    // for anyone who does not pass one. The `native-audio` models are not
+    // candidates either: they expose only `bidiGenerateContent`, the Live API
+    // socket, and this engine calls `generateContent`.
+    this.model = options?.model ?? 'gemini-3.1-flash-tts-preview';
   }
 
   private resolveApiKey(): string {

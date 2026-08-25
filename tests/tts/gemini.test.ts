@@ -83,6 +83,33 @@ describe('GeminiEngine.generate', () => {
     await expect(engine.generate('hello', { voice: 'Kore' })).rejects.toThrow(/sample rate/);
   });
 
+  it('defaults to a model that can actually return audio', async () => {
+    // The previous default was `gemini-2.5-flash`, which answers an AUDIO
+    // request with 400 "This model only supports text output". Nothing in the
+    // suite caught it because the transport is mocked here, so pin the model
+    // name: it is the only part of that failure visible without a live call.
+    generateContent.mockResolvedValue(audioResponse('audio/l16; rate=24000; channels=1'));
+    const engine = new GeminiEngine({ apiKey: 'test' });
+
+    await engine.generate('hello', { voice: 'Kore' });
+
+    expect(generateContent.mock.calls[0][0].model).toBe('gemini-3.1-flash-tts-preview');
+    expect(engine.describe().model).toBe('gemini-3.1-flash-tts-preview');
+  });
+
+  it('reads the media type spelling the 3.1 models use', async () => {
+    // Same audio, different spelling: lowercase `l16`, spaces after the
+    // semicolons, no `codec`, and an explicit `channels`. Both spellings are
+    // captured from live responses, 2.5 and 3.1 respectively.
+    generateContent.mockResolvedValue(audioResponse('audio/l16; rate=24000; channels=1'));
+    const engine = new GeminiEngine({ apiKey: 'test' });
+
+    await engine.generate('hello', { voice: 'Kore' });
+
+    const argv = ffmpegArgs();
+    expect(argv.slice(0, argv.indexOf('-i'))).toEqual(['-f', 's16le', '-ar', '24000', '-ac', '1']);
+  });
+
   it('raises a useful error when the response carries no audio', async () => {
     generateContent.mockResolvedValue({ candidates: [{ content: { parts: [{ text: 'sorry' }] } }] });
     const engine = new GeminiEngine({ apiKey: 'test' });
