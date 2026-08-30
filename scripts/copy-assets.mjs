@@ -27,4 +27,7 @@ mkdirSync(to, { recursive: true });
 const shaders = readdirSync(from).filter(name => name.endsWith('.glsl'));
 for (const name of shaders) copyFileSync(join(from, name), join(to, name));
 
-console.log(`copy-assets: ${shaders.length} shaders -> dist/transitions/shaders`);
+// stderr, not stdout: `prepare` makes this run inside `npm pack --silent`,
+// whose stdout is captured as the tarball filename (see the pack-smoke job's
+// TARBALL=$(npm pack --silent)). A line on stdout here corrupts that capture.
+console.error(`copy-assets: ${shaders.length} shaders -> dist/transitions/shaders`);
