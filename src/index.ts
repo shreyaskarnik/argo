@@ -56,6 +56,13 @@ export {
 // Effects
 export { showConfetti, type ConfettiOptions } from './effects.js';
 
+// Hyperframes component injection
+export {
+  applyComponent,
+  removeComponent,
+  type ApplyComponentOptions,
+} from './hf/apply-component.js';
+
 // Camera
 export {
   spotlight,

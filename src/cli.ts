@@ -29,6 +29,7 @@ import { applySpeedRampToTimeline, type Segment, type SceneSpeedMap } from './sp
 import { scaleCameraMoves, shiftCameraMoves, type CameraMove } from './camera-move.js';
 import { resolveFreezes, adjustPlacementsForFreezes, totalFreezeDurationMs, type FreezeSpec } from './freeze.js';
 import { renderShaderTransitions } from './transitions/shader-render.js';
+import { resolveHfBlockCues, renderHfBlocks } from './hf/block-render.js';
 import type { Placement } from './tts/align.js';
 
 function validateDemoName(name: string): string {
@@ -100,6 +101,7 @@ export function createProgram(): Command {
       const browser = (cmdOpts.browser as BrowserEngine) ?? config.video.browser;
       await record(demo, {
         demosDir: config.demosDir,
+        blocksDir: config.blocksDir,
         baseURL,
         video: { width: config.video.width, height: config.video.height },
         browser,
@@ -264,12 +266,28 @@ export function createProgram(): Command {
           height: exportSize.height,
           fps: config.video?.fps ?? 30,
           cacheDir: `.argo/${demo}/shaders`,
+          accent: shaderTransition.accent,
         });
         // Remap boundarySec to post-trim for the filter_complex splice
         shaderTransitions = rendered.map((r, i) => ({
           ...r,
           boundarySec: placements![i + 1].startMs / 1000,
         }));
+      }
+
+      // hf-block cutaways — pre-render installed hyperframes blocks (cache-hit cheap)
+      let hfBlocks: import('./hf/block-filter.js').RenderedHfBlock[] | undefined;
+      if (placements && placements.length > 0 && existsSync(manifestPath)) {
+        const hfManifestEntries = readScenesManifest(manifestPath);
+        const hfBlockCues = resolveHfBlockCues(hfManifestEntries, placements);
+        if (hfBlockCues.length > 0) {
+          hfBlocks = await renderHfBlocks({
+            cues: hfBlockCues,
+            blocksDir: config.blocksDir,
+            cacheDir: `.argo/${demo}/hf-blocks`,
+            fps: config.video?.fps ?? 30,
+          });
+        }
       }
 
       await exportVideo({
@@ -314,6 +332,7 @@ export function createProgram(): Command {
         freezeSpecs: resolvedFreezes.length > 0 ? resolvedFreezes : undefined,
         overlayPngs,
         shaderTransitions,
+        hfBlocks,
         encoder: config.export.encoder,
         encoderDefault: 'cpu',
       });
@@ -362,6 +381,9 @@ export function createProgram(): Command {
         demoName: demo,
         demosDir: config.demosDir,
         allowRawGsap: config.overlays.allowRawGsap,
+        blocksDir: config.blocksDir,
+        transitionAccent:
+          config.export.transition?.type === 'shader' ? config.export.transition.accent : undefined,
       });
 
       for (const err of result.errors) {
@@ -377,6 +399,55 @@ export function createProgram(): Command {
         console.log(`\n  ${demo}: passed with ${result.warnings.length} warning(s)`);
       } else {
         console.error(`\n  ${demo}: ${result.errors.length} error(s), ${result.warnings.length} warning(s)`);
+        process.exitCode = 1;
+      }
+    });
+
+  program
+    .command('add [name]')
+    .description('Install a block or component from the hyperframes registry into blocksDir')
+    .option('--list', 'list available registry items instead of installing')
+    .option('--json', 'machine-readable output')
+    .option('--registry <url>', 'override the registry URL')
+    .action(async (name: string | undefined, cmdOpts: { list?: boolean; json?: boolean; registry?: string }) => {
+      const { installItem, listItems } = await import('./hf/add.js');
+      const configPath = program.opts().config;
+      const config = await loadConfigForDemo(undefined, configPath);
+      const registryUrl = cmdOpts.registry ?? config.registry?.url;
+
+      if (cmdOpts.list) {
+        const items = await listItems({ registryUrl });
+        if (cmdOpts.json) {
+          console.log(JSON.stringify(items, null, 2));
+        } else {
+          for (const item of items) {
+            console.log(`${item.type.replace('hyperframes:', '').padEnd(10)} ${item.name}`);
+          }
+          console.log(`\n${items.length} items. Install with: argo add <name>`);
+        }
+        return;
+      }
+
+      if (!name) {
+        console.error('Usage: argo add <name>  (or argo add --list)');
+        process.exitCode = 1;
+        return;
+      }
+
+      try {
+        const result = await installItem({ name, blocksDir: config.blocksDir, registryUrl });
+        if (cmdOpts.json) {
+          console.log(JSON.stringify(result, null, 2));
+        } else {
+          console.log(`Installed ${result.kind === 'components' ? 'component' : 'block'} "${result.name}" → ${result.targetDir}/`);
+          for (const f of result.files) console.log(`  ${f}`);
+          if (result.kind === 'components') {
+            console.log(`\nUse it in a scene: "overlay": { "type": "hf-component", "name": "${result.name}" }`);
+            console.log(`Or in a demo script: await applyComponent(page, '${result.name}')`);
+          }
+        }
+      } catch (err) {
+        console.error((err as Error).message);
         process.exitCode = 1;
       }
     });
@@ -472,6 +543,7 @@ export function createProgram(): Command {
             sharpen: config.export.sharpen,
             frame: config.export.frame,
             motionBlur: config.export.motionBlur,
+            blocksDir: config.blocksDir,
           },
         });
         console.log(`\nArgo Dashboard running at: ${url}`);
@@ -511,6 +583,7 @@ export function createProgram(): Command {
           sharpen: config.export.sharpen,
           frame: config.export.frame,
           motionBlur: config.export.motionBlur,
+          blocksDir: config.blocksDir,
         },
       });
       console.log(`\nArgo Preview running at: ${url}`);

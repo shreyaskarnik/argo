@@ -77,9 +77,9 @@ Both the primary export path and blur-fill format variants (1:1, 9:16) are encod
 
 Pre-rendered WebGL shader transitions. At export time, a pre-pass extracts two boundary frames per scene boundary (last frame of outgoing, first frame of incoming) via ffmpeg, then Playwright Chromium renders the GLSL shader at each of `N = D × fps` progress values, producing a PNG sequence. `buildShaderSpliceFilter` generates a filter_complex three-segment concat (`scene_a + PNG_seq + scene_b`) that replaces the fade window.
 
-Cache key: `sha256(shader, durationMs, fps, width, height, sha256(aPng), sha256(bPng))`. Cached at `.argo/<demo>/shaders/<hash>/`. Second export with unchanged boundaries hits cache with no browser launch.
+Cache key: `sha256(shader, durationMs, fps, width, height, sha256(aPng), sha256(bPng), accent)`. Cached at `.argo/<demo>/shaders/<hash>/`. Second export with unchanged boundaries hits cache with no browser launch.
 
-Shaders live in `src/transitions/shaders/*.glsl`. Build step copies `.glsl` files to `dist/` (tsc does not). v1 ships: `crosswarp`, `swirl`, `ripple`, `luma-mask`, `light-leak` — adapted from gl-transitions.com (MIT).
+Shaders live in `src/transitions/shaders/*.glsl`. Build step copies `.glsl` files to `dist/` (tsc does not). v1 ships: `crosswarp`, `swirl`, `ripple`, `luma-mask`, `light-leak` — adapted from gl-transitions.com (MIT), plus 11 hyperframes ports (Apache-2.0): `domain-warp`, `ridged-burn`, `thermal-distortion`, `swirl-vortex`, `whip-pan`, `gravitational-lens`, `cinematic-zoom`, `chromatic-split`, `flash-through-white`, `sdf-iris`, `ripple-waves`. `export.transition.accent` (default `'#0ea5e9'`) tints accent-aware shaders: `domain-warp`, `ridged-burn`, `thermal-distortion`, `sdf-iris`, `ripple-waves`.
 
 Per-boundary shader selection is NOT supported in v1 — `export.transition.shader` applies to all boundaries. Future work: a sidecar for per-boundary overrides.
 
@@ -123,7 +123,27 @@ Static v1 blocks: `x-post`, `macos-notification`, `yt-lower-third`, `data-chart`
 
 Animated blocks (ship with `defaultMotion` using GSAP): `instagram-follow` (pulsing Follow button), `tiktok-follow` (rotating avatar ring + side slide), `reddit-post` (upvote card, simple entrance), `logo-outro` (scale-in end-card), `flowchart` (stacked nodes + arrows revealed with stagger), `app-showcase` (hero card with floating icon loop), `ui-3d-reveal` (perspective tilt-to-flat reveal of a screenshot). These use `BlockDefinition.defaultMotion` — a cue-level `motion` still overrides. Inspired by hyperframes blocks of the same names (Apache-2.0); implementations are original. Selector hooks used by motion loops/staggers: `.argo-ig-follow-btn`, `.argo-tt-ring`, `.argo-app-hero`, `.argo-3d-image`, `.argo-flow-node, .argo-flow-arrow`.
 
-Folder format is designed for a future `argo add <block>` command (not shipped yet).
+These built-in blocks ship inside the package (`src/blocks/`) — distinct from the hyperframes registry items installed into `blocksDir` by `argo add` (see HyperFrames Catalog below).
+
+### HyperFrames Catalog (`src/hf/`)
+
+`argo add <name>` installs blocks/components from the hyperframes registry (default `https://raw.githubusercontent.com/heygen-com/hyperframes/main/registry`, override via `--registry <url>` or config `registry.url`) into `blocksDir` (config, default `blocks/`, git-tracked). `argo add --list` (+ `--json`) browses the registry. Registry examples (`hyperframes:example`) are not installable. Item files are stored verbatim in native hyperframes format at `blocks/<name>/` plus a `registry-item.json` sidecar. Modules: `registry-client.ts` (fetch-injectable client — unit tests never touch the network), `add.ts` (`installItem`/`listItems`, path-traversal guards on item names and file paths), `component.ts` (snippet parser + CSS param validators), `apply-component.ts` (page injection).
+
+Overlay cue: `{ "type": "hf-component", "name": "vignette", "params": { "--vignette-size": "40%" } }` — full-frame injection (fixed, pointer-events none, high z-index) that bypasses the zone/theme/template machinery; duration comes from `showOverlay`. Script API: `applyComponent(page, name, { params?, blocksDir? })` / `removeComponent(page, name)` exported from the package — persists until removed. `params` are validated CSS custom properties (`--kebab-case` names, conservative value allowlist — no `url()`, `;{}<>`, control chars). Injection uses the same no-op `page.evaluate()` render fence as overlays and the same disposal-error-swallowing pattern as `showConfetti`.
+
+Trust model: components are trusted-at-install (user ran `argo add`, files are git-reviewable); only runtime `params` are validated. Component `<script>`s run via `new Function()` and may be blocked by strict CSP on the recorded page — logged as a warning, not a failure. Caveat: `caption-*` components install fine but word-level timing support is future work (STT alignment).
+
+`argo validate` checks that referenced hf-components are installed (`blocks/<name>/<name>.html` exists) and validates `export.transition.accent` as a 6-digit hex color.
+
+**`hf-block` cutaway cue** (`src/hf/block-render.ts`, `src/hf/block-filter.ts`): `{ type: 'hf-block', name, params?, durationMs?, fit?: 'cover' | {x,y,scale}, holdLastFrame? }`. Unlike `hf-component` (live DOM injection), `hf-block` is a no-op at recording time — it only paces the wait, nothing is injected into the page. The block's paused GSAP timeline is rendered later, at export time, by a dedicated headless Chromium pre-pass (`renderBlockFrames`) that loads the installed `blocks/<name>/<name>.html`, waits for the hyperframes convention `window.__timelines[<id>] = { duration(), pause(), seek(t) }` to register, then seeks it frame-by-frame and screenshots each frame with `omitBackground: true` for an alpha PNG sequence. `holdLastFrame` pins the timeline at its native duration instead of linearly retiming the whole animation into the window; sampling is edge-inclusive (last frame lands exactly at the window end) with an N=1 midpoint fallback.
+
+Content-addressed cache at `.argo/<demo>/hf-blocks/<hash>/` — `computeBlockHash(blockHtml, params, durationMs, fps, width, height)` — a cache hit skips the Chromium launch entirely (`renderHfBlocks` in `block-render.ts` shares one browser instance lazily across cache misses in a batch, mirroring the shader-render pre-pass pattern).
+
+`resolveHfBlockCues(rawManifest, placements)` anchors each cue to its scene's placement window: `endMs = startMs + (durationMs ?? windowMs)`, capped at the placement's own `endMs` unless the requested duration overshoots — in which case it's allowed to run into the gap after the scene, capped at the next placement's `startMs` (uncapped on the last scene; ffmpeg's `enable=between(t,...)` window is naturally clipped by the video's total duration regardless). Scenes with no matching placement are skipped with a warning, same as overlays/subtitles.
+
+Compositing (`buildHfBlockFilters`) adds one `-framerate`/`image2` input per cue and an `enable`-gated `overlay` with `eof_action=pass` — applied immediately after camera moves and overlay PNGs, before the frame effect/watermark (same layer priority as overlay PNGs). It's a pure cutaway: `-shortest` and total output duration are unaffected.
+
+Wired at all four export paths: pipeline primary, pipeline variants, CLI `argo export`, and `argo preview` export (`PreviewExportConfig` gained `blocksDir`). Blocks need network access at export time — real registry blocks load GSAP + Google Fonts from CDNs during the pre-render pass, so offline exports of demos with `hf-block` cues will fail at that step. **Known limitation:** `hf-block` + `export.speedRamp` is untested and can misalign windows — `resolveHfBlockCues` anchors windows to post-ramp scene placements (the same ones subtitles/chapters use), but the ramp's dead-time compression (`computeSegments` in `src/speed-ramp.ts`) is computed independently in source-timeline coordinates before cues are resolved. Avoid combining the two until this is verified end-to-end.
 
 ### Effects (`src/effects.ts`)
 
@@ -203,8 +223,9 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - `argo record/export/pipeline/validate` take bare demo names (e.g., `argo pipeline example`)
 - `argo pipeline --all` runs the full pipeline for every demo discovered in `demosDir` (finds all `.scenes.json` files)
 - `argo pipeline [demo]` — demo argument is optional when `--all` is used
-- `argo validate <demo>` checks scene name consistency between script and scenes manifest, validates overlay fields (no TTS/recording)
+- `argo validate <demo>` checks scene name consistency between script and scenes manifest, validates overlay fields, checks hf-component installs, and validates `export.transition.accent` hex (no TTS/recording)
 - `argo clip <demo> <scene>` extracts a scene clip from an exported MP4 using chapter markers. `--format gif` produces a palette-optimized GIF. Clips go to `videos/clips/`. Useful for release notes and docs.
+- `argo add <name>` installs a hyperframes registry item into `blocksDir`; `argo add --list` (+ `--json`) browses; `--registry <url>` overrides the registry (also config `registry.url`). Item names share the demo-name validation regex (path-traversal guard).
 - `--base-url <url>` flag on `record` and `pipeline` overrides `config.baseURL`
 - `--headed` flag on `record` and `pipeline` runs the browser in visible mode
 - `--all` flag on `pipeline` runs all demos in batch (sequential execution, continues on failure)
@@ -257,6 +278,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - `ARGO_SCENE_DURATIONS_PATH` — path to `.scene-durations.json` (loaded by narration fixture)
 - `ARGO_OVERLAYS_PATH` — path to `.scenes.json` manifest (loaded by overlay functions for manifest-based resolution)
 - `ARGO_AUTO_BACKGROUND` — set to `'1'` when config `overlays.autoBackground` is true
+- `ARGO_BLOCKS_DIR` — blocks directory for installed hyperframes items (loaded by `applyComponent`/hf-component cues). Set by `record()` from `config.blocksDir` at all three call sites: pipeline primary, pipeline variants, and CLI `argo record`.
 - `ARGO_ALLOW_RAW_GSAP` — set to `'1'` when config `overlays.allowRawGsap` is true. Re-checked by the runtime before executing `motion.raw` (defense in depth against inline cues that skip the validator).
 - `ARGO_OUTPUT_DIR` — output directory for timing JSON
 - `DEBUG` — when set (e.g., `DEBUG=pw:api`), Playwright debug output is forwarded to stderr even on success
@@ -332,6 +354,7 @@ Custom `test` fixture extends Playwright's `test` with a `narration` fixture tha
 - ffmpeg `gradients` source filter rejects negative `x0/y0/x1/y1` values — angle-to-coordinate conversion can produce negatives for certain angles. Always clamp.
 - `narration.mark()` does sync `appendFileSync` which can trigger app re-renders on the same event loop tick — overlay injection fence mitigates but apps with very aggressive DOM updates may still need manual `waitForTimeout()` after `mark()`.
 - `-shortest` must be skipped when frame PNG overlay is present — PNG has 0 duration and truncates the entire output.
+- `hf-block` cutaway cues are not validated in combination with `export.speedRamp` — cue windows are resolved from post-ramp placements while the ramp's gap-compression segments are computed independently in source-timeline coordinates, which can misalign the block window against the retimed video. Don't combine them until this is revisited.
 
 ## Security Invariants
 

@@ -174,5 +174,13 @@ export function renderTemplate(cue: OverlayCue, theme: BackgroundTheme = 'dark')
       const merged = { ...block.defaultProps, ...cue.props };
       return block.render(merged as never, theme);
     }
+    case 'hf-component':
+      throw new Error(
+        'hf-component cues are injected full-frame by showOverlay/applyComponent, not rendered as zone templates.',
+      );
+    case 'hf-block':
+      throw new Error(
+        'hf-block cues are composited at export time (pre-rendered PNG sequences), not rendered as zone templates.',
+      );
   }
 }

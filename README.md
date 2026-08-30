@@ -132,6 +132,8 @@ export default defineConfig({
   baseURL: 'http://localhost:3000',
   demosDir: 'demos',
   outputDir: 'videos',
+  blocksDir: 'blocks',              // where `argo add` installs hyperframes registry items (git-tracked)
+  // registry: { url: 'https://raw.githubusercontent.com/heygen-com/hyperframes/main/registry' },
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
   video: {
     width: 1920, height: 1080, fps: 30,
@@ -231,12 +233,14 @@ argo tts generate <manifest>       Generate TTS clips from manifest
 argo export <demo>                 Merge video + audio to MP4
 argo pipeline <demo>               Run all steps end-to-end
 argo pipeline --all                Run pipeline for every demo in demosDir
-argo validate <demo>               Check scene name consistency (no TTS/recording)
+argo validate <demo>               Check scenes, overlays, installed components (no TTS/recording)
 argo preview <demo>                Browser-based editor for voiceover, overlays, timing
 argo preview                       Multi-demo dashboard (lists all demos with status)
 argo clip <demo> <scene>            Extract a scene clip from exported video
 argo clip <demo> <scene> --format gif  Extract as palette-optimized GIF
 argo import <video-file>           Import external video for post-production
+argo add <name>                    Install a block/component from the hyperframes registry into blocksDir
+argo add --list                    Browse available registry items (add --json for machine-readable)
 argo doctor                        Check environment (ffmpeg, Playwright, config)
 argo --config <path> <command>     Use a custom config file
 
@@ -246,6 +250,8 @@ Options:
   --headed                         Run browser in visible mode
   --all                            Run pipeline for all demos
   --port <number>                  Preview server port (default: auto)
+  --registry <url>                 Override the registry URL for `argo add`
+  --json                           Machine-readable output for `argo add --list`
 ```
 
 ### Overlay Blocks
@@ -291,6 +297,59 @@ Argo ships 12 curated overlay blocks for demo narratives. Reference them from `.
 | `app-showcase` | Back-eased hero entrance + slow floating icon loop |
 | `ui-3d-reveal` | Perspective tilt-to-flat reveal with a subtle wobble loop |
 
+### Catalog (`argo add`)
+
+Install ready-made overlays and components from the [hyperframes](https://github.com/heygen-com/hyperframes) registry:
+
+```bash
+argo add --list                     # browse available items
+argo add --list --json              # machine-readable
+argo add vignette                   # install into blocksDir (default: blocks/)
+argo add vignette --registry <url>  # use a different registry for one install
+```
+
+Installed items land in `blocksDir` (default `blocks/`, git-tracked — review before committing) as `blocks/<name>/<file>` plus a `registry-item.json` sidecar recording what was fetched. Registry examples aren't installable via `argo add` — install those with the hyperframes CLI instead.
+
+Use an installed component full-frame via the `hf-component` overlay cue:
+
+```json
+{ "scene": "intro", "text": "…", "overlay": { "type": "hf-component", "name": "vignette", "params": { "--vignette-size": "40%" } } }
+```
+
+`params` are CSS custom properties applied to the injected component (validated — not arbitrary CSS). The component is shown for `showOverlay`'s duration and bypasses the zone/placement system (it's full-frame, not a templated overlay).
+
+Or drive it manually from the script for effects that should persist across scenes:
+
+```ts
+import { applyComponent, removeComponent } from '@argo-video/cli';
+await applyComponent(page, 'grain-overlay');   // persists until removed
+await removeComponent(page, 'grain-overlay');
+```
+
+> **Note:** `caption-*` components install like any other item but don't yet support word-level timing (future work). Components can ship a `<script>`, but strict CSP on the recorded page may block it — a warning is logged, the recording still succeeds.
+
+Use an installed **block** as an export-time cutaway with the `hf-block` overlay cue:
+
+```json
+{
+  "scene": "outro",
+  "overlay": {
+    "type": "hf-block",
+    "name": "logo-outro",
+    "params": { "--brand-color": "#6366f1" },
+    "durationMs": 2000,
+    "fit": "cover",
+    "holdLastFrame": false
+  }
+}
+```
+
+`hf-block` is fundamentally different from `hf-component`: during recording it's a no-op (just paces the wait, nothing is injected into the page), and the block's GSAP timeline is rendered afterward — at export time — in a separate headless Chromium pass that seeks the block's `window.__timelines` entry frame-by-frame and screenshots it with a transparent background. The resulting PNG sequence is composited over the recording as a cutaway overlay (an `enable`-gated ffmpeg `overlay`), so it never changes the video's total duration. Frames are cached by content hash at `.argo/<demo>/hf-blocks/<hash>/` — an unchanged block/params/duration/fps/size combo skips the browser launch entirely on the next export.
+
+The window the block plays over defaults to the scene's placement (from mark to the next mark); `durationMs` can shrink that window or extend it into the dead time after the scene (capped at the next scene's start, or left open on the last scene). `fit` is `'cover'` (scaled to fill the frame, the default) or `{ x, y, scale }` for a positioned/scaled placement. `holdLastFrame: true` pins the block's final frame instead of linearly retiming its whole timeline into the window — useful when the window is much shorter than the block's natural animation length.
+
+Because the pre-render pass loads the real block HTML, it needs network access at export time for blocks that pull in GSAP or Google Fonts from a CDN — plan for that in CI/offline export environments. `hf-block` is also not currently compatible with `export.speedRamp`: the cutaway's window is resolved from post-ramp scene placements but the ramp's own dead-time compression is computed independently, so combining the two can misalign the block window against the retimed video. Avoid pairing them until this is revisited.
+
 ### GSAP motion (advanced)
 
 Every overlay supports two kinds of `motion`: a named CSS preset (`none`, `fade-in`, `slide-in`) or a declarative GSAP motion object with `in`, `out`, and `loop` phases. `showOverlay(page, scene, durationMs)` auto-times the exit so the visible window matches `durationMs`:
@@ -326,6 +385,7 @@ import { showConfetti } from '@argo-video/cli';
 import { spotlight, focusRing, dimAround, zoomTo, resetCamera } from '@argo-video/cli';
 import { cursorHighlight, resetCursor } from '@argo-video/cli';
 import { showCaption, hideCaption, withCaption } from '@argo-video/cli';
+import { applyComponent, removeComponent } from '@argo-video/cli';
 import { defineConfig, demosProject, engines } from '@argo-video/cli';
 ```
 
@@ -350,6 +410,8 @@ import { defineConfig, demosProject, engines } from '@argo-video/cli';
 | `showCaption(page, scene, text, durationMs)` | Show a simple text caption |
 | `withCaption(page, scene, text, action)` | Show caption during an async action |
 | `hideCaption(page)` | Remove caption |
+| `applyComponent(page, name, opts?)` | Inject an installed hyperframes component (`argo add`) full-frame; persists until removed. `opts: { params?, blocksDir? }` |
+| `removeComponent(page, name)` | Remove a component applied via `applyComponent` |
 | `narration.mark(scene)` | Record a scene timestamp |
 | `narration.durationFor(scene, opts?)` | Compute hold duration from TTS clip length (remaining time from now) |
 | `narration.sceneDuration(scene, opts?)` | Full scene duration — stable, non-decreasing (for overlay display) |
@@ -482,16 +544,23 @@ Transition types: `fade-through-black`, `dissolve` (quicker dip-to-black, not a 
 Pre-rendered WebGL shader transitions between scenes, cached by content hash.
 
 ```js
-export: {
-  transition: {
-    type: 'shader',
-    shader: 'crosswarp',   // crosswarp | swirl | ripple | luma-mask | light-leak
-    durationMs: 800,
+export default defineConfig({
+  export: {
+    transition: {
+      type: 'shader',
+      shader: 'ridged-burn',
+      durationMs: 2000,
+      accent: '#0ea5e9', // tints edge glow/burn in accent-aware shaders
+    },
   },
-}
+});
 ```
 
-Shaders are adapted from [gl-transitions.com](https://gl-transitions.com) (MIT). First export launches headless Chromium to pre-render shader frames; cached at `.argo/<demo>/shaders/<hash>/` so subsequent exports skip the browser launch.
+16 shaders are available: `crosswarp`, `swirl`, `ripple`, `luma-mask`, `light-leak`, `domain-warp`, `ridged-burn`, `thermal-distortion`, `swirl-vortex`, `whip-pan`, `gravitational-lens`, `cinematic-zoom`, `chromatic-split`, `flash-through-white`, `sdf-iris`, `ripple-waves`.
+
+The first five are adapted from [gl-transitions.com](https://gl-transitions.com) (MIT); the remaining 11 are ported from [hyperframes](https://github.com/heygen-com/hyperframes) (Apache-2.0). First export launches headless Chromium to pre-render shader frames; cached at `.argo/<demo>/shaders/<hash>/` so subsequent exports skip the browser launch.
+
+`export.transition.accent` (default `'#0ea5e9'`) tints edge glow/burn in accent-aware shaders: `domain-warp`, `ridged-burn`, `thermal-distortion`, `sdf-iris`, `ripple-waves`.
 
 See `demos/shaders-showcase.demo.ts` for a complete example.
 

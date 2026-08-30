@@ -7,6 +7,10 @@ export interface ValidateOptions {
   demosDir: string;
   /** Mirrors config `overlays.allowRawGsap`. When true, `motion.raw` is accepted. */
   allowRawGsap?: boolean;
+  /** Directory holding installed hyperframes items (config.blocksDir). Default 'blocks'. */
+  blocksDir?: string;
+  /** Mirrors config `export.transition.accent` — validated as 6-digit hex when set. */
+  transitionAccent?: string;
 }
 
 export interface ValidateResult {
@@ -18,6 +22,13 @@ export async function validateDemo(options: ValidateOptions): Promise<ValidateRe
   const { demoName, demosDir } = options;
   const errors: string[] = [];
   const warnings: string[] = [];
+
+  // Validate export.transition.accent (6-digit hex, optional leading #)
+  if (options.transitionAccent !== undefined && !/^#?[0-9a-fA-F]{6}$/.test(options.transitionAccent.trim())) {
+    errors.push(
+      `export.transition.accent: "${options.transitionAccent}" is not a 6-digit hex color (e.g. #0ea5e9)`,
+    );
+  }
 
   // Check demo script exists
   const scriptPath = join(demosDir, `${demoName}.demo.ts`);
@@ -56,7 +67,7 @@ export async function validateDemo(options: ValidateOptions): Promise<ValidateRe
       if (!Array.isArray(scenes)) {
         errors.push(`Scenes manifest must be a JSON array`);
       } else {
-        const validTypes = new Set(['lower-third', 'headline-card', 'callout', 'image-card', 'arrow', 'block']);
+        const validTypes = new Set(['lower-third', 'headline-card', 'callout', 'image-card', 'arrow', 'block', 'hf-component', 'hf-block']);
         const validPlacements = new Set(['bottom-center', 'top-left', 'top-right', 'bottom-left', 'bottom-right', 'center']);
         const validMotions = new Set(['none', 'fade-in', 'slide-in']);
 
@@ -106,6 +117,36 @@ export async function validateDemo(options: ValidateOptions): Promise<ValidateRe
               }
               if (!ov.props || typeof ov.props !== 'object') {
                 errors.push(`Scene "${entry.scene}" overlay: "props" object is required when type="block"`);
+              }
+            }
+            // Validate hf-component / hf-block fields — both install to the same
+            // blocksDir/<name>/<name>.html layout.
+            if (ov.type === 'hf-component' || ov.type === 'hf-block') {
+              if (!ov.name || typeof ov.name !== 'string') {
+                errors.push(`Scene "${entry.scene}" overlay: ${ov.type} requires a "name" field`);
+              } else if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(ov.name)) {
+                errors.push(`Scene "${entry.scene}" overlay: invalid ${ov.type} name "${ov.name}"`);
+              } else {
+                const blocksDir = options.blocksDir ?? 'blocks';
+                const componentFile = join(blocksDir, ov.name, `${ov.name}.html`);
+                if (!existsSync(componentFile)) {
+                  errors.push(
+                    `Scene "${entry.scene}" overlay: ${ov.type} "${ov.name}" is not installed ` +
+                      `(missing ${componentFile}). Run: argo add ${ov.name}`,
+                  );
+                }
+              }
+            }
+            // Validate hf-block fit shape
+            if (ov.type === 'hf-block' && ov.fit !== undefined && ov.fit !== 'cover') {
+              const fit = ov.fit;
+              if (
+                typeof fit !== 'object' || fit === null ||
+                typeof fit.x !== 'number' || typeof fit.y !== 'number' || typeof fit.scale !== 'number'
+              ) {
+                errors.push(
+                  `Scene "${entry.scene}" overlay: hf-block "fit" must be 'cover' or { x, y, scale } with numeric fields`,
+                );
               }
             }
           }

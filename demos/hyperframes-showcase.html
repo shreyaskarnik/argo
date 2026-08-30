@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Argo × HyperFrames</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --accent: #0ea5e9;
+    --accent-bright: #7dd3fc;
+    --ink: #f5f7fa;
+    --muted: rgba(245, 247, 250, 0.62);
+    --bg: #07090d;
+  }
+  html, body { background: var(--bg); color: var(--ink); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  section {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 8vh 9vw;
+    position: relative;
+  }
+  .kicker {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 26px;
+  }
+  h1 {
+    font-size: clamp(56px, 7.2vw, 118px);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.02;
+    max-width: 15ch;
+  }
+  h1 .dim { color: var(--muted); }
+  h1 .glow { color: var(--accent-bright); }
+  .sub {
+    margin-top: 30px;
+    font-size: clamp(19px, 1.6vw, 26px);
+    line-height: 1.55;
+    color: var(--muted);
+    max-width: 52ch;
+  }
+  .sub strong { color: var(--ink); font-weight: 650; }
+  code.cmd {
+    display: inline-block;
+    margin-top: 34px;
+    padding: 16px 26px;
+    border-radius: 12px;
+    background: rgba(14, 165, 233, 0.09);
+    border: 1px solid rgba(14, 165, 233, 0.35);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: clamp(17px, 1.4vw, 23px);
+    color: var(--accent-bright);
+  }
+  code.cmd .p { color: var(--muted); }
+
+  /* hook backdrop: faint radial wash + grid */
+  #hook::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(1100px 620px at 76% 22%, rgba(14, 165, 233, 0.16), transparent 62%),
+      radial-gradient(800px 520px at 12% 88%, rgba(56, 189, 248, 0.08), transparent 60%);
+    pointer-events: none;
+  }
+  #hook::after {
+    content: "";
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(245,247,250,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(245,247,250,0.035) 1px, transparent 1px);
+    background-size: 72px 72px;
+    mask-image: radial-gradient(900px 600px at 70% 30%, black, transparent 75%);
+    pointer-events: none;
+  }
+
+  /* pillars row on #better */
+  .pillars {
+    margin-top: 54px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 40px;
+    align-items: center;
+    max-width: 1180px;
+  }
+  .pillar {
+    padding: 34px 36px;
+    border-radius: 18px;
+    background: rgba(245, 247, 250, 0.04);
+    border: 1px solid rgba(245, 247, 250, 0.09);
+  }
+  .pillar h3 {
+    font-size: 26px;
+    font-weight: 750;
+    letter-spacing: -0.015em;
+    margin-bottom: 12px;
+  }
+  .pillar p { color: var(--muted); font-size: 18px; line-height: 1.55; }
+  .pillar .tag { font-size: 13px; font-weight: 700; letter-spacing: 0.18em; color: var(--accent); text-transform: uppercase; display: block; margin-bottom: 14px; }
+  .times {
+    font-size: 54px;
+    font-weight: 300;
+    color: var(--accent);
+    text-align: center;
+  }
+
+  .stat-row { margin-top: 46px; display: flex; gap: 64px; }
+  .stat .n { font-size: clamp(44px, 4.6vw, 76px); font-weight: 800; letter-spacing: -0.03em; color: var(--accent-bright); }
+  .stat .l { margin-top: 6px; font-size: 16px; color: var(--muted); letter-spacing: 0.04em; }
+
+  .shader-grid {
+    margin-top: 46px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    max-width: 1080px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 17px;
+  }
+  .shader-grid span {
+    padding: 14px 18px;
+    border-radius: 10px;
+    background: rgba(245, 247, 250, 0.04);
+    border: 1px solid rgba(245, 247, 250, 0.09);
+    color: var(--muted);
+    text-align: center;
+  }
+  .shader-grid span.hot {
+    color: var(--accent-bright);
+    border-color: rgba(14, 165, 233, 0.5);
+    background: rgba(14, 165, 233, 0.10);
+  }
+
+  /* outro backdrop — intentionally quiet; the logo-outro block composites over it */
+  #outro { align-items: center; text-align: center; }
+  #outro .sub { margin-top: 18px; }
+  #outro h1 { max-width: none; }
+</style>
+</head>
+<body>
+
+<section id="hook">
+  <div class="kicker">Argo &times; HyperFrames</div>
+  <h1>Product demos,<br /><span class="glow">but cinematic.</span></h1>
+  <p class="sub">This video is <strong>choreography, not screen capture</strong>. Playwright drives the browser. Argo directs the film. HyperFrames supplies the motion — <strong>no editor, no timeline, no re-takes</strong>.</p>
+</section>
+
+<section id="argo">
+  <div class="kicker">Meet Argo</div>
+  <h1>Record the <span class="glow">real thing.</span></h1>
+  <p class="sub">Not a screen recorder — <strong>the full power of Playwright, pointed at filmmaking</strong>. Real navigation, real clicks, real waits: your product driven the way users drive it, then narrated, directed, and exported. <strong>One command, end to end</strong>.</p>
+  <code class="cmd"><span class="p">$</span> argo pipeline my-demo</code>
+</section>
+
+<section id="overlays">
+  <div class="kicker">Argo overlays</div>
+  <h1>Five templates.<br /><span class="glow">Plus blocks.</span></h1>
+  <p class="sub">Lower-thirds, headline cards, callouts, arrows, image cards — and a curated block catalog. All GSAP-animated, all driven from a <strong>JSON manifest</strong>.</p>
+</section>
+
+<section id="camera">
+  <div class="kicker">Camera direction</div>
+  <h1>Direct the <span class="glow">viewer's eye.</span></h1>
+  <div class="pillars" style="grid-template-columns: 1fr 1fr; max-width: 1080px; gap: 28px; margin-top: 44px;">
+    <div class="pillar" id="cam-spotlight"><span class="tag">spotlight()</span><h3>Spotlight</h3><p>Dim everything but the point of interest.</p></div>
+    <div class="pillar" id="cam-focus"><span class="tag">focusRing()</span><h3>Focus ring</h3><p>Draw a pulsing ring around any element.</p></div>
+    <div class="pillar" id="cam-dim"><span class="tag">dimAround()</span><h3>Dim around</h3><p>Fade the page back, keep the subject lit.</p></div>
+    <div class="pillar" id="cam-zoom"><span class="tag">zoomTo()</span><h3>Post-export zoom</h3><p>Frame-exact ffmpeg zoompan — no DOM tricks.</p></div>
+  </div>
+</section>
+
+<section id="components">
+  <div class="kicker">HyperFrames components</div>
+  <h1 class="shimmer-sweep-target">Film grade,<br /><span class="glow">one install.</span></h1>
+  <p class="sub">Vignette. Shimmer. Installed from the catalog with <strong>argo add</strong>, injected live into the recording — watch this very footage change.</p>
+</section>
+
+<section id="effects">
+  <div class="kicker">Effects &amp; freeze</div>
+  <h1>Ship-it <span class="glow">moments.</span></h1>
+  <p class="sub">Confetti bursts, emoji rain — and when the moment lands, argo can <strong>freeze the frame</strong> in the export while the narration keeps going.</p>
+</section>
+
+<section id="shaders">
+  <div class="kicker">Shader transitions</div>
+  <h1>Sixteen <span class="glow">shaders.</span></h1>
+  <p class="sub">Every cut in this video is <strong>whip-pan</strong> — ported from the HyperFrames shader library. Restyle the whole film by changing one word.</p>
+  <div class="shader-grid">
+    <span>crosswarp</span><span>swirl</span><span>ripple</span><span>luma-mask</span>
+    <span>light-leak</span><span>domain-warp</span><span>ridged-burn</span><span>thermal-distortion</span>
+    <span>swirl-vortex</span><span class="hot">whip-pan</span><span>gravitational-lens</span><span>cinematic-zoom</span>
+    <span>chromatic-split</span><span>flash-through-white</span><span>sdf-iris</span><span>ripple-waves</span>
+  </div>
+</section>
+
+<section id="better">
+  <div class="kicker">Better together</div>
+  <h1>Crafted with Playwright.<br /><span class="glow">Composed via HyperFrames.</span></h1>
+  <div class="pillars">
+    <div class="pillar">
+      <span class="tag">Argo directs</span>
+      <h3>The choreography</h3>
+      <p>The full Playwright API driving your real product — plus narration, camera moves, one-command export.</p>
+    </div>
+    <div class="times">&times;</div>
+    <div class="pillar">
+      <span class="tag">HyperFrames performs</span>
+      <h3>The composition</h3>
+      <p>Shader transitions, film grade, branded end cards — a motion catalog, installed with one command.</p>
+    </div>
+  </div>
+  <code class="cmd"><span class="p">$</span> argo add vignette grain-overlay logo-outro</code>
+</section>
+
+<section id="outro">
+  <div class="kicker">Argo &times; HyperFrames</div>
+  <h1>Ship the demo.</h1>
+  <p class="sub">github.com/shreyaskarnik/argo &nbsp;·&nbsp; github.com/heygen-com/hyperframes</p>
+</section>
+
+</body>
+</html>

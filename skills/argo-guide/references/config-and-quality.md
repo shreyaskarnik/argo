@@ -11,6 +11,8 @@ export default defineConfig({
   baseURL: 'http://localhost:3000',
   demosDir: 'demos',
   outputDir: 'videos',
+  blocksDir: 'blocks',        // where `argo add` installs hyperframes registry items (git-tracked)
+  // registry: { url: '...' }, // override the hyperframes registry for `argo add`
   tts: { defaultVoice: 'af_heart', defaultSpeed: 1.0 },
   video: {
     width: 1920,

@@ -11,6 +11,7 @@ import { buildCameraMoveFilter, buildMotionBlurFilter, type CameraMove } from '.
 import { buildFreezeFilter, type ResolvedFreeze } from './freeze.js';
 import { getVideoFrameRate } from './media.js';
 import { buildOverlayPngFilters, isImportedVideo, type RenderedOverlayPng } from './overlays/render-to-png.js';
+import { buildHfBlockFilters, type RenderedHfBlock } from './hf/block-filter.js';
 import { buildFrameFilter } from './frame.js';
 import { getGpuEncoderName, resolveEncoder, type GpuEncoder } from './gpu-encoder.js';
 
@@ -66,6 +67,8 @@ export interface ExportOptions {
   watermark?: WatermarkConfig;
   /** Pre-rendered overlay PNGs to composite onto the video (for imported videos). */
   overlayPngs?: RenderedOverlayPng[];
+  /** Pre-rendered hyperframes block PNG sequences composited as cutaway overlays. */
+  hfBlocks?: RenderedHfBlock[];
   /** Apply contrast-adaptive sharpening (CAS) to restore text crispness.
    * true = strength 0.5. { strength: 0.0-1.0 } to tune. */
   sharpen?: boolean | { strength: number };
@@ -412,11 +415,13 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     // filter_complex — otherwise ffmpeg rejects with "Option vf cannot be
     // applied to input url" because the new `-i` lands after the `-vf`. Covers
     // frame (adds PNG input), watermark (adds PNG input), overlayPngs (adds
-    // PNG inputs), cameraMoves (filter_complex only), and sharpen (which
-    // routes via filter_complex once other filters are present).
+    // PNG inputs), hfBlocks (adds image2 sequence inputs), cameraMoves
+    // (filter_complex only), and sharpen (which routes via filter_complex
+    // once other filters are present).
     const downstreamWillUseFilterComplex =
       (options.cameraMoves && options.cameraMoves.length > 0) ||
       (options.overlayPngs && options.overlayPngs.length > 0) ||
+      (options.hfBlocks && options.hfBlocks.length > 0) ||
       Boolean(options.frame) ||
       Boolean(options.watermark && options.watermark.src && existsSync(options.watermark.src)) ||
       Boolean(options.sharpen);
@@ -470,6 +475,18 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     filterParts.push(...ovlResult.filterParts);
     videoSource = ovlResult.videoSource;
     nextInput = ovlResult.nextInput;
+  }
+
+  // Pre-rendered hyperframes block PNG sequences — composited immediately after
+  // overlay PNGs (same layer priority: after transitions/camera moves, before
+  // frame/watermark) as cutaway overlays with an `enable`-gated timeline window.
+  const hfBlocks = options.hfBlocks;
+  if (hfBlocks && hfBlocks.length > 0) {
+    const hfResult = buildHfBlockFilters(hfBlocks, nextInput, videoSource, outputWidth ?? 1920, outputHeight ?? 1080);
+    args.push(...hfResult.inputArgs);
+    filterParts.push(...hfResult.filterParts);
+    videoSource = hfResult.videoSource;
+    nextInput = hfResult.nextInput;
   }
 
   // Frame effect — padding, rounded corners, shadow, background
@@ -758,11 +775,16 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     // Skip -shortest when:
     // - Freeze-frame holds extend the video beyond the audio
     // - Overlay PNGs are present (imported videos where audio may be shorter than video)
+    // - hf-block PNG sequences are present (same reasoning as overlay PNGs — these
+    //   are finite image2 sequences with eof_action=pass, so they can't hang the
+    //   encode, but -shortest could still truncate the video against a shorter
+    //   audio track when they're the reason overlayPngs would otherwise be absent)
     // - Imported videos have narration shorter than the full source video
     const hasFreezes = freezeSpecs && freezeSpecs.length > 0;
     const hasOverlayPngs = options.overlayPngs && options.overlayPngs.length > 0;
+    const hasHfBlocks = options.hfBlocks && options.hfBlocks.length > 0;
     const importedNarrationVideo = importedVideo && hasAudio;
-    if (!hasFreezes && !hasOverlayPngs && !importedNarrationVideo) {
+    if (!hasFreezes && !hasOverlayPngs && !hasHfBlocks && !importedNarrationVideo) {
       args.push('-shortest');
     }
   }

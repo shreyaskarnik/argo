@@ -21,8 +21,13 @@ try {
 }
 
 describe('shader registry', () => {
-  it('ships exactly the v1 five shaders', () => {
-    expect(SHADER_NAMES).toEqual(['crosswarp', 'swirl', 'ripple', 'luma-mask', 'light-leak']);
+  it('ships the v1 five plus the hyperframes ports', () => {
+    expect(SHADER_NAMES).toEqual([
+      'crosswarp', 'swirl', 'ripple', 'luma-mask', 'light-leak',
+      'domain-warp', 'ridged-burn', 'thermal-distortion', 'swirl-vortex',
+      'whip-pan', 'gravitational-lens', 'cinematic-zoom', 'chromatic-split', 'flash-through-white',
+      'sdf-iris', 'ripple-waves',
+    ]);
   });
 
   it('each shader has non-empty GLSL source', () => {
@@ -190,4 +195,119 @@ describe('renderShaderTransitions', () => {
 
     rmSync(tmp, { recursive: true, force: true });
   }, 120000);
+});
+
+describe('computeShaderHash accent', () => {
+  let tmp: string;
+  beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'argo-shader-accent-')); });
+  afterEach(() => { rmSync(tmp, { recursive: true, force: true }); });
+
+  it('different accent produces a different hash', async () => {
+    const { computeShaderHash } = await import('../../src/transitions/shader-render.js');
+    const a = join(tmp, 'a.png');
+    const b = join(tmp, 'b.png');
+    writeFileSync(a, Buffer.from([1, 2, 3]));
+    writeFileSync(b, Buffer.from([4, 5, 6]));
+    const h1 = computeShaderHash('crosswarp', 800, 30, 640, 360, a, b, '#0ea5e9');
+    const h2 = computeShaderHash('crosswarp', 800, 30, 640, 360, a, b, '#ff0000');
+    expect(h1).not.toBe(h2);
+  });
+
+  it('omitted accent equals DEFAULT_ACCENT hash', async () => {
+    const { computeShaderHash } = await import('../../src/transitions/shader-render.js');
+    const { DEFAULT_ACCENT } = await import('../../src/transitions/accent.js');
+    const a = join(tmp, 'a.png');
+    const b = join(tmp, 'b.png');
+    writeFileSync(a, Buffer.from([1, 2, 3]));
+    writeFileSync(b, Buffer.from([4, 5, 6]));
+    expect(computeShaderHash('crosswarp', 800, 30, 640, 360, a, b))
+      .toBe(computeShaderHash('crosswarp', 800, 30, 640, 360, a, b, DEFAULT_ACCENT));
+  });
+
+  it('accent hex case does not change the hash', async () => {
+    const { computeShaderHash } = await import('../../src/transitions/shader-render.js');
+    const a = join(tmp, 'a.png');
+    const b = join(tmp, 'b.png');
+    writeFileSync(a, Buffer.from([1, 2, 3]));
+    writeFileSync(b, Buffer.from([4, 5, 6]));
+    expect(computeShaderHash('crosswarp', 800, 30, 640, 360, a, b, '#0EA5E9'))
+      .toBe(computeShaderHash('crosswarp', 800, 30, 640, 360, a, b, '#0ea5e9'));
+  });
+});
+
+describe('buildShaderPageHtml uniforms', () => {
+  it('embeds accent values and resolution setup', async () => {
+    const { buildShaderPageHtml } = await import('../../src/transitions/shader-page.html.js');
+    const { deriveAccentColors } = await import('../../src/transitions/accent.js');
+    const html = buildShaderPageHtml(640, 360, 'void main(){}', deriveAccentColors('#ff8000'));
+    expect(html).toContain('accentDark');
+    expect(html).toContain('resolution');
+    expect(html).toContain('gl.uniform2f');
+  });
+
+  it('accepts a shader-variant config with accent at compile time', () => {
+    const cfg: TransitionConfig = {
+      type: 'shader',
+      shader: 'crosswarp',
+      durationMs: 800,
+      accent: '#ff8000',
+    };
+    expect(cfg.type).toBe('shader');
+  });
+});
+
+describe('every registered shader compiles and renders', () => {
+  let tmp: string;
+  beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'argo-shader-smoke-')); });
+  afterEach(() => { rmSync(tmp, { recursive: true, force: true }); });
+
+  it.skipIf(!hasFfmpeg)('renders one frame per shader without GL errors', async () => {
+    const { renderShaderFrames } = await import('../../src/transitions/shader-render.js');
+    const { chromium } = await import('playwright');
+    // two tiny solid-color PNG fixtures via ffmpeg
+    const a = join(tmp, 'a.png');
+    const b = join(tmp, 'b.png');
+    await execFileP('ffmpeg', ['-y', '-f', 'lavfi', '-i', 'color=red:s=64x36', '-frames:v', '1', a]);
+    await execFileP('ffmpeg', ['-y', '-f', 'lavfi', '-i', 'color=blue:s=64x36', '-frames:v', '1', b]);
+    const browser = await chromium.launch({
+      args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blacklist'],
+    });
+    try {
+      for (const shader of SHADER_NAMES) {
+        const outDir = join(tmp, shader);
+        const n = await renderShaderFrames({
+          shader, aPng: a, bPng: b, width: 64, height: 36,
+          fps: 30, durationMs: 66, outputDir: outDir, browser,
+        });
+        expect(n, shader).toBeGreaterThanOrEqual(1);
+        expect(existsSync(join(outDir, 'frame_0000.png')), shader).toBe(true);
+      }
+    } finally {
+      await browser.close();
+    }
+  }, 120_000);
+});
+
+describe('renderShaderTransitions boundary clamping', () => {
+  let tmp: string;
+  beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'argo-shader-clamp-')); });
+  afterEach(() => { rmSync(tmp, { recursive: true, force: true }); });
+
+  it.skipIf(!hasFfmpeg)('clamps a boundary past the video end instead of failing', async () => {
+    const { renderShaderTransitions } = await import('../../src/transitions/shader-render.js');
+    // 2-second test video
+    const video = join(tmp, 'v.mp4');
+    await execFileP('ffmpeg', ['-y', '-f', 'lavfi', '-i', 'color=red:s=64x36:d=2', '-r', '30', video]);
+    // boundary at 5s — well past the 2s video (mark-drift scenario)
+    const results = await renderShaderTransitions({
+      videoPath: video,
+      boundaries: [{ boundarySec: 5, durationMs: 200 }],
+      shader: 'crosswarp',
+      width: 64, height: 36, fps: 30,
+      cacheDir: join(tmp, 'cache'),
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0].frameCount).toBeGreaterThanOrEqual(1);
+    expect(existsSync(join(results[0].pngDir, 'frame_0000.png'))).toBe(true);
+  }, 120_000);
 });

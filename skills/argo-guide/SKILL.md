@@ -189,7 +189,7 @@ Key fields: `scene` (required, matches `mark()`), `text` (spoken narration — o
 
 ### Overlay Templates
 
-Five types, each with a `type` discriminant. All support `placement`, `motion`, and `autoBackground`.
+Five zone-based template types, each with a `type` discriminant. All support `placement`, `motion`, and `autoBackground`. (Three more cue types exist: `block` — see Overlay blocks below; `hf-component` — full-frame hyperframes components, see HyperFrames components below; and `hf-block` — export-time hyperframes block cutaways, see HyperFrames blocks below.)
 
 - **`lower-third`**: `{ type: 'lower-third', text: '...' }` — text banner
 - **`headline-card`**: `{ type: 'headline-card', title: '...', kicker: '...', body: '...' }` — large card
@@ -247,6 +247,45 @@ Argo ships 12 ready-to-use blocks for narrative inserts. Reference via `overlay:
 
 See `demos/blocks-showcase.demo.ts` for a full example. Block sources live under `src/blocks/<name>/` with a `block.json` schema and a `template.ts` exporting the `BlockDefinition` (+ optional `defaultMotion`). Animated blocks credit HyperFrames (Apache-2.0) for inspiration in their `block.json`.
 
+### HyperFrames components (`argo add`)
+
+Beyond the built-in blocks, install full-frame components (vignettes, grain, glows) from the hyperframes registry:
+
+```bash
+npx argo add --list          # browse registry items (--json for machine-readable)
+npx argo add vignette        # installs into blocksDir (default blocks/, git-tracked)
+```
+
+Reference an installed component with the `hf-component` cue type:
+
+```json
+{ "scene": "intro", "overlay": { "type": "hf-component", "name": "vignette", "params": { "--vignette-size": "40%" } } }
+```
+
+`hf-component` cues are **full-frame** — they bypass zones/placement/motion; duration comes from `showOverlay`. `params` are validated CSS custom properties. For effects that should persist across scenes, use the script API instead:
+
+```typescript
+import { applyComponent, removeComponent } from '@argo-video/cli';
+await applyComponent(page, 'grain-overlay');   // persists until removed
+await removeComponent(page, 'grain-overlay');
+```
+
+Config: `blocksDir` (install location, default `blocks/`) and `registry: { url }` (registry override; also `--registry <url>` per-invocation). `argo validate` errors if a referenced component isn't installed. Caveats: `caption-*` components install but lack word-timing support (future); component `<script>`s may be blocked by strict CSP on the recorded page (warning, not failure); components are trusted-at-install — review `blocks/` before committing.
+
+### HyperFrames blocks (`hf-block`, export-time cutaways)
+
+Installed **blocks** (e.g. `logo-outro`, animated end-cards) can also be used as a scene-anchored cutaway that's pre-rendered and composited at export time, instead of injected live:
+
+```json
+{ "scene": "outro", "overlay": { "type": "hf-block", "name": "logo-outro", "durationMs": 2000, "fit": "cover", "holdLastFrame": false } }
+```
+
+`hf-block` does nothing during recording — no injection, just a pacing wait. At export time, a headless Chromium pre-pass loads the block, seeks its GSAP timeline, and captures an alpha PNG sequence, which is composited over the recording as a cutaway overlay (video duration is unaffected). Frames are cached at `.argo/<demo>/hf-blocks/<hash>/`; an unchanged block/params/duration skips the render on the next export.
+
+The cutaway window defaults to the scene's placement (mark to next mark); `durationMs` can shorten it or extend it into the gap after the scene. `fit` is `'cover'` (default, fills the frame) or `{ x, y, scale }` for a positioned placement. `holdLastFrame: true` freezes the block's last frame instead of stretching its whole animation to fit the window.
+
+Caveats: the pre-render pass needs network access for blocks that load GSAP/fonts from a CDN — offline exports of `hf-block` demos will fail at that step. Not currently compatible with `export.speedRamp` (cutaway windows can misalign with the retimed video) — avoid combining the two.
+
 ### How Overlays Get Triggered
 
 Overlays need **two things** to appear in the video:
@@ -283,6 +322,8 @@ npx argo clip <name> <scene>                # Extract a scene as MP4 clip
 npx argo clip <name> <scene> --format gif   # Extract as GIF (for release notes, docs)
 npx argo import <video-file>                 # Import external video for post-production
 npx argo import <video-file> --demo <name>   # Import with custom demo name
+npx argo add <name>                          # Install hyperframes registry item into blocksDir
+npx argo add --list                          # Browse registry items (--json for machine-readable)
 npx argo init                               # Scaffold example demo + config
 npx argo init --from tests/spec.ts          # Convert existing Playwright test
 ```
@@ -326,7 +367,7 @@ export: {
 
 - **Transitions:** `fade-through-black` | `dissolve` | `wipe-left` | `wipe-right` — applied at scene boundaries during export. `dissolve` is a quicker dip-to-black (not a true crossfade blend). Use `durationMs: 2000` or higher for transitions that are clearly visible with voiceover (500ms is too fast to notice). Content changes (page navigation, slide switches) should happen BEFORE `narration.mark()` so the transition fades between old and new content.
 
-- **Shader transitions:** Pre-rendered WebGL shaders for high-impact transitions. Config: `transition: { type: 'shader', shader: 'crosswarp', durationMs: 800 }`. Shaders: `crosswarp`, `swirl`, `ripple`, `luma-mask`, `light-leak` (gl-transitions.com, MIT). Pre-rendered once per boundary, cached at `.argo/<demo>/shaders/<hash>/` keyed by content hash — second export skips the browser launch. On first export, Chromium renders PNG frames at `N = durationMs × fps` values; `buildShaderSpliceFilter` splices PNG sequence between boundary scenes.
+- **Shader transitions:** Pre-rendered WebGL shaders for high-impact transitions. Config: `transition: { type: 'shader', shader: 'ridged-burn', durationMs: 2000, accent: '#0ea5e9' }`. 16 shaders: `crosswarp`, `swirl`, `ripple`, `luma-mask`, `light-leak` (gl-transitions.com, MIT), plus `domain-warp`, `ridged-burn`, `thermal-distortion`, `swirl-vortex`, `whip-pan`, `gravitational-lens`, `cinematic-zoom`, `chromatic-split`, `flash-through-white`, `sdf-iris`, `ripple-waves` (ported from [hyperframes](https://github.com/heygen-com/hyperframes), Apache-2.0). `accent` (default `'#0ea5e9'`) tints edge glow/burn in accent-aware shaders: `domain-warp`, `ridged-burn`, `thermal-distortion`, `sdf-iris`, `ripple-waves`. Pre-rendered once per boundary, cached at `.argo/<demo>/shaders/<hash>/` keyed by content hash (includes accent) — second export skips the browser launch. On first export, Chromium renders PNG frames at `N = durationMs × fps` values; `buildShaderSpliceFilter` splices PNG sequence between boundary scenes.
 - **Speed ramp:** Compresses inter-scene gaps (navigation, page loads) to keep demos tight. `gapSpeed: 2.0` = 2× speed for gaps. Only gaps > `minGapMs` (default 500ms) are affected.
 - **Formats:** `1:1` (square), `9:16` (vertical), `gif` (palette-optimized animated GIF). Both `1:1` and `9:16` use **blur-fill** — the source is scaled to fit, overlaid on a blurred version of itself. No more hard crop clipping.
 - **Audio:** `audio: { loudnorm: true }` applies EBU R128 loudness normalization (-16 LUFS). Makes voiceover consistent across engines and scenes.
@@ -475,7 +516,7 @@ PATH="/opt/homebrew/opt/node@22/bin:$PATH" npx hyperframes add logo-outro
 # drops compositions/logo-outro.html + any model/asset files into the project
 ```
 
-The catalog is at <https://hyperframes.heygen.com/catalog/>. Most blocks work on stable chromium; 3D/WebGL ones need `experimentalCanvasDrawElement: true` + `browserChannel: 'chrome-canary'`. See `references/compositions.md` for the import workflow.
+The catalog is at <https://hyperframes.heygen.com/catalog/>. Most blocks work on stable chromium; 3D/WebGL ones need `experimentalCanvasDrawElement: true` + `browserChannel: 'chrome-canary'`. See `references/compositions.md` for the import workflow. For full-frame **components** (vignettes, grain, glows) applied over the recorded page, use `npx argo add <name>` and the `hf-component` cue instead — see "HyperFrames components" above.
 
 **Composition contract** (compatible with hyperframes blocks — `npx hyperframes add <name>` works):
 

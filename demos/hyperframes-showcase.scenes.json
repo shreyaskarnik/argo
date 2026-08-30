@@ -1,0 +1,101 @@
+[
+  {
+    "scene": "hook",
+    "text": "This video was not edited. It was choreographed. Every camera move, every beat, every cut you are about to see is code. Playwright drives the browser. Argo directs the film. Hyper Frames supplies the motion. This is the full tour.",
+    "speed": 0.94,
+    "overlay": {
+      "type": "headline-card",
+      "kicker": "ARGO × HYPERFRAMES",
+      "title": "The full tour.",
+      "body": "Every feature. One take. Zero editors.",
+      "placement": "top-right",
+      "motion": {
+        "type": "gsap",
+        "in": { "from": { "y": -30, "opacity": 0, "scale": 0.92 }, "duration": 0.55, "ease": "back.out" },
+        "out": { "to": { "opacity": 0, "y": -12 }, "duration": 0.35 }
+      }
+    }
+  },
+  {
+    "scene": "catalog",
+    "text": "First, the catalog. Hyper Frames, by Hey Jen, is an open source motion library: over a hundred and forty blocks, components, and shader transitions, all plain H T M L. Liquid glass U I. Three D code. Shader dissolves. And every one of them installs into argo with a single command.",
+    "speed": 0.95,
+    "overlay": {
+      "type": "lower-third",
+      "text": "hyperframes.heygen.com — 142 blocks · components · shader transitions",
+      "placement": "bottom-left",
+      "motion": {
+        "type": "gsap",
+        "in": { "from": { "x": -40, "opacity": 0 }, "duration": 0.5, "ease": "power3.out" },
+        "out": { "to": { "opacity": 0 }, "duration": 0.35 }
+      }
+    }
+  },
+  {
+    "scene": "argo",
+    "text": "And this is argo. Not a screen recorder: the full power of Playwright, pointed at film making. Real navigation, real clicks, real waits. Your product, driven exactly the way users drive it, then narrated, directed, and exported. One command, end to end."
+  },
+  {
+    "scene": "voices",
+    "voice": "am_michael",
+    "text": "Notice anything different? New narrator. Argo's voiceover is per scene: swap voices, engines, even languages, from one line of JSON in the manifest. She'll take it back from here."
+  },
+  {
+    "scene": "overlays",
+    "text": "Overlays are declared, not keyframed. Five built in templates, plus a curated block catalog, all animated with G sap. Here is a callout, an arrow, and a social post block, straight from the manifest."
+  },
+  {
+    "scene": "camera",
+    "text": "Camera direction is a function call. Spotlight the thing that matters. Ring it. Dim everything else. The viewer's eye goes exactly where the script says."
+  },
+  {
+    "scene": "zoom",
+    "text": "And the zoom is not a browser trick. Argo records the move, then applies it at export with frame exact F F M peg zoom pan. Overlays stay crisp. Nothing in the page ever moved."
+  },
+  {
+    "scene": "chart",
+    "text": "This entire chart is a Hyper Frames block. A full H T M L composition with its own timeline, pre rendered frame by frame in a headless browser, and composited into this video as a cutaway. No screen recording involved.",
+    "overlay": {
+      "type": "hf-block",
+      "name": "data-chart",
+      "params": { "--bg-color": "#0b0e14", "--text-color": "#f5f7fa" }
+    }
+  },
+  {
+    "scene": "components",
+    "text": "Components grade the footage itself. A cinematic vignette pulls your eye to the center. A shimmer sweeps across the headline. Installed from the catalog, injected live, while the recorder was rolling."
+  },
+  {
+    "scene": "effects",
+    "text": "Ship it moments get confetti. And right at the peak, argo freezes the frame in the export, while I keep talking. The recording never stopped. The timeline just held its breath.",
+    "post": [{ "type": "freeze", "atMs": 6000, "durationMs": 1800 }]
+  },
+  {
+    "scene": "shaders",
+    "text": "Every cut in this video is whip pan: a shader ported from the Hyper Frames library. Fifteen more ship with argo, from ridged burn to gravitational lens, and changing the whole video's style is one word in the config."
+  },
+  {
+    "scene": "better",
+    "text": "So here is the thesis. This is not just a Playwright video. It is cinematic choreography: carefully crafted with Playwright, composed via Hyper Frames. Argo directs; the catalog performs. Better together.",
+    "overlay": {
+      "type": "callout",
+      "text": "argo add vignette grain-overlay data-chart logo-outro",
+      "placement": "top-right",
+      "motion": {
+        "type": "gsap",
+        "in": { "from": { "y": -24, "opacity": 0 }, "duration": 0.45, "ease": "back.out" },
+        "out": { "to": { "opacity": 0 }, "duration": 0.3 }
+      }
+    }
+  },
+  {
+    "scene": "outro",
+    "text": "And this end card? A catalog block. We installed it, opened the H T M L, made it ours, and argo re rendered it automatically. Chapters, subtitles, and metadata are already in the file. Crafted with Playwright. Composed via Hyper Frames. Go ship one.",
+    "speed": 0.93,
+    "overlay": {
+      "type": "hf-block",
+      "name": "logo-outro",
+      "holdLastFrame": true
+    }
+  }
+]

@@ -1,10 +1,17 @@
+import type { AccentColors } from './accent.js';
+
 /**
  * Inline HTML template for the Playwright page used to render shader frames.
  * The page exposes two globals:
  *   window.__loadFrames(aDataUri, bDataUri) — uploads A/B textures
  *   window.__renderAt(progress) → Promise<string> — returns PNG as data URI
  */
-export function buildShaderPageHtml(width: number, height: number, fragmentShaderGlsl: string): string {
+export function buildShaderPageHtml(
+  width: number,
+  height: number,
+  fragmentShaderGlsl: string,
+  accent?: AccentColors,
+): string {
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><style>
@@ -54,6 +61,17 @@ export function buildShaderPageHtml(width: number, height: number, fragmentShade
     return;
   }
   gl.useProgram(prog);
+
+  // Optional uniforms — WebGL silently ignores uniform* calls with a null
+  // location, so shaders that don't declare these are unaffected.
+  const accentColors = ${JSON.stringify(accent ?? null)};
+  if (accentColors) {
+    const set3 = (name, v) => gl.uniform3f(gl.getUniformLocation(prog, name), v[0], v[1], v[2]);
+    set3('accent', accentColors.accent);
+    set3('accentDark', accentColors.accentDark);
+    set3('accentBright', accentColors.accentBright);
+  }
+  gl.uniform2f(gl.getUniformLocation(prog, 'resolution'), ${width}, ${height});
 
   const buf = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, buf);
