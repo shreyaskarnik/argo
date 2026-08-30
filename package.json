@@ -17,7 +17,7 @@
   },
   "scripts": {
     "build": "tsc && npm run copy-assets",
-    "copy-assets": "mkdir -p dist/transitions/shaders && cp src/transitions/shaders/*.glsl dist/transitions/shaders/",
+    "copy-assets": "node scripts/copy-assets.mjs",
     "prepare": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest"
