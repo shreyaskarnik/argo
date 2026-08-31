@@ -16,6 +16,18 @@ interface CameraOptions {
 export interface SpotlightOptions extends CameraOptions {
   opacity?: number;
   padding?: number;
+  /**
+   * Corner radius of the cutout, in px. Default 10. Pass 0 for square corners,
+   * which on a pill button read as a crop rather than as a highlight.
+   */
+  radius?: number;
+  /**
+   * Blur radius applied to the cutout's edge, in px. Default 12; 0 gives a hard
+   * edge. The visible ramp runs a little over twice this value. Past about a
+   * third of the cutout's shorter side it outgrows the filter region below and
+   * the ramp is cut off partway, showing as a faint square edge.
+   */
+  feather?: number;
 }
 
 export interface FocusRingOptions extends CameraOptions {
@@ -90,6 +102,12 @@ async function runCameraEffect(
   }
 }
 
+/**
+ * Resolved in the signature and reused as the page function's fallback, so the
+ * two cannot drift into disagreeing about what a default is.
+ */
+const SPOTLIGHT_DEFAULTS = { opacity: 0.7, padding: 12, radius: 10, feather: 12 } as const;
+
 export async function spotlight(
   page: Page,
   selectorOrLocator: SelectorOrLocator,
@@ -98,13 +116,15 @@ export async function spotlight(
   const duration = opts?.duration ?? 3000;
   const fadeIn = opts?.fadeIn ?? 400;
   const fadeOut = opts?.fadeOut ?? 400;
-  const opacity = opts?.opacity ?? 0.7;
-  const padding = opts?.padding ?? 12;
+  const opacity = opts?.opacity ?? SPOTLIGHT_DEFAULTS.opacity;
+  const padding = opts?.padding ?? SPOTLIGHT_DEFAULTS.padding;
+  const radius = opts?.radius ?? SPOTLIGHT_DEFAULTS.radius;
+  const feather = opts?.feather ?? SPOTLIGHT_DEFAULTS.feather;
   const wait = opts?.wait ?? false;
 
   const { selector, rect: preRect } = await resolveRect(page, selectorOrLocator);
 
-  await runCameraEffect(page, ({ selector, preRect, duration, fadeIn, fadeOut, opacity, padding, attr }: any) => {
+  await runCameraEffect(page, ({ selector, preRect, duration, fadeIn, fadeOut, opacity, padding, radius, feather, defaults, attr }: any) => {
     const rect = preRect ?? (() => {
       const target = document.querySelector(selector);
       if (!target) { console.warn('[argo] camera effect: no element found for selector "' + selector + '"'); return null; }
@@ -112,35 +132,61 @@ export async function spotlight(
     })();
     if (!rect) return;
 
-    const overlay = document.createElement('div');
-    overlay.setAttribute(attr, 'spotlight');
-    // `evenodd` because both rings of the cutout are written in the same
-    // winding order, so the default `nonzero` fills the interior instead of
-    // clearing it and the overlay paints as a solid scrim with no hole. It
-    // also keeps the cutout independent of vertex order.
-    overlay.style.cssText = `
-      position: fixed; inset: 0; z-index: 99990; pointer-events: none;
-      background: rgba(0,0,0,${opacity});
-      clip-path: polygon(
-        evenodd,
-        0% 0%, 0% 100%, 100% 100%, 100% 0%, 0% 0%,
-        ${rect.left - padding}px ${rect.top - padding}px,
-        ${rect.left - padding}px ${rect.bottom + padding}px,
-        ${rect.right + padding}px ${rect.bottom + padding}px,
-        ${rect.right + padding}px ${rect.top - padding}px,
-        ${rect.left - padding}px ${rect.top - padding}px
-      );
-      opacity: 0; transition: opacity ${fadeIn}ms ease-out;
+    // A white full-viewport rect keeps the scrim, a black rounded rect punched
+    // through it drops the scrim, and blurring that black rect is what feathers
+    // the hole. A clip-path polygon can express none of that.
+
+    // Interpolated into markup, and TypeScript does not reach a JS caller, so
+    // coerce and clamp: a NaN or a negative renders as a blank scrim with no
+    // hole. The rect needs none of it, coming from getBoundingClientRect or
+    // Playwright.
+    const num = (v: unknown, fallback: number) => (Number.isFinite(Number(v)) ? Number(v) : fallback);
+    const pad = Math.max(0, num(padding, defaults.padding));
+    const rad = Math.max(0, num(radius, defaults.radius));
+    const soft = Math.max(0, num(feather, defaults.feather));
+    const dim = Math.min(1, Math.max(0, num(opacity, defaults.opacity)));
+
+    const id = 'argo-spot-' + Math.random().toString(36).slice(2, 10);
+    const x = rect.left - pad;
+    const y = rect.top - pad;
+    const w = rect.width + pad * 2;
+    const h = rect.height + pad * 2;
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute(attr, 'spotlight');
+    svg.style.cssText = `
+      position: fixed; inset: 0; width: 100%; height: 100%;
+      z-index: 99990; pointer-events: none;
+      opacity: 0; transition: opacity ${fadeIn}ms cubic-bezier(0.4, 0, 0.2, 1);
     `;
-    document.body.appendChild(overlay);
-    requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+    // No viewBox, so user units map 1:1 onto the CSS pixels that
+    // getBoundingClientRect and Playwright's boundingBox both report.
+    //
+    // Two quiet failures: SVG defaults to linearRGB, which ramps the scrim far
+    // too fast right at the hole's edge, and the default -10%/120% filter
+    // region clips the blur partway through its ramp on a small target.
+    svg.innerHTML = `
+      <defs>
+        <filter id="${id}-feather" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">
+          <feGaussianBlur stdDeviation="${soft / 2}" />
+        </filter>
+        <mask id="${id}" maskUnits="userSpaceOnUse">
+          <rect x="0" y="0" width="100%" height="100%" fill="white" />
+          <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rad}" ry="${rad}"
+                fill="black" ${soft > 0 ? `filter="url(#${id}-feather)"` : ''} />
+        </mask>
+      </defs>
+      <rect x="0" y="0" width="100%" height="100%" fill="black" fill-opacity="${dim}" mask="url(#${id})" />
+    `;
+    document.body.appendChild(svg);
+    requestAnimationFrame(() => { svg.style.opacity = '1'; });
 
     setTimeout(() => {
-      overlay.style.transition = `opacity ${fadeOut}ms ease-out`;
-      overlay.style.opacity = '0';
-      setTimeout(() => overlay.remove(), fadeOut);
+      svg.style.transition = `opacity ${fadeOut}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+      svg.style.opacity = '0';
+      setTimeout(() => svg.remove(), fadeOut);
     }, duration);
-  }, { selector, preRect, duration, fadeIn, fadeOut, opacity, padding, attr: CAMERA_ATTR }, duration + fadeOut, wait);
+  }, { selector, preRect, duration, fadeIn, fadeOut, opacity, padding, radius, feather, defaults: SPOTLIGHT_DEFAULTS, attr: CAMERA_ATTR }, duration + fadeOut, wait);
 }
 
 export async function focusRing(
@@ -228,7 +274,8 @@ export async function dimAround(
       const padding = 0;
       const overlay = document.createElement('div');
       overlay.setAttribute(attr, 'dim-around');
-      // `evenodd` for the same reason as in spotlight() above.
+      // `evenodd`: both rings share a winding order, so `nonzero` would fill
+      // the interior instead of clearing it and paint a scrim with no hole.
       overlay.style.cssText = `
         position: fixed; inset: 0; z-index: 99990; pointer-events: none;
         background: rgba(0,0,0,${1 - dimOpacity});

@@ -39,7 +39,8 @@ describeCameraE2E('E2E: camera effects', () => {
       await page.setContent(FIXTURE);
 
       const box = (await page.locator('#target').boundingBox())!;
-      // Both regions sit clear of the cutout edge, so antialiasing cannot skew it.
+      // Both regions sit clear of the cutout edge; the default feather ramps
+      // ~14px inward of it, so these insets must stay well above that.
       const insideTarget = {
         x: Math.round(box.x + 40),
         y: Math.round(box.y + 25),
