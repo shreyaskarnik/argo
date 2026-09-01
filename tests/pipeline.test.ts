@@ -199,6 +199,24 @@ describe('runPipeline', () => {
     }));
   });
 
+  it('hands exportVideo camera moves on the ramped timeline, not the recorded one', async () => {
+    writeFileSync(join(ARGO_DIR, '.timing.camera-moves.json'), JSON.stringify([
+      { startMs: 5000, durationMs: 400, holdMs: 600, x: 100, y: 120, w: 300, h: 240, scale: 1.4 },
+    ]));
+
+    await runPipeline(DEMO_NAME, {
+      ...defaultConfig,
+      export: { ...defaultConfig.export, speedRamp: { gapSpeed: 2.0, minGapMs: 500 } },
+    });
+
+    // Recorded at 5000, so 4200 once the 800ms head trim comes off. The 3000ms
+    // gap ahead of it runs at 2x, taking 1500ms off the front. Without the
+    // remap the move reaches exportVideo at 4200 and fires on the wrong scene.
+    expect(mockedExportVideo).toHaveBeenCalledWith(expect.objectContaining({
+      cameraMoves: [expect.objectContaining({ startMs: 2700 })],
+    }));
+  });
+
   it('writes scene durations metadata for recording-time pacing', async () => {
     mockedGenerateClips.mockResolvedValue([
       { scene: 'intro', clipPath: join(ARGO_DIR, 'clips', 'intro.wav'), durationMs: 1200 },

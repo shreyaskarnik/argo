@@ -20,8 +20,14 @@ import type { OverlayManifestEntry, SceneEffect, Zone } from './overlays/types.j
 import { generateSrt, generateVtt } from './subtitles.js';
 import { generateChapterMetadata } from './chapters.js';
 import { exportVideo, checkFfmpeg } from './export.js';
-import { applySpeedRampToTimeline } from './speed-ramp.js';
-import { scaleCameraMoves, shiftCameraMoves, type CameraMove } from './camera-move.js';
+import { applySpeedRampToTimeline, remapTimeMs } from './speed-ramp.js';
+import {
+  exportTimelineRemap,
+  remapCameraMoves,
+  scaleCameraMoves,
+  shiftCameraMoves,
+  type CameraMove,
+} from './camera-move.js';
 import { generateFramePng } from './frame.js';
 import { resolveFreezes, adjustPlacementsForFreezes, totalFreezeDurationMs, type FreezeSpec } from './freeze.js';
 import { buildOverlayPngsForImport, isImportedVideo, type RenderedOverlayPng } from './overlays/render-to-png.js';
@@ -1022,6 +1028,14 @@ export async function startPreviewServer(options: PreviewOptions): Promise<{ url
             if (existsSync(cameraMovesPath)) {
               let moves: CameraMove[] = JSON.parse(readFileSync(cameraMovesPath, 'utf-8'));
               if (headTrimMs > 0) moves = shiftCameraMoves(moves, headTrimMs);
+              // Same trip the pipeline and CLI paths make; see exportTimelineRemap.
+              moves = remapCameraMoves(
+                moves,
+                exportTimelineRemap(
+                  (timeMs) => remapTimeMs(timeMs, speedRampSegments ?? []),
+                  previewResolvedFreezes,
+                ),
+              );
               const captureW = ec?.captureWidth ?? ec?.outputWidth ?? 1920;
               const captureH = ec?.captureHeight ?? ec?.outputHeight ?? 1080;
               const outW = ec?.outputWidth ?? captureW;

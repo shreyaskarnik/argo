@@ -25,8 +25,19 @@ import {
 } from './timeline.js';
 import { generateChapterMetadata } from './chapters.js';
 import { generateSrt, generateVtt } from './subtitles.js';
-import { applySpeedRampToTimeline, type Segment, type SceneSpeedMap } from './speed-ramp.js';
-import { scaleCameraMoves, shiftCameraMoves, type CameraMove } from './camera-move.js';
+import {
+  applySpeedRampToTimeline,
+  remapTimeMs,
+  type Segment,
+  type SceneSpeedMap,
+} from './speed-ramp.js';
+import {
+  exportTimelineRemap,
+  remapCameraMoves,
+  scaleCameraMoves,
+  shiftCameraMoves,
+  type CameraMove,
+} from './camera-move.js';
 import { resolveFreezes, adjustPlacementsForFreezes, totalFreezeDurationMs, type FreezeSpec } from './freeze.js';
 import { renderShaderTransitions } from './transitions/shader-render.js';
 import type { Placement } from './tts/align.js';
@@ -299,6 +310,14 @@ export function createProgram(): Command {
             if (existsSync(cameraMovesPath)) {
               let moves: CameraMove[] = JSON.parse(readFileSync(cameraMovesPath, 'utf-8'));
               if (headTrimMs && headTrimMs > 0) moves = shiftCameraMoves(moves, headTrimMs);
+              // Same trip the pipeline path makes; see exportTimelineRemap.
+              moves = remapCameraMoves(
+                moves,
+                exportTimelineRemap(
+                  (timeMs) => remapTimeMs(timeMs, speedRampSegments ?? []),
+                  resolvedFreezes,
+                ),
+              );
               const scaleX = exportSize.width / config.video.width;
               const scaleY = exportSize.height / config.video.height;
               moves = scaleCameraMoves(moves, scaleX, scaleY);

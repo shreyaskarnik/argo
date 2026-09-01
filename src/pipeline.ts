@@ -9,8 +9,14 @@ import { generateFramePng } from './frame.js';
 import { generateSrt, generateVtt } from './subtitles.js';
 import { generateChapterMetadata } from './chapters.js';
 import { buildSceneReport, formatSceneReport } from './report.js';
-import { applySpeedRampToTimeline, type SceneSpeedMap } from './speed-ramp.js';
-import { scaleCameraMoves, shiftCameraMoves, type CameraMove } from './camera-move.js';
+import { applySpeedRampToTimeline, remapTimeMs, type SceneSpeedMap } from './speed-ramp.js';
+import {
+  exportTimelineRemap,
+  remapCameraMoves,
+  scaleCameraMoves,
+  shiftCameraMoves,
+  type CameraMove,
+} from './camera-move.js';
 import {
   resolveFreezes,
   adjustPlacementsForFreezes,
@@ -414,10 +420,22 @@ export async function runPipeline(
   if (tailPadMs !== undefined) exportOptions.tailPadMs = tailPadMs;
   if (headTrimMs > 0) exportOptions.headTrimMs = headTrimMs;
 
-  // Apply camera moves — shift for head trim, then scale from CSS layout
-  // coordinates to the final export dimensions when those differ.
+  // Apply camera moves: shift for head trim, remap onto the timeline the
+  // export actually produces, then scale from CSS layout coordinates to the
+  // final export dimensions when those differ.
   if (cameraMoves.length > 0) {
     let moves = shiftCameraMoves(cameraMoves, headTrimMs);
+
+    // Placements already make this trip, through applySpeedRampToTimeline and
+    // adjustPlacementsForFreezes above; moves have to make it too.
+    moves = remapCameraMoves(
+      moves,
+      exportTimelineRemap(
+        (timeMs) => remapTimeMs(timeMs, speedRampPlan.segments),
+        resolvedFreezes,
+      ),
+    );
+
     const scaleX = exportSize.width / config.video.width;
     const scaleY = exportSize.height / config.video.height;
     moves = scaleCameraMoves(moves, scaleX, scaleY);
@@ -620,6 +638,12 @@ export async function runPipeline(
 
       if (variantCameraMoves.length > 0) {
         variantCameraMoves = shiftCameraMoves(variantCameraMoves, variantHeadTrimMs);
+        // Variants never pass speedRampSegments, so only the freeze half
+        // applies. It does apply: variantPlacements were freeze-adjusted above.
+        variantCameraMoves = remapCameraMoves(
+          variantCameraMoves,
+          exportTimelineRemap((timeMs) => timeMs, variantResolvedFreezes),
+        );
       }
 
       // Render overlay PNGs for imported video variants

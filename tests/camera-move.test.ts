@@ -2,10 +2,14 @@ import { describe, it, expect } from 'vitest';
 import {
   buildCameraMoveFilter,
   detectChainedPairs,
+  exportTimelineRemap,
+  remapCameraMoves,
   shiftCameraMoves,
   scaleCameraMoves,
   type CameraMove,
 } from '../src/camera-move.js';
+import { computeSegments, remapTimeMs } from '../src/speed-ramp.js';
+import { adjustPlacementsForFreezes } from '../src/freeze.js';
 
 describe('buildCameraMoveFilter', () => {
   const baseMove: CameraMove = {
@@ -299,5 +303,129 @@ describe('scaleCameraMoves', () => {
     expect(scaled[0].y).toBe(300);
     expect(scaled[0].w).toBe(600);
     expect(scaled[0].h).toBe(600);
+  });
+});
+
+describe('remapCameraMoves', () => {
+  // Two one-second scenes in a seven-second timeline, gaps at double speed:
+  // [0,1000]@2, [1000,2000]@1, [2000,5000]@2, [5000,6000]@1, [6000,7000]@2.
+  const segments = computeSegments(
+    [
+      { scene: 'intro', startMs: 1000, endMs: 2000 },
+      { scene: 'outro', startMs: 5000, endMs: 6000 },
+    ],
+    7000,
+    { gapSpeed: 2.0, minGapMs: 500 },
+  );
+  const remap = (timeMs: number) => remapTimeMs(timeMs, segments);
+
+  it('shifts a move by the gap time removed ahead of it, keeping its duration', () => {
+    const moves: CameraMove[] = [
+      { startMs: 1100, durationMs: 300, holdMs: 100, x: 10, y: 20, w: 30, h: 40 },
+    ];
+
+    const [move] = remapCameraMoves(moves, remap);
+
+    // 500ms of the leading gap is removed, and the move itself sits inside a
+    // scene the ramp does not touch, so it keeps its shape exactly.
+    expect(move.startMs).toBe(600);
+    expect(move.durationMs).toBe(300);
+    expect(move.holdMs).toBe(100);
+  });
+
+  it('shrinks a move that spans a compressed gap instead of only shifting it', () => {
+    const moves: CameraMove[] = [
+      { startMs: 1800, durationMs: 200, holdMs: 800, x: 10, y: 20, w: 30, h: 40 },
+    ];
+
+    const [move] = remapCameraMoves(moves, remap);
+
+    // Recorded span is 200 + 800 + 200 = 1200ms running from 1800 to 3000.
+    // On the ramped timeline that is 1300 to 2000, so the move has to occupy
+    // 700ms. Shifting alone would leave it running 500ms past its content.
+    expect(move.startMs).toBe(1300);
+    const spanMs = move.durationMs * 2 + (move.holdMs ?? 0);
+    // Within a millisecond of the ramped span: duration and hold are rounded to
+    // whole milliseconds independently, so they can disagree with the exact
+    // span by 1ms. At 30fps that is a thirtieth of a frame.
+    expect(Math.abs(spanMs - (remap(3000) - remap(1800)))).toBeLessThanOrEqual(1);
+  });
+
+  it('leaves moves untouched when the timeline is not remapped', () => {
+    const moves: CameraMove[] = [
+      { startMs: 1800, durationMs: 200, holdMs: 800, x: 10, y: 20, w: 30, h: 40 },
+    ];
+
+    expect(remapCameraMoves(moves, (timeMs) => timeMs)).toEqual(moves);
+  });
+
+  it('keeps a closing move at its authored speed when its tail overhangs the end', () => {
+    // Second scene runs to the very end, so there is no trailing segment for
+    // the zoom-out to land in and the move's span runs past 7000.
+    const closing = computeSegments(
+      [{ scene: 'intro', startMs: 1000, endMs: 2000 }, { scene: 'outro', startMs: 4000, endMs: 7000 }],
+      7000,
+      { gapSpeed: 2.0, minGapMs: 500 },
+    );
+    const moves: CameraMove[] = [
+      { startMs: 6500, durationMs: 400, holdMs: 2200, x: 10, y: 20, w: 30, h: 40 },
+    ];
+
+    const [move] = remapCameraMoves(moves, (timeMs) => remapTimeMs(timeMs, closing));
+
+    // The ramp leaves this scene alone, so only the start shifts. Measuring the
+    // span against a saturated endpoint charges the overhang against the 500ms
+    // of timeline left, rendering the 400ms ease in two frames.
+    expect(move.durationMs).toBe(400);
+    expect(move.holdMs).toBe(2200);
+  });
+
+  it('never rounds a fade down to zero', () => {
+    const moves: CameraMove[] = [
+      { startMs: 0, durationMs: 10, holdMs: 0, x: 10, y: 20, w: 30, h: 40 },
+    ];
+
+    // A 25x scene compresses a 10ms fade to 0.4ms. Rounding that to 0 would
+    // make buildCameraMoveFilter divide by zero, which ffmpeg accepts and
+    // renders as a move that does nothing at all.
+    const [move] = remapCameraMoves(moves, (timeMs) => timeMs / 25);
+    expect(move.durationMs).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('exportTimelineRemap', () => {
+  it('measures freezes against the ramped clock, not the recorded one', () => {
+    // Halve everything, then hold 1000ms at ramped t=1000.
+    const remap = exportTimelineRemap(
+      (timeMs) => timeMs / 2,
+      [{ absoluteMs: 1000, durationMs: 1000 }],
+    );
+
+    // Recorded 1000 lands at ramped 500, which is before the freeze, so it is
+    // untouched. Comparing the freeze against the recorded 1000 instead would
+    // wrongly push it to 1500.
+    expect(remap(1000)).toBe(500);
+
+    // Recorded 4000 lands at ramped 2000, past the freeze, so it takes the
+    // full inserted hold.
+    expect(remap(4000)).toBe(3000);
+  });
+
+  it('pushes a time landing exactly on a freeze, as adjustPlacementsForFreezes does', () => {
+    const freezes = [{ absoluteMs: 1000, durationMs: 500 }];
+    const remap = exportTimelineRemap((timeMs) => timeMs, freezes);
+
+    // `<=`, matching adjustPlacementsForFreezes. The two have to agree or a
+    // move and the scene it belongs to drift apart by the whole hold.
+    expect(remap(1000)).toBe(1500);
+    expect(remap(999)).toBe(999);
+    expect(adjustPlacementsForFreezes([{ scene: 'a', startMs: 1000, endMs: 2000 }], freezes)[0].startMs)
+      .toBe(1500);
+  });
+
+  it('is an identity when there is neither a ramp nor a freeze', () => {
+    const remap = exportTimelineRemap((timeMs) => timeMs, []);
+    expect(remap(0)).toBe(0);
+    expect(remap(12_345)).toBe(12_345);
   });
 });
