@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { mkdirSync, existsSync, rmSync, writeFileSync, readFileSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { startAssetServer, type AssetServer } from './asset-server.js';
@@ -124,6 +125,8 @@ export default defineConfig({
 }
 
 export async function record(demoName: string, options: RecordOptions): Promise<RecordResult> {
+  // Resolve before starting servers or timers so a missing peer fails cleanly.
+  const playwrightCli = createRequire(import.meta.url).resolve('@playwright/test/cli');
   const argoDir = path.join('.argo', options.argoSubdir ?? demoName);
   mkdirSync(argoDir, { recursive: true });
 
@@ -273,7 +276,9 @@ export async function record(demoName: string, options: RecordOptions): Promise<
       const defaultJpegQuality = useJpegStitch && dsf > 1 ? 80 : 95;
       const jpegQuality = String(options.jpegQuality ?? defaultJpegQuality);
 
-      execFile('npx', ['playwright', 'test', '--config', recordConfigPath, '--grep', demoName, '--project', 'demos'], {
+      // Invoke the installed peer through Node: Windows cannot execFile the
+      // npx.cmd shim, and recording should not depend on a shell or download.
+      execFile(process.execPath, [playwrightCli, 'test', '--config', recordConfigPath, '--grep', demoName, '--project', 'demos'], {
         env: {
           ...process.env,
           ARGO_DEMO_NAME: demoName,
@@ -316,7 +321,7 @@ export async function record(demoName: string, options: RecordOptions): Promise<
           process.stderr.write(stderr);
         }
         if (error) {
-          const output = [stdout, stderr].filter(Boolean).join('\n');
+          const output = [stdout, stderr].filter(Boolean).join('\n') || error.message;
           // Append the last scene the demo entered before failing — `.scene-progress.jsonl`
           // is appended on every narration.mark() so its tail is the failure point.
           // Helps users map a Playwright stack to a scene without reading line numbers.

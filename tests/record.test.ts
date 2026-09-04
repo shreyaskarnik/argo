@@ -3,6 +3,9 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { createRequire } from 'node:module';
+
+const playwrightCli = createRequire(import.meta.url).resolve('@playwright/test/cli');
 
 const { execFileMock } = vi.hoisted(() => ({
   execFileMock: vi.fn(),
@@ -70,9 +73,9 @@ describe('record', () => {
       timingPath: join('.argo', 'demo', '.timing.json'),
     });
     expect(execFileMock).toHaveBeenCalledWith(
-      'npx',
+      process.execPath,
       [
-        'playwright',
+        playwrightCli,
         'test',
         '--config',
         join('.argo', 'demo', 'playwright.record.config.mjs'),
@@ -113,7 +116,7 @@ describe('record', () => {
     });
 
     expect(execFileMock).toHaveBeenCalledWith(
-      'npx',
+      process.execPath,
       expect.any(Array),
       expect.objectContaining({
         env: expect.objectContaining({
@@ -133,7 +136,7 @@ describe('record', () => {
       showActions: true,
     });
     expect(execFileMock).toHaveBeenCalledWith(
-      'npx',
+      process.execPath,
       expect.any(Array),
       expect.objectContaining({ env: expect.objectContaining({ ARGO_SHOW_ACTIONS: '{}' }) }),
       expect.any(Function),
@@ -149,7 +152,7 @@ describe('record', () => {
       cursorHighlight: { color: '#ff0000', radius: 24, clickRipple: false },
     });
     expect(execFileMock).toHaveBeenCalledWith(
-      'npx',
+      process.execPath,
       expect.any(Array),
       expect.objectContaining({
         env: expect.objectContaining({
@@ -169,7 +172,7 @@ describe('record', () => {
       cursorHighlight: true,
     });
     expect(execFileMock).toHaveBeenCalledWith(
-      'npx',
+      process.execPath,
       expect.any(Array),
       expect.objectContaining({ env: expect.objectContaining({ ARGO_CURSOR_HIGHLIGHT: '{}' }) }),
       expect.any(Function),
@@ -185,7 +188,7 @@ describe('record', () => {
       sceneThumbnails: false,
     });
     expect(execFileMock).toHaveBeenCalledWith(
-      'npx',
+      process.execPath,
       expect.any(Array),
       expect.objectContaining({ env: expect.objectContaining({ ARGO_SCENE_THUMBS: '0' }) }),
       expect.any(Function),
@@ -257,7 +260,7 @@ describe('record', () => {
     expect(config).toContain("browserName: \"chromium\"");
     expect(config).toContain('deviceScaleFactor: 2');
     expect(execFileMock).toHaveBeenCalledWith(
-      'npx',
+      process.execPath,
       expect.any(Array),
       expect.objectContaining({
         env: expect.objectContaining({
@@ -287,7 +290,7 @@ describe('record', () => {
 
     expect(config).toContain('deviceScaleFactor: 1');
     expect(execFileMock).toHaveBeenCalledWith(
-      'npx',
+      process.execPath,
       expect.any(Array),
       expect.objectContaining({
         env: expect.objectContaining({

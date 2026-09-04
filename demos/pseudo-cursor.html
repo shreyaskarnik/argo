@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Argo · Pseudo cursor playground</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #101923; color: #f1f5f9; font-family: 'Segoe UI', sans-serif; }
+    header { height: 88px; padding: 0 52px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2b3642; }
+    .brand { font-size: 25px; font-weight: 700; letter-spacing: -1px; }
+    .brand span { color: #78dab9; }
+    .tag { font-size: 12px; letter-spacing: 2px; color: #abb9c6; text-transform: uppercase; }
+    /* Keep a small area painting so jpeg-stitch captures the final static hold
+       after resetCursor removes the otherwise animated cursor ring. */
+    .tag::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 10px; border-radius: 50%; background: #78dab9; animation: capture-pulse 1.5s ease-in-out infinite; }
+    @keyframes capture-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+    main { padding: 28px 52px; }
+    .eyebrow { margin: 0 0 12px; color: #78dab9; font-size: 12px; letter-spacing: 2px; font-weight: 600; }
+    h1 { font-size: 36px; letter-spacing: -1.5px; margin: 0 0 10px; }
+    .subtitle { margin: 0; color: #abb9c6; font-size: 16px; }
+    .layout { display: grid; grid-template-columns: 1fr 348px; gap: 28px; margin-top: 22px; }
+    .workspace { color: #182936; background: #f4f6f7; border-radius: 16px; overflow: hidden; }
+    .toolbar { padding: 16px 22px; border-bottom: 1px solid #dce2e5; display: flex; align-items: center; justify-content: space-between; }
+    .toolbar strong { font-size: 16px; }
+    .badge { font-size: 12px; color: #527060; background: #e2ebe5; padding: 6px 12px; border-radius: 20px; }
+    .content { padding: 22px; }
+    h2 { font-size: 24px; margin: 0 0 6px; letter-spacing: -.5px; }
+    .hint { color: #657580; font-size: 14px; margin: 0 0 18px; }
+    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    button, .next { font: inherit; cursor: pointer; }
+    .card { text-align: left; border: 1px solid #ced8dd; border-radius: 10px; background: white; padding: 16px; color: #182936; transition: background .2s, border-color .2s; }
+    .card:hover { background: #edf4ff; border-color: #3b82f6; }
+    .card[aria-pressed="true"] { background: #e7f0ff; border-color: #3b82f6; }
+    .card strong, .card span { display: block; }
+    .card strong { font-size: 17px; margin-bottom: 8px; }
+    .card span { font-size: 13px; color: #657580; }
+    .actions { display: flex; gap: 14px; margin-top: 18px; align-items: center; }
+    .primary, .next { border: 0; border-radius: 8px; padding: 13px 20px; font-size: 14px; font-weight: 600; }
+    .primary { background: #203d56; color: white; }
+    .primary:hover { background: #315674; }
+    .next { color: #203d56; background: #e3e9ed; text-decoration: none; }
+    #status { min-height: 20px; margin: 18px 0 0; color: #366654; font-size: 14px; }
+    aside { padding: 24px; border: 1px solid #34414d; border-radius: 16px; display: flex; flex-direction: column; }
+    #step { color: #78dab9; font-size: 12px; letter-spacing: 2px; margin: 0 0 16px; }
+    #lesson { font-size: 25px; line-height: 1.2; }
+    #explanation { color: #abb9c6; font-size: 16px; line-height: 1.5; margin: 14px 0 16px; }
+    #code { display: block; margin-top: auto; padding: 16px; background: #0b121b; border-radius: 8px; color: #91c7ff; font: 13px/1.7 Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+    footer { display: flex; justify-content: space-between; margin-top: 26px; color: #91a1b0; font-size: 12px; }
+    .overlay-scene .tag, .overlay-scene footer { visibility: hidden; }
+  </style>
+</head>
+<body>
+  <header><div class="brand">argo<span> / </span>lab</div><div class="tag">Recording essentials · 01</div></header>
+  <main>
+    <p class="eyebrow">PSEUDO CURSOR</p>
+    <h1>Make every interaction visible.</h1>
+    <p class="subtitle">A clear SVG pointer. A brief animated circle to mark its arrival and each click.</p>
+    <div class="layout">
+      <section class="workspace" aria-label="Demo workspace">
+        <div class="toolbar"><strong>Studio / <span id="page-name">Projects</span></strong><span class="badge">Interactive playground</span></div>
+        <div class="content">
+          <h2 id="workspace-title">Choose your next story</h2>
+          <p class="hint">Move between the cards, pick a project, then open the next page.</p>
+          <div class="cards">
+            <button class="card" id="launch" aria-pressed="false"><strong>Product launch</strong><span>A first look at what is new</span></button>
+            <button class="card" id="walkthrough" aria-pressed="false"><strong>Feature walkthrough</strong><span>Show how the details work</span></button>
+          </div>
+          <div class="actions"><button class="primary" id="select">Use selected project</button><a class="next" href="/review" id="next">Continue to review →</a></div>
+          <p id="status" role="status">Ready when you are.</p>
+        </div>
+      </section>
+      <aside aria-label="Cursor lesson">
+        <p id="step">01 / AUTOMATIC SETUP</p>
+        <h2 id="lesson">Here is your pointer.</h2>
+        <p id="explanation">A circle briefly contracts around the arrow when it appears. Then it disappears, leaving just the pointer.</p>
+        <code id="code">cursorHighlight: {
+  mode: 'click'
+}</code>
+      </aside>
+    </div>
+    <footer><span>Real Playwright mouse events · Argo cursor overlay</span><span>APPEAR → MOVE → CLICK → LOCATE</span></footer>
+  </main>
+  <script>
+    let selected = '';
+    const status = document.getElementById('status');
+    for (const card of document.querySelectorAll('.card')) {
+      card.addEventListener('click', () => {
+        for (const other of document.querySelectorAll('.card')) other.setAttribute('aria-pressed', 'false');
+        card.setAttribute('aria-pressed', 'true');
+        selected = card.querySelector('strong').textContent;
+        status.textContent = selected + ' selected.';
+      });
+    }
+    document.getElementById('select').addEventListener('click', () => {
+      status.textContent = selected ? selected + ' is ready to record.' : 'Choose a project first.';
+    });
+    if (location.pathname === '/review') {
+      document.getElementById('page-name').textContent = 'Review';
+      document.getElementById('workspace-title').textContent = 'New page. The pointer carries on.';
+      document.getElementById('next').textContent = 'Back to projects →';
+      document.getElementById('next').href = '/';
+      document.getElementById('step').textContent = '05 / NAVIGATION';
+      document.getElementById('lesson').textContent = 'The highlight comes along.';
+      document.getElementById('explanation').textContent = 'After navigation, a brief circle locates the pointer again. Ordinary movement stays free of circles.';
+      document.getElementById('code').textContent = "await cursor.click(nextPage);\n// Restore the pointer and feedback";
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+[
+  { "scene": "intro" },
+  { "scene": "movement" },
+  { "scene": "clicks" },
+  {
+    "scene": "overlays",
+    "overlay": {
+      "type": "callout",
+      "text": "3 overlays + pointer + click feedback",
+      "placement": "top-right",
+      "motion": "fade-in"
+    }
+  },
+  { "scene": "navigation" },
+  { "scene": "locate" },
+  { "scene": "customize" },
+  { "scene": "outro" }
+]

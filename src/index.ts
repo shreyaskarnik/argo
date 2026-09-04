@@ -79,6 +79,14 @@ export {
   resetCursor,
   type CursorHighlightOptions,
 } from './cursor.js';
+export {
+  createHumanCursor,
+  type HumanCursor,
+  type HumanCursorOptions,
+  type CursorPoint,
+  type CursorMoveOptions,
+  type CursorClickOptions,
+} from './human-cursor.js';
 
 // Composition — embed a self-contained HTML composition as an Argo scene.
 // Follows hyperframes' contract (data-composition-id + paused master timeline
