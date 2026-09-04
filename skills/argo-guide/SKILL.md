@@ -88,7 +88,8 @@ All camera effects are **non-blocking by default** (fire-and-forget safe). All a
 | `zoomTo(page, target, opts?)` | Scale viewport centered on target. Pass `{ narration }` for overlay-safe ffmpeg post-export zoom (recommended). Without `narration`, falls back to browser-side CSS transforms (overlays scale with the page). |
 | `resetCamera(page)` | Clear all active camera effects |
 | `showConfetti(page, opts?)` | Confetti burst. `spread: 'burst'` (center-top fan) or `'rain'` (full-width fall). `emoji: '🎃'` or `emoji: ['🎃', '👻']` renders emoji instead of colored rectangles. |
-| `cursorHighlight(page, opts?)` | Manually enable a persistent ring following cursor. Remove with `resetCursor(page)`. Use `video.cursorHighlight` for recording-wide automatic setup. |
+| `createHumanCursor(page, opts?)` | Visible SVG pointer with seeded travel, pre-click dwell, and navigation restoration. Await `cursor.moveTo()` / `cursor.click()`; clean up with `cursor.dispose()`. |
+| `cursorHighlight(page, opts?)` | Circle feedback, separate from the SVG pointer. `mode: 'click'` gives brief appearance/click/Control locator animations; the default `continuous` mode follows the mouse with a ring. Remove with `resetCursor(page)`. Use `video.cursorHighlight` for recording-wide automatic setup. |
 
 Derive camera durations from `narration.durationFor()` so effects track voiceover timing:
 **Effect timing pattern**: Derive beat durations from `durationFor()` so effects stay synchronized with voiceover. Subtract any setup wait time before dividing:
@@ -108,6 +109,24 @@ await zoomTo(page, '#revenue-chart', { narration, scale: 1.5, holdMs: 2000 });
 await page.waitForTimeout(narration.durationFor('details'));
 ```
 The zoom is applied during export via ffmpeg `zoompan` (not `crop` — crop w/h are not per-frame). Camera moves are written to `.timing.camera-moves.json` and auto-shifted for head trim + scaled for `deviceScaleFactor`.
+
+### Pseudo Cursor and Click Location Feedback
+
+For a visible pseudo mouse, use `createHumanCursor()` to draw the **SVG arrow**;
+`cursorHighlight()` alone only draws circle feedback. When the user wants a
+click/accessibility-style locator, set `video.cursorHighlight: { mode: 'click' }`:
+the arrow travels alone, and a circle briefly contracts toward its location on
+appearance, click, or Control release, then disappears after 700 ms. Reserve
+the default continuous ring for requests that actually need persistent emphasis.
+
+Keep one cursor instance across scenes and use its real mouse movements so
+clicks, overlays, and cursor telemetry agree. The highlight helper owns the
+circle animation; do not add a second ripple to the SVG helper. Multiple
+overlays can remain visible in different zones while the pointer interacts.
+
+Read [references/pseudo-cursor.md](references/pseudo-cursor.md) for configuration,
+movement/typing examples, overlay composition, cleanup, limitations, and the
+self-contained recording demo.
 
 ### Mobile Demos
 
@@ -525,6 +544,7 @@ Read these when you need deeper guidance on specific topics:
 
 - **`references/tts-engines.md`** — Engine selection, voice cloning, phonetic spelling per engine, cloud API keys
 - **`references/config-and-quality.md`** — Full config options, dark mode recording, Playwright tricks for demos, 4K export, browser quality
+- **`references/pseudo-cursor.md`** — SVG pointer vs circle feedback, brief click/appearance/Control locator, seeded motion, simultaneous overlays, cleanup, and recording checks
 - **`references/init-from-conversion.md`** — Converting Playwright tests, post-conversion LLM workflow, scene detection heuristics
 - **`references/compositions.md`** — `renderComposition` + Hyperframes block import, contract, when to mix authored motion with recordings, mixed-demo patterns, audio sidecar
 - **`examples/basic.demo.ts`** — Complete working demo script template

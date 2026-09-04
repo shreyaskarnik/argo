@@ -37,6 +37,11 @@ export default defineConfig({
 
 All fields are optional — `defineConfig()` merges with sensible defaults.
 
+For an SVG pointer with brief click/appearance location feedback, use
+`video.cursorHighlight: { mode: 'click' }` and create the SVG in the demo with
+`createHumanCursor()`. See [pseudo-cursor.md](pseudo-cursor.md) for the full
+recipe, Control-key locator, overlay composition, and recording checks.
+
 ## Dark Mode Recording
 
 Three ways to record in dark mode, depending on scope:
