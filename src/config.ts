@@ -56,8 +56,9 @@ export interface VideoConfig {
   /** Auto-annotate Playwright interactions (clicks, fills) with action labels in the recording.
    * Drives `page.screencast.showActions()` from the narration fixture. Off by default. */
   showActions?: boolean | ShowActionsConfig;
-  /** Render a pseudo-cursor highlight that follows mouse movement in the recording.
-   * `true` uses the default ring; an object customizes its appearance. Off by default. */
+  /** Render cursor feedback in the recording. `true` uses a continuous ring;
+   * an object with mode:'click' shows brief appearance/click/Control locator
+   * circles. Other object fields customize the appearance. Off by default. */
   cursorHighlight?: boolean | CursorHighlightOptions;
   /** Capture a JPEG thumbnail per scene at the moment `narration.mark()` fires.
    * Saved to `.argo/<demo>/thumbs/<scene>.jpg`. Used by the preview scrubber for

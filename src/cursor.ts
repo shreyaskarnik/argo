@@ -4,15 +4,17 @@ const CURSOR_ATTR = 'data-argo-cursor';
 const CURSOR_ID = 'argo-cursor-highlight';
 
 export interface CursorHighlightOptions {
+  /** Continuous ring, or brief locator circles on appearance/click/Control release. Default: 'continuous'. */
+  mode?: 'continuous' | 'click';
   /** Highlight ring color. Default: '#3b82f6' */
   color?: string;
   /** Radius of the highlight circle in px. Default: 20 */
   radius?: number;
-  /** Show a pulsing glow around cursor. Default: true */
+  /** Show a breathing glow in continuous mode. Default: true */
   pulse?: boolean;
   /** Show a ripple effect on click. Default: true */
   clickRipple?: boolean;
-  /** Opacity of the highlight ring. Default: 0.5 */
+  /** Opacity of the ring or locator animation. Default: 0.5 */
   opacity?: number;
 }
 
@@ -30,10 +32,11 @@ async function applyCursorHighlight(
   const pulse = opts?.pulse ?? true;
   const clickRipple = opts?.clickRipple ?? true;
   const opacity = opts?.opacity ?? 0.5;
+  const mode = opts?.mode ?? 'continuous';
 
   try {
     await page.evaluate(
-      ({ color, radius, pulse, clickRipple, opacity, attr, id, skipIfPresent }) => {
+      ({ color, radius, pulse, clickRipple, opacity, mode, attr, id, skipIfPresent }) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const w = window as any;
 
@@ -73,6 +76,11 @@ async function applyCursorHighlight(
               0% { transform: translate(-50%, -50%) scale(1); opacity: ${opacity}; }
               100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
             }
+            @keyframes argo-cursor-locate {
+              0% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; }
+              15%, 70% { opacity: ${opacity}; }
+              100% { transform: translate(-50%, -50%) scale(.2); opacity: 0; }
+            }
           `;
           (document.head ?? document.documentElement).appendChild(style);
 
@@ -81,11 +89,12 @@ async function applyCursorHighlight(
           dot.id = id;
           dot.setAttribute(attr, 'highlight');
           dot.style.cssText = `
-            position: fixed; z-index: 99998; pointer-events: none;
+            position: fixed; z-index: 2147483646; pointer-events: none;
             width: ${radius * 2}px; height: ${radius * 2}px;
             border-radius: 50%;
             border: 2px solid ${color};
             opacity: ${opacity};
+            visibility: ${mode === 'click' ? 'hidden' : 'visible'};
             transform: translate(-50%, -50%);
             left: -100px; top: -100px;
             transition: left 0.05s ease-out, top 0.05s ease-out;
@@ -93,25 +102,66 @@ async function applyCursorHighlight(
           `;
           document.body.appendChild(dot);
 
+          let lastPoint: { x: number; y: number } | null = null;
+          let locateTimer: ReturnType<typeof setTimeout> | undefined;
+          const locate = (x: number, y: number) => {
+            // Retrigger one circle on rapid clicks/Control presses. Leave it at
+            // the event position instead of attaching it to the moving arrow.
+            clearTimeout(locateTimer);
+            document.querySelectorAll(`[${attr}="ripple"]`).forEach(el => el.remove());
+            const circle = document.createElement('div');
+            circle.setAttribute(attr, 'ripple');
+            circle.setAttribute('aria-hidden', 'true');
+            circle.style.cssText = `
+              position: fixed; z-index: 2147483645; pointer-events: none;
+              width: ${radius * 2}px; height: ${radius * 2}px;
+              border-radius: 50%; border: 2px solid white;
+              box-shadow: 0 0 0 2px ${color}, inset 0 0 0 1px ${color};
+              left: ${x}px; top: ${y}px;
+              animation: argo-cursor-locate .7s ease-out both;
+            `;
+            document.body.appendChild(circle);
+            locateTimer = setTimeout(() => circle.remove(), 700);
+          };
+
           // Track mouse movement
           const onMove = (e: MouseEvent) => {
             dot.style.left = e.clientX + 'px';
             dot.style.top = e.clientY + 'px';
+            if (mode === 'click' && !lastPoint) locate(e.clientX, e.clientY);
+            lastPoint = { x: e.clientX, y: e.clientY };
           };
           document.addEventListener('mousemove', onMove, true);
 
           // Store cleanup reference
           (dot as any).__cleanup = () => {
             document.removeEventListener('mousemove', onMove, true);
+            clearTimeout(locateTimer);
           };
+
+          if (mode === 'click') {
+            const onKeyUp = (e: KeyboardEvent) => {
+              if (e.key === 'Control' && lastPoint) locate(lastPoint.x, lastPoint.y);
+            };
+            document.addEventListener('keyup', onKeyUp, true);
+            const origCleanup = (dot as any).__cleanup;
+            (dot as any).__cleanup = () => {
+              origCleanup();
+              document.removeEventListener('keyup', onKeyUp, true);
+            };
+          }
 
           // Click ripple effect
           if (clickRipple) {
             const onClick = (e: MouseEvent) => {
+              if (mode === 'click') {
+                locate(e.clientX, e.clientY);
+                return;
+              }
               const ripple = document.createElement('div');
               ripple.setAttribute(attr, 'ripple');
               ripple.style.cssText = `
-                position: fixed; z-index: 99997; pointer-events: none;
+                position: fixed; z-index: 2147483645; pointer-events: none;
                 width: ${radius * 2}px; height: ${radius * 2}px;
                 border-radius: 50%;
                 border: 2px solid ${color};
@@ -143,7 +193,7 @@ async function applyCursorHighlight(
           document.addEventListener('DOMContentLoaded', install, { once: true });
         }
       },
-      { color, radius, pulse, clickRipple, opacity, attr: CURSOR_ATTR, id: CURSOR_ID, skipIfPresent },
+      { color, radius, pulse, clickRipple, opacity, mode, attr: CURSOR_ATTR, id: CURSOR_ID, skipIfPresent },
     );
   } catch (err) {
     const msg = (err as Error)?.message ?? '';
@@ -154,8 +204,8 @@ async function applyCursorHighlight(
 }
 
 /**
- * Enables a persistent cursor highlight that follows the mouse pointer.
- * The highlight remains active until `resetCursor(page)` is called.
+ * Enables cursor feedback until `resetCursor(page)` is called. By default a
+ * ring follows the mouse; mode:'click' shows only brief locator animations.
  * Calling again replaces the existing highlight.
  */
 export async function cursorHighlight(

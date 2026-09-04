@@ -158,6 +158,52 @@ Set `video.cursorHighlight` to `true` for the default pseudo-cursor, or pass
 the overlay when recording starts and restores it after top-level navigation,
 so demo scripts do not need to call `cursorHighlight()` themselves.
 
+For an **SVG mouse pointer with brief click feedback**, combine
+`createHumanCursor()` with `cursorHighlight(page, { mode: 'click' })`. The pointer
+travels alone along seeded curves and pauses before clicking. A circle
+contracts toward the pointer tip on its first mouse event, on a click, or when
+Control is released. It disappears after 700 ms and stays at the event position
+if the mouse moves away. Rapid triggers restart one circle. Both helpers
+survive navigation; `createHumanCursor()` adds no duplicate click feedback.
+
+```ts
+import { createHumanCursor, cursorHighlight, resetCursor } from '@argo-video/cli';
+
+await cursorHighlight(page, { mode: 'click' }); // Or set video.cursorHighlight to this object.
+const cursor = await createHumanCursor(page, { seed: 'my-demo', size: 30 });
+await cursor.click(page.getByRole('button', { name: 'Continue' }));
+await cursor.moveTo(page.getByRole('link', { name: 'Details' }), { durationMs: 900 });
+await cursor.dispose();
+await resetCursor(page);
+```
+
+`mode: 'continuous'` is the default for the existing persistent ring behavior.
+Use one cursor instance across scenes. `cursor.hide()` hides the SVG until its
+next move; `cursor.dispose()` removes it and its navigation listener. The ring
+is independent and is removed with `resetCursor(page)`. `cursor.click(field)`
+followed by `demoType(page, field, text)` makes typing follow visible cursor
+travel. `start` and movement `target` options use fractions of the viewport and
+target bounding box respectively; `size` uses CSS pixels.
+
+Try the self-contained [pseudo-cursor demo](demos/pseudo-cursor.demo.ts):
+
+[Watch the recorded demo](videos/pseudo-cursor.mp4) (47 seconds, 1280×720).
+
+```bash
+npm run build
+node bin/argo.js pipeline pseudo-cursor
+```
+
+It records SVG pointer travel, brief appearance/click circles, Control-key
+location feedback, three simultaneous overlays (callout, lower third, and
+arrow), automatic restoration after a full page navigation,
+custom styling, and `resetCursor()` cleanup. Nested `withOverlay()` calls keep
+different zones visible together while the pseudo cursor clicks the page. The
+demo uses a local HTML fixture with on-screen explanations, so no app server, TTS engine,
+or API keys are needed. Chromium and ffmpeg must be installed. Output:
+`videos/pseudo-cursor.mp4`. Settings live in
+[`demos/pseudo-cursor.config.mjs`](demos/pseudo-cursor.config.mjs).
+
 > **Tip:** Use `browser: 'webkit'` for sharper video on macOS. Chromium has a [known video capture quality issue](https://github.com/microsoft/playwright/issues/31424). Set `deviceScaleFactor: 2` for retina-quality recordings (captured at 2x, downscaled with lanczos in export).
 
 ### Mobile Demos
@@ -345,7 +391,7 @@ import { defineConfig, demosProject, engines } from '@argo-video/cli';
 | `dimAround(page, selector, opts?)` | Fade sibling elements to highlight target |
 | `zoomTo(page, selector, opts?)` | Scale viewport centered on target. Pass `{ narration }` for overlay-safe ffmpeg post-export zoom (recommended). |
 | `resetCamera(page)` | Clear all active camera effects |
-| `cursorHighlight(page, opts?)` | Manually enable a persistent cursor ring with pulse + click ripple. For recording-wide automatic setup, use `video.cursorHighlight`. Options: `color`, `radius`, `pulse`, `clickRipple`, `opacity` |
+| `cursorHighlight(page, opts?)` | Enable a continuous ring or `mode: 'click'` for brief appearance/click/Control locator circles. For automatic setup, use `video.cursorHighlight`. Options: `mode`, `color`, `radius`, `pulse`, `clickRipple`, `opacity` |
 | `resetCursor(page)` | Remove cursor highlight |
 | `showCaption(page, scene, text, durationMs)` | Show a simple text caption |
 | `withCaption(page, scene, text, action)` | Show caption during an async action |

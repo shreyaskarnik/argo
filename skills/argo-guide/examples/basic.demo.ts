@@ -29,8 +29,9 @@ test('my-demo', async ({ page, narration }) => {
   await page.goto('/');
   await page.waitForLoadState('networkidle');
 
-  // Optional: enable cursor highlight for the whole recording
-  cursorHighlight(page, { color: '#3b82f6', radius: 20 });
+  // Optional persistent ring only. For an SVG pointer with brief click circles,
+  // use createHumanCursor + mode: 'click'; see references/pseudo-cursor.md.
+  await cursorHighlight(page, { color: '#3b82f6', radius: 20 });
 
   // Begin screen capture. The first narration.mark() below lands at t=0.
   await narration.startRecording(page);
