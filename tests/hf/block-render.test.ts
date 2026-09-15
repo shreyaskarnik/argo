@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium, type Browser } from 'playwright';
 import { computeBlockHash, renderBlockFrames } from '../../src/hf/block-render.js';
+import { describeWithCapability, canLaunchChromium } from '../helpers/capability.js';
 
 // Fixture block: no GSAP, no network. Registers a fake timeline implementing
 // the { duration, pause, seek } interface the renderer relies on, and mirrors
@@ -44,12 +45,12 @@ describe('computeBlockHash', () => {
   });
 });
 
-describe('renderBlockFrames', () => {
+describeWithCapability(await canLaunchChromium(), 'a Chromium binary')('renderBlockFrames', () => {
   let browser: Browser;
   let tmp: string;
 
   beforeAll(async () => { browser = await chromium.launch(); }, 60_000);
-  afterAll(async () => { await browser.close(); });
+  afterAll(async () => { await browser?.close(); });
   beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'argo-blockrender-')); });
   afterEach(() => { rmSync(tmp, { recursive: true, force: true }); });
 

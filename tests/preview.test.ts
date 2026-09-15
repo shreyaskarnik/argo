@@ -130,6 +130,31 @@ describePreview('preview server', () => {
     expect(html).toContain('id="music-volume"');
   });
 
+  // hf-component and hf-block cues are not zone templates, so renderTemplate
+  // refuses them. The preview used to push every overlay through it, which
+  // took the whole page down for any demo using the hyperframes catalog.
+  it('serves the page and data for a manifest with hf-* overlays', async () => {
+    const { argoDir, demosDir } = await scaffoldDemo(dir, 'test-demo');
+    writeFileSync(join(demosDir, 'test-demo.scenes.json'), JSON.stringify([
+      { scene: 'welcome', text: 'Welcome.', overlay: { type: 'lower-third', text: 'Welcome' } },
+      { scene: 'feature', text: 'A component.', overlay: { type: 'hf-component', name: 'vignette' } },
+      { scene: 'closing', text: 'A cutaway.', overlay: { type: 'hf-block', name: 'logo-reveal' } },
+    ], null, 2));
+    const server = await startPreviewServer({ demoName: 'test-demo', argoDir, demosDir });
+    close = server.close;
+
+    const page = await fetch(server.url);
+    expect(page.status).toBe(200);
+    const data = await fetch(`${server.url}/api/data`);
+    expect(data.status).toBe(200);
+    const body = await data.json();
+    // The zone template still renders; the hf-* cues are left to their own
+    // paths (live injection, export-time compositing) instead of crashing.
+    expect(body.renderedOverlays?.welcome).toBeDefined();
+    expect(body.renderedOverlays?.feature).toBeUndefined();
+    expect(body.renderedOverlays?.closing).toBeUndefined();
+  });
+
   it('serves /api/data with timing, voiceover, overlays', async () => {
     const { argoDir, demosDir } = await scaffoldDemo(dir, 'test-demo');
     await mkdir(join(argoDir, 'test-demo', 'music'), { recursive: true });

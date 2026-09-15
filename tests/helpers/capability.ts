@@ -1,4 +1,5 @@
 import { describe, it } from 'vitest';
+import { chromium } from 'playwright';
 
 /**
  * Choose a `describe` variant based on whether an external prerequisite — a
@@ -35,3 +36,37 @@ export function describeWithCapability(
 
   return describe.skip;
 }
+
+/**
+ * Test-level counterpart to `describeWithCapability`, for suites that mix
+ * tests needing a prerequisite with ones that don't. Replaces `it.runIf` /
+ * `it.skipIf`, which skip silently in CI exactly like `describe.skip` did.
+ */
+export function itWithCapability(available: boolean, requirement: string): typeof it {
+  if (available) return it;
+
+  if (process.env.CI) {
+    return ((name: string) =>
+      it(`${name} (requires ${requirement})`, () => {
+        throw new Error(
+          `${requirement} was unavailable in CI, so "${name}" did not run. ` +
+          'CI installs this deliberately — check the workflow rather than ' +
+          'relaxing this assertion, because skipping here hides real regressions.',
+        );
+      })) as unknown as typeof it;
+  }
+
+  return it.skip;
+}
+
+/** Whether a headless Chromium can be launched on this machine. */
+export async function canLaunchChromium(): Promise<boolean> {
+  try {
+    const browser = await chromium.launch({ headless: true });
+    await browser.close();
+    return true;
+  } catch {
+    return false;
+  }
+}
+

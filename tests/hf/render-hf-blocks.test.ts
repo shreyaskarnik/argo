@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readdirSync } from 'node
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { resolveHfBlockCues, renderHfBlocks } from '../../src/hf/block-render.js';
+import { describeWithCapability, canLaunchChromium } from '../helpers/capability.js';
 
 const FIXTURE_BLOCK = `<!doctype html><html><head><style>html,body{margin:0;width:320px;height:180px}</style></head>
 <body><div data-composition-id="fx"><div id="p"></div></div>
@@ -44,9 +45,41 @@ describe('resolveHfBlockCues', () => {
     );
     expect(cues).toEqual([]);
   });
+
+  // The manifest is read by pipeline, export and preview, none of which run
+  // `argo validate`, so the resolver is the first place these can be caught.
+  it('skips a cue whose name would escape blocksDir', () => {
+    const cues = resolveHfBlockCues(
+      [{ scene: 'intro', overlay: { type: 'hf-block', name: '../../etc/x' } }],
+      placements,
+    );
+    expect(cues).toEqual([]);
+  });
+
+  it('skips a cue with a malformed fit instead of emitting scale=NaN', () => {
+    const cues = resolveHfBlockCues(
+      [
+        { scene: 'intro', overlay: { type: 'hf-block', name: 'a', fit: 'contain' } },
+        { scene: 'outro', overlay: { type: 'hf-block', name: 'b', fit: { x: 0, y: 0, scale: 'big' } } },
+      ],
+      placements,
+    );
+    expect(cues).toEqual([]);
+  });
 });
 
-describe('renderHfBlocks', () => {
+describe('renderHfBlocks input guard', () => {
+  // Defense in depth for a caller that builds cues without the resolver.
+  it('refuses a block name that is not a plain item name, before touching the filesystem', async () => {
+    await expect(renderHfBlocks({
+      cues: [{ name: '../outside', params: undefined, fit: 'cover', holdLastFrame: false, startMs: 0, endMs: 1000 }],
+      blocksDir: '/nonexistent-blocks', cacheDir: '/nonexistent-cache', fps: 10,
+    })).rejects.toThrow(/invalid hf-block name/i);
+  });
+});
+
+// renderHfBlocks launches Chromium on a cache miss.
+describeWithCapability(await canLaunchChromium(), 'a Chromium binary')('renderHfBlocks', () => {
   let tmp: string;
   beforeEach(() => {
     tmp = mkdtempSync(join(tmpdir(), 'argo-renderhf-'));

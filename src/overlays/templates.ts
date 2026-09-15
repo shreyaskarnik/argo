@@ -150,6 +150,17 @@ function imageCard(src: string, theme: BackgroundTheme, title?: string, body?: s
   };
 }
 
+/**
+ * Whether a cue renders as a zone template. `hf-component` cues are injected
+ * full-frame at record time and `hf-block` cues are composited at export time,
+ * so `renderTemplate` refuses both. Every caller that walks a manifest's
+ * overlays — the preview, the imported-video PNG pre-pass — must filter with
+ * this first, or one hyperframes cue takes down the whole path.
+ */
+export function isZoneTemplateCue(cue: Pick<OverlayCue, 'type'>): boolean {
+  return cue.type !== 'hf-component' && cue.type !== 'hf-block';
+}
+
 export function renderTemplate(cue: OverlayCue, theme: BackgroundTheme = 'dark'): TemplateResult {
   switch (cue.type) {
     case 'lower-third':

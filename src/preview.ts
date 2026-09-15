@@ -12,7 +12,7 @@ import { execFile, spawnSync } from 'node:child_process';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync, existsSync, readdirSync, writeFileSync, statSync, createReadStream, unlinkSync, mkdirSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
-import { renderTemplate } from './overlays/templates.js';
+import { renderTemplate, isZoneTemplateCue } from './overlays/templates.js';
 import { alignClips, schedulePlacements, type ClipInfo, type Placement, type SceneTiming } from './tts/align.js';
 import { ClipCache, type ManifestEntry } from './tts/cache.js';
 import { createWavBuffer, parseWavHeader } from './tts/engine.js';
@@ -271,6 +271,7 @@ function buildRenderedOverlays(
   const renderedOverlays: PreviewData['renderedOverlays'] = {};
   for (const entry of overlays) {
     const { scene, ...cue } = entry;
+    if (!isZoneTemplateCue(cue)) continue;
     const zone: Zone = cue.placement ?? 'bottom-center';
     const theme = themeMap?.[scene] ?? 'dark';
     const { contentHtml, styles } = renderTemplate(cue, theme);

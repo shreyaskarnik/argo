@@ -100,3 +100,45 @@ describe('buildOverlayPngFilters', () => {
     expect(result.filterParts[0]).toContain('overlay=x=(W-w)/2:y=(H-h)/2');
   });
 });
+
+describe('buildOverlayPngsForImport with hf-* overlays', () => {
+  // hf-block is composited at export time from its own PNG sequence, and
+  // hf-component is injected live; neither is a zone template. Passing them to
+  // the PNG pre-pass made renderTemplate throw and failed every export of an
+  // imported video that used the hyperframes catalog.
+  it('skips hf-* cues instead of throwing', async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync: write, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { buildOverlayPngsForImport } = await import('../src/overlays/render-to-png.js');
+
+    const root = mkdtempSync(join(tmpdir(), 'argo-hf-import-'));
+    try {
+      const argoDir = join(root, '.argo');
+      mkdirSync(join(argoDir, 'demo'), { recursive: true });
+      write(join(argoDir, 'demo', '.imported'), '');
+      const manifestPath = join(root, 'demo.scenes.json');
+      write(manifestPath, JSON.stringify([
+        { scene: 'a', overlay: { type: 'hf-block', name: 'logo-reveal' } },
+        { scene: 'b', overlay: { type: 'hf-component', name: 'vignette' } },
+      ]));
+
+      const result = await buildOverlayPngsForImport({
+        argoDir,
+        demoName: 'demo',
+        manifestPath,
+        placements: [
+          { scene: 'a', startMs: 0, endMs: 1000 },
+          { scene: 'b', startMs: 1000, endMs: 2000 },
+        ] as never,
+        videoWidth: 1920,
+        videoHeight: 1080,
+      });
+
+      // Nothing here is a zone template, so there is nothing to pre-render.
+      expect(result).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

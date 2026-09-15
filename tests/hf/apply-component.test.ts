@@ -4,31 +4,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium, type Browser, type Page } from 'playwright';
 import { applyComponent, removeComponent, resolveBlocksDir } from '../../src/hf/apply-component.js';
+import { describeWithCapability, canLaunchChromium } from '../helpers/capability.js';
 
 const SNIPPET = `<div id="hf-vignette"></div>
 <style>#hf-vignette { position: absolute; inset: 0; background: radial-gradient(ellipse, transparent var(--vignette-size, 45%), rgba(0,0,0,0.7) 100%); }</style>
 <script>document.documentElement.dataset.hfScriptRan = '1';</script>`;
-
-let browser: Browser;
-let page: Page;
-let tmp: string;
-
-beforeAll(async () => {
-  browser = await chromium.launch();
-}, 60_000);
-afterAll(async () => { await browser.close(); });
-
-beforeEach(async () => {
-  tmp = mkdtempSync(join(tmpdir(), 'argo-apply-'));
-  mkdirSync(join(tmp, 'vignette'), { recursive: true });
-  writeFileSync(join(tmp, 'vignette', 'vignette.html'), SNIPPET);
-  page = await browser.newPage();
-  await page.setContent('<h1>app</h1>');
-});
-afterEach(async () => {
-  await page.close();
-  rmSync(tmp, { recursive: true, force: true });
-});
 
 describe('resolveBlocksDir', () => {
   it('prefers explicit, then env, then "blocks"', () => {
@@ -42,7 +22,31 @@ describe('resolveBlocksDir', () => {
   });
 });
 
-describe('applyComponent / removeComponent', () => {
+// Skips locally without Chromium; fails in CI, where it is installed on purpose.
+describeWithCapability(await canLaunchChromium(), 'a Chromium binary')('applyComponent / removeComponent', () => {
+  // Scoped here rather than at file level, so resolveBlocksDir's pure tests
+  // above do not depend on a browser.
+  let browser: Browser;
+  let page: Page;
+  let tmp: string;
+
+  beforeAll(async () => {
+    browser = await chromium.launch();
+  }, 60_000);
+  afterAll(async () => { await browser?.close(); });
+
+  beforeEach(async () => {
+    tmp = mkdtempSync(join(tmpdir(), 'argo-apply-'));
+    mkdirSync(join(tmp, 'vignette'), { recursive: true });
+    writeFileSync(join(tmp, 'vignette', 'vignette.html'), SNIPPET);
+    page = await browser.newPage();
+    await page.setContent('<h1>app</h1>');
+  });
+  afterEach(async () => {
+    await page.close();
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
   it('injects container + style + runs script, applies params, and removes cleanly', async () => {
     await applyComponent(page, 'vignette', {
       blocksDir: tmp,

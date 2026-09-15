@@ -10,7 +10,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { renderTemplate, type TemplateResult } from './templates.js';
+import { renderTemplate, isZoneTemplateCue, type TemplateResult } from './templates.js';
 import type { OverlayCue, Zone } from './types.js';
 import type { BackgroundTheme } from './zones.js';
 import type { Placement } from '../tts/align.js';
@@ -307,6 +307,7 @@ export async function buildOverlayPngsForImport(options: {
   const overlayInputs: OverlayPngInput[] = [];
   for (const entry of scenes) {
     if (!entry.overlay || !entry.scene) continue;
+    if (!isZoneTemplateCue(entry.overlay)) continue;
     const placement = placements.find((p) => p.scene === entry.scene);
     if (!placement) continue;
     overlayInputs.push({

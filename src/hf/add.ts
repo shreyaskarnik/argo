@@ -12,6 +12,15 @@ import {
 
 /** Same pattern the CLI uses for demo names — path-traversal guard. */
 const ITEM_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
+
+/**
+ * Whether `name` is a plain registry item name, safe to `path.join` onto
+ * `blocksDir`. Shared with the render path so an installed item and a manifest
+ * reference are held to the same rule.
+ */
+export function isValidItemName(name: string): boolean {
+  return ITEM_NAME_RE.test(name);
+}
 /** Item file paths must be flat (no slashes) — e.g. "vignette.html". */
 const ITEM_FILE_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 

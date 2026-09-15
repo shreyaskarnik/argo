@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { isValidItemName } from './add.js';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -174,6 +175,13 @@ export interface HfBlockCueResolved {
  * that produced no timeline placement) are skipped with a warning rather
  * than throwing — hf-block cutaways are best-effort like overlays/subtitles.
  */
+/** `{ x, y, scale }` with finite numbers and a positive scale. */
+function isValidFit(fit: unknown): fit is { x: number; y: number; scale: number } {
+  if (!fit || typeof fit !== 'object') return false;
+  const { x, y, scale } = fit as Record<string, unknown>;
+  return [x, y, scale].every((v) => typeof v === 'number' && Number.isFinite(v)) && (scale as number) > 0;
+}
+
 export function resolveHfBlockCues(rawManifest: unknown[], placements: Placement[]): HfBlockCueResolved[] {
   const placementByScene = new Map<string, Placement>();
   for (const p of placements) placementByScene.set(p.scene, p);
@@ -196,6 +204,20 @@ export function resolveHfBlockCues(rawManifest: unknown[], placements: Placement
       holdLastFrame?: unknown;
     };
     if (ov.type !== 'hf-block' || typeof ov.name !== 'string') continue;
+
+    // Pipeline, export and preview read the manifest without running
+    // `argo validate`, so check here too. A name is joined onto blocksDir, and
+    // a malformed fit becomes `scale=NaN:NaN` that ffmpeg rejects only after
+    // TTS and recording have already run. Skip with a warning, like the
+    // missing-placement case below.
+    if (!isValidItemName(ov.name)) {
+      console.warn(`hf-block cue for scene "${e.scene}" has an invalid name "${ov.name}" — skipping.`);
+      continue;
+    }
+    if (ov.fit !== undefined && ov.fit !== 'cover' && !isValidFit(ov.fit)) {
+      console.warn(`hf-block cue for scene "${e.scene}" has an invalid fit — expected 'cover' or { x, y, scale } — skipping.`);
+      continue;
+    }
 
     const placement = placementByScene.get(e.scene);
     if (!placement) {
@@ -252,6 +274,10 @@ export async function renderHfBlocks(opts: RenderHfBlocksOptions): Promise<Rende
 
   try {
     for (const cue of opts.cues) {
+      // Defense in depth: a caller may build cues without the resolver.
+      if (!isValidItemName(cue.name)) {
+        throw new Error(`Invalid hf-block name "${cue.name}" — only letters, digits, "-" and "_" are allowed.`);
+      }
       const blockDir = join(opts.blocksDir, cue.name);
       const blockHtmlPath = join(blockDir, `${cue.name}.html`);
       if (!existsSync(blockHtmlPath)) {
