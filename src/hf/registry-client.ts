@@ -22,6 +22,39 @@ export interface RegistryItemFile {
   path: string;
   target?: string;
   type?: string;
+  /**
+   * Where the bytes live when they are not beside the manifest. Upstream hosts
+   * binary assets on a CDN so the git registry stays text-only; for those
+   * files nothing exists at the registry path.
+   */
+  url?: string;
+}
+
+/** Largest single item file accepted, matching the hyperframes CLI's bound. */
+const MAX_ITEM_FILE_BYTES = 128 * 1024 * 1024;
+
+/**
+ * Resolve where an item file's bytes come from: its declared `url`, or the
+ * registry path beside the manifest. Only an absolute `https://` url is
+ * honoured; the manifest is third-party input, and anything else (`http:`,
+ * `file:`, a bare host) is refused rather than guessed at. Throws before any
+ * request is made, so a bad manifest fails before anything is written.
+ */
+export function itemFileSourceUrl(
+  registryUrl: string,
+  kind: 'blocks' | 'components',
+  name: string,
+  file: Pick<RegistryItemFile, 'path' | 'url'>,
+): string {
+  if (file.url === undefined) return `${registryUrl}/${kind}/${name}/${file.path}`;
+  let parsed: URL | undefined;
+  try { parsed = new URL(file.url); } catch { parsed = undefined; }
+  if (!parsed || parsed.protocol !== 'https:') {
+    throw new Error(
+      `Unsafe file url "${file.url}" for "${name}/${file.path}": must be an absolute https:// URL.`,
+    );
+  }
+  return parsed.href;
 }
 
 export interface RegistryItem {
@@ -96,13 +129,17 @@ export async function fetchItemFile(
   registryUrl: string,
   kind: 'blocks' | 'components',
   name: string,
-  filePath: string,
+  file: Pick<RegistryItemFile, 'path' | 'url'>,
   fetchImpl: FetchLike = fetch,
 ): Promise<Buffer> {
-  const url = `${registryUrl}/${kind}/${name}/${filePath}`;
+  const url = itemFileSourceUrl(registryUrl, kind, name, file);
   const res = await fetchImpl(url);
   if (!res.ok) {
     throw new Error(`Registry fetch failed (${res.status}): ${url}`);
   }
-  return Buffer.from(await res.arrayBuffer());
+  const bytes = Buffer.from(await res.arrayBuffer());
+  if (bytes.length > MAX_ITEM_FILE_BYTES) {
+    throw new Error(`Registry file too large (${bytes.length} bytes): ${url}`);
+  }
+  return bytes;
 }

@@ -63,7 +63,7 @@ describe('registry client', () => {
     const f = stubFetch({
       [`${REG}/components/vignette/vignette.html`]: '<div id="hf-vignette"></div>',
     });
-    const bytes = await fetchItemFile(REG, 'components', 'vignette', 'vignette.html', f);
+    const bytes = await fetchItemFile(REG, 'components', 'vignette', { path: 'vignette.html' }, f);
     expect(bytes.toString('utf-8')).toContain('hf-vignette');
   });
 

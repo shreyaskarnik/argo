@@ -142,6 +142,45 @@ describe('installItem', () => {
     expect(result.files).toContain('assets/sfx/click.wav');
   });
 
+  // Upstream moved large binary assets off the git registry to a CDN: 396
+  // files across 25 items now declare `url`, and nothing exists at the
+  // registry path, so installing from `path` alone is a 404.
+  it('fetches a file from its declared https url instead of the registry path', async () => {
+    const jpg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
+    const cdn = 'https://static.example.test/registry-assets/223d162eed10f08f.jpg';
+    const routes = {
+      ...ROUTES,
+      [`${REG}/components/vignette/registry-item.json`]: JSON.stringify({
+        name: 'vignette',
+        type: 'hyperframes:component',
+        files: [{ path: 'vignette.html' }, { path: 'assets/carousel/a.jpg', url: cdn }],
+      }),
+      [cdn]: jpg,
+    };
+    await installItem({ name: 'vignette', blocksDir: tmp, registryUrl: REG, fetchImpl: stubFetch(routes) });
+
+    const written = readFileSync(join(tmp, 'vignette', 'assets', 'carousel', 'a.jpg'));
+    expect(Buffer.from(written).equals(Buffer.from(jpg))).toBe(true);
+  });
+
+  it('refuses a file url that is not https, before writing anything', async () => {
+    for (const url of ['http://static.example.test/a.jpg', 'file:///etc/passwd', 'static.example.test/a.jpg']) {
+      const routes = {
+        ...ROUTES,
+        [`${REG}/components/vignette/registry-item.json`]: JSON.stringify({
+          name: 'vignette',
+          type: 'hyperframes:component',
+          files: [{ path: 'vignette.html' }, { path: 'a.jpg', url }],
+        }),
+      };
+      await expect(
+        installItem({ name: 'vignette', blocksDir: tmp, registryUrl: REG, fetchImpl: stubFetch(routes) }),
+        url,
+      ).rejects.toThrow(/must be an absolute https/i);
+    }
+    expect(existsSync(join(tmp, 'vignette'))).toBe(false);
+  });
+
   it('still rejects nested paths that escape the item directory', async () => {
     const hostile = ['assets/../../x.html', '/abs/x.png', 'assets//x.png', 'assets/.hidden', 'assets\\x.png', 'assets/', './x.html'];
     for (const path of hostile) {

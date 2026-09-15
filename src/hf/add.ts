@@ -3,6 +3,7 @@ import { join, dirname, resolve, sep } from 'node:path';
 import {
   DEFAULT_REGISTRY_URL,
   fetchItemFile,
+  itemFileSourceUrl,
   fetchRegistryIndex,
   fetchRegistryItem,
   kindFromType,
@@ -90,6 +91,8 @@ export async function installItem(opts: {
     if (!isSafeItemFilePath(f.path)) {
       throw new Error(`Unsafe file path in registry-item.json for "${name}": "${f.path}"`);
     }
+    // Validate every source up front too, so a bad url fails before any write.
+    itemFileSourceUrl(registryUrl, kind, name, f);
   }
 
   const targetDir = join(blocksDir, name);
@@ -102,7 +105,7 @@ export async function installItem(opts: {
     if (!dest.startsWith(resolve(targetDir) + sep)) {
       throw new Error(`Unsafe file path in registry-item.json for "${name}": "${f.path}"`);
     }
-    const content = await fetchItemFile(registryUrl, kind, name, f.path, fetchImpl);
+    const content = await fetchItemFile(registryUrl, kind, name, f, fetchImpl);
     mkdirSync(dirname(dest), { recursive: true });
     // Bytes, not text: see fetchItemFile.
     writeFileSync(dest, content);
