@@ -7,12 +7,20 @@ import type { FetchLike } from '../../src/hf/registry-client.js';
 
 const REG = 'https://example.test/registry';
 
-function stubFetch(routes: Record<string, string>): FetchLike {
-  return async (url: string) => ({
-    ok: routes[url] !== undefined,
-    status: routes[url] !== undefined ? 200 : 404,
-    text: async () => routes[url] ?? 'not found',
-  });
+function stubFetch(routes: Record<string, string | Uint8Array>): FetchLike {
+  // Serves both views of a body, like a real Response, so a test can tell
+  // whether the installer read bytes or decoded them as text.
+  return async (url: string) => {
+    const body = routes[url];
+    const bytes = body === undefined ? new TextEncoder().encode('not found')
+      : typeof body === 'string' ? new TextEncoder().encode(body) : body;
+    return {
+      ok: body !== undefined,
+      status: body !== undefined ? 200 : 404,
+      text: async () => new TextDecoder().decode(bytes),
+      arrayBuffer: async () => bytes.slice().buffer,
+    };
+  };
 }
 
 const ROUTES = {
@@ -94,6 +102,64 @@ describe('installItem', () => {
     await expect(
       installItem({ name: 'vignette', blocksDir: tmp, registryUrl: REG, fetchImpl: stubFetch(routes) }),
     ).rejects.toThrow(/unsafe file path/i);
+  });
+
+  // Registry assets include PNG/JPEG/WAV/WOFF2. Decoding one as UTF-8
+  // replaces every invalid byte with U+FFFD, so the install "succeeds" and the
+  // file is garbage: a real 74,455-byte registry PNG came out at 135,320.
+  it('writes binary assets byte-for-byte', async () => {
+    // PNG signature plus bytes that are not valid UTF-8 on their own.
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xfe, 0x00, 0x80, 0xc3]);
+    const routes = {
+      ...ROUTES,
+      [`${REG}/components/vignette/registry-item.json`]: JSON.stringify({
+        name: 'vignette',
+        type: 'hyperframes:component',
+        files: [{ path: 'vignette.html' }, { path: 'lava.png' }],
+      }),
+      [`${REG}/components/vignette/lava.png`]: png,
+    };
+    await installItem({ name: 'vignette', blocksDir: tmp, registryUrl: REG, fetchImpl: stubFetch(routes) });
+
+    expect(Buffer.from(readFileSync(join(tmp, 'vignette', 'lava.png'))).equals(Buffer.from(png))).toBe(true);
+  });
+
+  // 64 of 399 registry items keep assets under subdirectories such as
+  // `assets/carousel-images/`, which a flat-only rule refused outright.
+  it('installs assets in nested subdirectories', async () => {
+    const routes = {
+      ...ROUTES,
+      [`${REG}/components/vignette/registry-item.json`]: JSON.stringify({
+        name: 'vignette',
+        type: 'hyperframes:component',
+        files: [{ path: 'vignette.html' }, { path: 'assets/sfx/click.wav' }],
+      }),
+      [`${REG}/components/vignette/assets/sfx/click.wav`]: new Uint8Array([0x52, 0x49, 0x46, 0x46, 0xff]),
+    };
+    const result = await installItem({ name: 'vignette', blocksDir: tmp, registryUrl: REG, fetchImpl: stubFetch(routes) });
+
+    expect(existsSync(join(tmp, 'vignette', 'assets', 'sfx', 'click.wav'))).toBe(true);
+    expect(result.files).toContain('assets/sfx/click.wav');
+  });
+
+  it('still rejects nested paths that escape the item directory', async () => {
+    const hostile = ['assets/../../x.html', '/abs/x.png', 'assets//x.png', 'assets/.hidden', 'assets\\x.png', 'assets/', './x.html'];
+    for (const path of hostile) {
+      const routes = {
+        ...ROUTES,
+        [`${REG}/components/vignette/registry-item.json`]: JSON.stringify({
+          name: 'vignette',
+          type: 'hyperframes:component',
+          files: [{ path }],
+        }),
+      };
+      await expect(
+        installItem({ name: 'vignette', blocksDir: tmp, registryUrl: REG, fetchImpl: stubFetch(routes) }),
+        path,
+      ).rejects.toThrow(/unsafe file path/i);
+    }
+    // Nothing was written for any rejected manifest.
+    expect(existsSync(join(tmp, 'vignette'))).toBe(false);
   });
 });
 

@@ -118,6 +118,17 @@ describe('validate: hf-component + accent', () => {
     expect(result.errors.some((e) => /fit/.test(e))).toBe(true);
   });
 
+  // Must agree with resolveHfBlockCues, which skips these at export time. If
+  // validate passed them, `argo validate` would say ok and the cutaway would
+  // then quietly never appear.
+  it('errors on a non-positive or non-finite hf-block fit scale', async () => {
+    for (const scale of [0, -1]) {
+      writeManifest({ type: 'hf-block', name: 'vignette', fit: { x: 0, y: 0, scale } });
+      const result = await validateDemo({ demoName: 'd', demosDir: join(tmp, 'demos'), blocksDir: join(tmp, 'blocks') });
+      expect(result.errors.some((e) => /fit/.test(e)), `scale ${scale}`).toBe(true);
+    }
+  });
+
   it('accepts a valid transition accent without leading #', async () => {
     writeManifest(undefined);
     const result = await validateDemo({

@@ -23,6 +23,9 @@ void main(){
   float shift=pull*.02/(dist+.2);
   float r=texture2D(from,clamp(vUv-uv*(warpStr+shift),0.,1.)).r;
   float b=texture2D(from,clamp(vUv-uv*(warpStr-shift),0.,1.)).b;
-  vec3 lensed=vec3(r,A.g,b)*horizon;
+  // Begin with the untouched source; full horizon darkening starts at progress 0.3.
+  // Ported from upstream hyperframes dd06b321 (#3660).
+  float horizonStrength=smoothstep(0.,.3,progress);
+  vec3 lensed=vec3(r,A.g,b)*mix(1.,horizon,horizonStrength);
   gl_FragColor=vec4(mix(lensed,B.rgb,smoothstep(.3,.9,progress)),1.);
 }

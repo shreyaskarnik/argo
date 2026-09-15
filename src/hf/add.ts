@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname, resolve, sep } from 'node:path';
 import {
   DEFAULT_REGISTRY_URL,
   fetchItemFile,
@@ -21,8 +21,20 @@ const ITEM_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
 export function isValidItemName(name: string): boolean {
   return ITEM_NAME_RE.test(name);
 }
-/** Item file paths must be flat (no slashes) — e.g. "vignette.html". */
+/** One segment of an item file path — e.g. "vignette.html", "assets". */
 const ITEM_FILE_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+
+/**
+ * Whether `filePath` is a safe relative path inside an item directory.
+ *
+ * Items keep assets in subdirectories (`assets/carousel-images/x.jpg`), so a
+ * path may be nested, but every `/`-separated segment must be a plain name.
+ * That rules out `..`, `.`, empty segments (absolute paths, `a//b`, trailing
+ * `/`), dotfiles and backslashes in one rule, before anything touches disk.
+ */
+function isSafeItemFilePath(filePath: string): boolean {
+  return filePath.split('/').every((segment) => ITEM_FILE_RE.test(segment));
+}
 
 export interface InstallResult {
   name: string;
@@ -75,7 +87,7 @@ export async function installItem(opts: {
 
   const item = await fetchRegistryItem(registryUrl, kind, name, fetchImpl);
   for (const f of item.files) {
-    if (!ITEM_FILE_RE.test(f.path)) {
+    if (!isSafeItemFilePath(f.path)) {
       throw new Error(`Unsafe file path in registry-item.json for "${name}": "${f.path}"`);
     }
   }
@@ -85,8 +97,15 @@ export async function installItem(opts: {
 
   const written: string[] = [];
   for (const f of item.files) {
+    const dest = resolve(targetDir, f.path);
+    // Belt and braces for the segment check above: never write outside.
+    if (!dest.startsWith(resolve(targetDir) + sep)) {
+      throw new Error(`Unsafe file path in registry-item.json for "${name}": "${f.path}"`);
+    }
     const content = await fetchItemFile(registryUrl, kind, name, f.path, fetchImpl);
-    writeFileSync(join(targetDir, f.path), content, 'utf-8');
+    mkdirSync(dirname(dest), { recursive: true });
+    // Bytes, not text: see fetchItemFile.
+    writeFileSync(dest, content);
     written.push(f.path);
   }
   writeFileSync(join(targetDir, 'registry-item.json'), JSON.stringify(item, null, 2), 'utf-8');

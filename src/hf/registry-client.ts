@@ -11,7 +11,7 @@ export const DEFAULT_REGISTRY_URL =
 
 export type FetchLike = (
   url: string,
-) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
+) => Promise<{ ok: boolean; status: number; text(): Promise<string>; arrayBuffer(): Promise<ArrayBuffer> }>;
 
 export interface RegistryIndexItem {
   name: string;
@@ -87,12 +87,22 @@ export async function fetchRegistryItem(
   return item;
 }
 
+/**
+ * Fetch one item file as raw bytes. Items ship images, audio and fonts next to
+ * their HTML, and decoding those as text replaces every invalid UTF-8 byte
+ * with U+FFFD, so the install would succeed and leave the asset corrupt.
+ */
 export async function fetchItemFile(
   registryUrl: string,
   kind: 'blocks' | 'components',
   name: string,
   filePath: string,
   fetchImpl: FetchLike = fetch,
-): Promise<string> {
-  return fetchText(`${registryUrl}/${kind}/${name}/${filePath}`, fetchImpl);
+): Promise<Buffer> {
+  const url = `${registryUrl}/${kind}/${name}/${filePath}`;
+  const res = await fetchImpl(url);
+  if (!res.ok) {
+    throw new Error(`Registry fetch failed (${res.status}): ${url}`);
+  }
+  return Buffer.from(await res.arrayBuffer());
 }

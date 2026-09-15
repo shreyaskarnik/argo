@@ -142,10 +142,11 @@ export async function validateDemo(options: ValidateOptions): Promise<ValidateRe
               const fit = ov.fit;
               if (
                 typeof fit !== 'object' || fit === null ||
-                typeof fit.x !== 'number' || typeof fit.y !== 'number' || typeof fit.scale !== 'number'
+                ![fit.x, fit.y, fit.scale].every((v) => typeof v === 'number' && Number.isFinite(v)) ||
+                fit.scale <= 0
               ) {
                 errors.push(
-                  `Scene "${entry.scene}" overlay: hf-block "fit" must be 'cover' or { x, y, scale } with numeric fields`,
+                  `Scene "${entry.scene}" overlay: hf-block "fit" must be 'cover' or { x, y, scale } with finite numbers and scale > 0`,
                 );
               }
             }

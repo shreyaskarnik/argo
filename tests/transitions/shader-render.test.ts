@@ -157,6 +157,78 @@ describe('renderShaderFrames', () => {
     }
     rmSync(tmp, { recursive: true, force: true });
   }, 60000);
+
+  // A transition's first frame has to be the outgoing scene, or the cut into
+  // it jumps. Upstream hyperframes fixed gravitational-lens for exactly this
+  // (#3660): its horizon darkening applied at full strength from progress 0,
+  // which multiplies the frame centre by smoothstep(0,.3,0) = 0.
+  // The same rule for every shader: a transition begins on the outgoing frame
+  // and ends on the incoming one, or the cuts on either side of it jump. Worth
+  // pinning for the whole set, since each port from upstream is a fresh chance
+  // to break it and nothing else would notice.
+  itWithFfmpeg('starts every shader on the outgoing frame and ends on the incoming one', async () => {
+    const { renderShaderFrames } = await import('../../src/transitions/shader-render.js');
+    const { chromium } = await import('playwright');
+    const tmp = mkdtempSync(join(tmpdir(), 'argo-endpoints-'));
+    const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blacklist'] });
+    try {
+      const aPng = join(tmp, 'a.png');
+      const bPng = join(tmp, 'b.png');
+      await execFileP('ffmpeg', ['-f', 'lavfi', '-i', 'color=red:s=160x90', '-frames:v', '1', '-y', aPng]);
+      await execFileP('ffmpeg', ['-f', 'lavfi', '-i', 'color=blue:s=160x90', '-frames:v', '1', '-y', bPng]);
+      const pixel = async (file: string, x: number, y: number) => {
+        const { stdout } = await execFileP('ffmpeg',
+          ['-v', 'error', '-i', file, '-vf', `crop=1:1:${x}:${y}`, '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'],
+          { encoding: 'buffer' });
+        return [...(stdout as unknown as Buffer)];
+      };
+      const points = [[80, 45], [8, 8], [150, 80]];
+      const wrong: string[] = [];
+      for (const shader of SHADER_NAMES) {
+        const outDir = join(tmp, shader);
+        // 3 frames at progress 0, 0.5, 1.
+        await renderShaderFrames({ shader, aPng, bPng, width: 160, height: 90, fps: 30, durationMs: 100, outputDir: outDir, browser });
+        for (const [x, y] of points) {
+          const [r0, g0, b0] = await pixel(join(outDir, 'frame_0000.png'), x, y);
+          if (!(r0 > 230 && g0 < 25 && b0 < 25)) wrong.push(`${shader} start (${x},${y}) rgb(${r0},${g0},${b0})`);
+          const [r1, g1, b1] = await pixel(join(outDir, 'frame_0002.png'), x, y);
+          if (!(b1 > 230 && r1 < 25 && g1 < 25)) wrong.push(`${shader} end (${x},${y}) rgb(${r1},${g1},${b1})`);
+        }
+      }
+      expect(wrong).toEqual([]);
+    } finally {
+      await browser.close();
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }, 120000);
+
+  itWithFfmpeg('starts gravitational-lens on the untouched outgoing frame', async () => {
+    const { renderShaderFrames } = await import('../../src/transitions/shader-render.js');
+    const tmp = mkdtempSync(join(tmpdir(), 'argo-lens-'));
+    try {
+      const aPng = join(tmp, 'a.png');
+      const bPng = join(tmp, 'b.png');
+      await execFileP('ffmpeg', ['-f', 'lavfi', '-i', 'color=red:s=320x180', '-frames:v', '1', '-y', aPng]);
+      await execFileP('ffmpeg', ['-f', 'lavfi', '-i', 'color=blue:s=320x180', '-frames:v', '1', '-y', bPng]);
+      const outDir = join(tmp, 'frames');
+      await renderShaderFrames({
+        shader: 'gravitational-lens', aPng, bPng, width: 320, height: 180, fps: 30, durationMs: 500, outputDir: outDir,
+      });
+
+      // frame_0000 is rendered at progress 0. Read the centre pixel as RGB.
+      const { stdout } = await execFileP(
+        'ffmpeg',
+        ['-v', 'error', '-i', join(outDir, 'frame_0000.png'), '-vf', 'crop=1:1:160:90', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'],
+        { encoding: 'buffer' },
+      );
+      const [r, g, b] = stdout as unknown as Buffer;
+      expect(r, `centre pixel was rgb(${r},${g},${b}), not the red outgoing frame`).toBeGreaterThan(230);
+      expect(g).toBeLessThan(25);
+      expect(b).toBeLessThan(25);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }, 60000);
 });
 
 describe('renderShaderTransitions', () => {

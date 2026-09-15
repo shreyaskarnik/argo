@@ -15,6 +15,7 @@ function stubFetch(routes: Record<string, string>): FetchLike {
       ok: body !== undefined,
       status: body !== undefined ? 200 : 404,
       text: async () => body ?? 'not found',
+      arrayBuffer: async () => new TextEncoder().encode(body ?? 'not found').buffer,
     };
   };
 }
@@ -62,9 +63,8 @@ describe('registry client', () => {
     const f = stubFetch({
       [`${REG}/components/vignette/vignette.html`]: '<div id="hf-vignette"></div>',
     });
-    await expect(fetchItemFile(REG, 'components', 'vignette', 'vignette.html', f)).resolves.toContain(
-      'hf-vignette',
-    );
+    const bytes = await fetchItemFile(REG, 'components', 'vignette', 'vignette.html', f);
+    expect(bytes.toString('utf-8')).toContain('hf-vignette');
   });
 
   it('throws a clear error on HTTP failure', async () => {

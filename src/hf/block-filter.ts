@@ -50,7 +50,11 @@ export function buildHfBlockFilters(
     let x: number;
     let y: number;
     if (b.fit === 'cover') {
-      scaleExpr = `scale=${videoW}:${videoH}`;
+      // Fill the frame keeping the block's aspect ratio, then centre-crop the
+      // overflow. A bare scale=W:H stretches: a 16:9 block in a 9:16 variant
+      // would be squashed to a third of its width. When the aspects already
+      // match, the crop is a no-op.
+      scaleExpr = `scale=${videoW}:${videoH}:force_original_aspect_ratio=increase,crop=${videoW}:${videoH}`;
       x = 0;
       y = 0;
     } else {
