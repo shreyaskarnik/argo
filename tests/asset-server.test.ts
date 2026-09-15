@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { describeWithCapability } from './helpers/capability.js';
 import { startAssetServer } from '../src/asset-server.js';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -23,7 +24,7 @@ async function canBindLocalhost(): Promise<boolean> {
   }
 }
 
-const describeAssetServer = (await canBindLocalhost()) ? describe : describe.skip;
+const describeAssetServer = describeWithCapability(await canBindLocalhost(), 'a bindable loopback socket');
 
 describeAssetServer('startAssetServer', () => {
   let tmpDir: string;

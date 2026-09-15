@@ -1,4 +1,5 @@
 import type { TTSEngine, TTSEngineOptions, TTSEngineMetadata } from '../engine.js';
+import { importOptional, OPENAI_DEP } from '../../optional-deps.js';
 
 export interface OpenAIEngineOptions {
   apiKey?: string;
@@ -39,15 +40,10 @@ export class OpenAIEngine implements TTSEngine {
   async generate(text: string, options: TTSEngineOptions): Promise<Buffer> {
     if (!text?.trim()) throw new Error('TTS text must not be empty');
 
-    let OpenAI: any;
-    try {
-      // @ts-ignore — openai is an optional dependency
-      ({ OpenAI } = await import('openai'));
-    } catch {
-      throw new Error(
-        "OpenAI TTS engine requires the 'openai' package. Install it with: npm i openai"
-      );
-    }
+    const { OpenAI } = await importOptional(
+      () => import('openai'),
+      OPENAI_DEP,
+    );
 
     const client = new OpenAI({ apiKey: this.resolveApiKey() });
 

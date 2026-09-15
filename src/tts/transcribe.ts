@@ -7,12 +7,18 @@
  * the source of truth is the rendered audio itself — transcribe it
  * back with Whisper and read the per-word timestamps.
  *
- * Uses `@huggingface/transformers` (already in tree for Kokoro). Whisper
- * runs locally via ONNX, no cloud round-trip. The pipeline instance is
- * cached per process so repeated calls reuse the loaded model.
+ * Uses `@huggingface/transformers`. Whisper runs locally via ONNX, no cloud
+ * round-trip. The pipeline instance is cached per process so repeated calls
+ * reuse the loaded model.
+ *
+ * The import is dynamic and lives inside `getTranscriber()` on purpose.
+ * `@huggingface/transformers` is an optional peer dependency that pulls
+ * ~400MB of ONNX runtime, and transcription is opt-in (`tts.transcribe`).
+ * A top-level import would make every Argo command, including `validate`
+ * and `export`, fail to even load when the package is absent.
  */
-import { pipeline } from '@huggingface/transformers';
 import { spawnSync } from 'node:child_process';
+import { importOptional, WHISPER_DEP } from '../optional-deps.js';
 
 export interface WordTiming {
   /** The word as Whisper transcribed it. Whisper emits leading spaces on
@@ -53,6 +59,10 @@ let cached: { model: string; transcriber: Transcriber } | null = null;
  *  Switching model busts the cache (rare). */
 async function getTranscriber(model: string): Promise<Transcriber> {
   if (cached?.model === model) return cached.transcriber;
+  const { pipeline } = await importOptional(
+    () => import('@huggingface/transformers'),
+    WHISPER_DEP,
+  );
   const transcriber = (await pipeline('automatic-speech-recognition', model)) as unknown as Transcriber;
   cached = { model, transcriber };
   return transcriber;

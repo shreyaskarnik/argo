@@ -15,15 +15,24 @@ export default defineConfig({
 });
 ```
 
+Every engine is an optional peer dependency. npm does not install any of
+them automatically, so a fresh `@argo-video/cli` has no TTS engine until one
+is added. `npx argo doctor` lists which are present.
+
 | Engine | Type | Install | Voices |
 |--------|------|---------|--------|
-| `engines.kokoro()` | local | built-in | `af_heart`, `am_michael` |
+| `engines.kokoro()` | local | `npm i kokoro-js@1` | `af_heart`, `am_michael` |
 | `engines.openai()` | cloud | `npm i openai` | `alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer` |
 | `engines.elevenlabs()` | cloud | `npm i @elevenlabs/elevenlabs-js` | ElevenLabs voice IDs |
 | `engines.gemini()` | cloud | `npm i @google/genai` | Gemini voice names |
 | `engines.sarvam()` | cloud | `npm i sarvamai` | `meera` + Indian language voices |
 | `engines.mlxAudio()` | local | `pip install mlx-audio` | model-dependent (Apple Silicon only) |
-| `engines.transformers()` | local | built-in | any HuggingFace `text-to-speech` model |
+| `engines.transformers()` | local | `npm i @huggingface/transformers@3` | any HuggingFace `text-to-speech` model |
+
+Those commands assume a project-local Argo. For a global install add `-g`,
+and install Kokoro's two packages in one command so npm deduplicates the
+ONNX runtime: `npm i -g kokoro-js@1 @huggingface/transformers@3`. For npx,
+compose them: `npx -p @argo-video/cli -p openai -- argo pipeline <demo>`.
 
 Cloud engines read API keys from environment variables (`OPENAI_API_KEY`, `ELEVENLABS_API_KEY`, `GEMINI_API_KEY`, `SARVAM_API_KEY`) or accept `apiKey` in factory options.
 

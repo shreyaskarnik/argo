@@ -1,0 +1,10 @@
+{
+  "name": "argo-pack-smoke",
+  "private": true,
+  "type": "module",
+  "description": "Consumer-shaped project used by CI to run the packed tarball end to end.",
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "playwright": "^1.59.1"
+  }
+}

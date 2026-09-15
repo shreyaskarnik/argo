@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describeWithCapability } from '../helpers/capability.js';
 import { mkdtemp, rm, writeFile, mkdir, readdir, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -21,7 +22,7 @@ async function canBindLocalhost(): Promise<boolean> {
   }
 }
 
-const describeE2E = (await canBindLocalhost()) ? describe : describe.skip;
+const describeE2E = describeWithCapability(await canBindLocalhost(), 'a bindable loopback socket');
 
 describeE2E('E2E: argo record', () => {
   let server: FakeServer;

@@ -114,10 +114,15 @@ export async function spotlight(
 
     const overlay = document.createElement('div');
     overlay.setAttribute(attr, 'spotlight');
+    // `evenodd` because both rings of the cutout are written in the same
+    // winding order, so the default `nonzero` fills the interior instead of
+    // clearing it and the overlay paints as a solid scrim with no hole. It
+    // also keeps the cutout independent of vertex order.
     overlay.style.cssText = `
       position: fixed; inset: 0; z-index: 99990; pointer-events: none;
       background: rgba(0,0,0,${opacity});
       clip-path: polygon(
+        evenodd,
         0% 0%, 0% 100%, 100% 100%, 100% 0%, 0% 0%,
         ${rect.left - padding}px ${rect.top - padding}px,
         ${rect.left - padding}px ${rect.bottom + padding}px,
@@ -223,10 +228,12 @@ export async function dimAround(
       const padding = 0;
       const overlay = document.createElement('div');
       overlay.setAttribute(attr, 'dim-around');
+      // `evenodd` for the same reason as in spotlight() above.
       overlay.style.cssText = `
         position: fixed; inset: 0; z-index: 99990; pointer-events: none;
         background: rgba(0,0,0,${1 - dimOpacity});
         clip-path: polygon(
+          evenodd,
           0% 0%, 0% 100%, 100% 100%, 100% 0%, 0% 0%,
           ${rect.left - padding}px ${rect.top - padding}px,
           ${rect.left - padding}px ${rect.bottom + padding}px,

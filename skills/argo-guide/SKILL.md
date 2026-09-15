@@ -16,6 +16,8 @@ Argo turns Playwright demo scripts into polished product demo videos with AI voi
 
 ## Prerequisites
 
+**No TTS engine ships by default.** Every engine is an optional peer dependency. Install one before running a pipeline: `npm i kokoro-js@1` (local, no API key) or `npm i openai` (cloud, needs `OPENAI_API_KEY`). Run `npx argo doctor` to see which engines are present and the exact install command for this project.
+
 1. **`@argo-video/cli`** in `devDependencies` — install with `npm i -D @argo-video/cli` if missing
 2. **`argo.config.mjs`** in project root — scaffold with `npx argo init` if missing (use `.mjs` to avoid ESM warnings)
 3. **Playwright browsers** — `npx playwright install chromium` (or `webkit` for best macOS quality)
@@ -86,7 +88,7 @@ All camera effects are **non-blocking by default** (fire-and-forget safe). All a
 | `zoomTo(page, target, opts?)` | Scale viewport centered on target. Pass `{ narration }` for overlay-safe ffmpeg post-export zoom (recommended). Without `narration`, falls back to browser-side CSS transforms (overlays scale with the page). |
 | `resetCamera(page)` | Clear all active camera effects |
 | `showConfetti(page, opts?)` | Confetti burst. `spread: 'burst'` (center-top fan) or `'rain'` (full-width fall). `emoji: '🎃'` or `emoji: ['🎃', '👻']` renders emoji instead of colored rectangles. |
-| `cursorHighlight(page, opts?)` | Persistent ring following cursor. Remove with `resetCursor(page)`. |
+| `cursorHighlight(page, opts?)` | Manually enable a persistent ring following cursor. Remove with `resetCursor(page)`. Use `video.cursorHighlight` for recording-wide automatic setup. |
 
 Derive camera durations from `narration.durationFor()` so effects track voiceover timing:
 **Effect timing pattern**: Derive beat durations from `durationFor()` so effects stay synchronized with voiceover. Subtract any setup wait time before dividing:

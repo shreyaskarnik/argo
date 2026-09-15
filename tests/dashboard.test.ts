@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describeWithCapability } from './helpers/capability.js';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
@@ -31,7 +32,7 @@ async function canBindLocalhost(): Promise<boolean> {
   });
 }
 
-const describeDashboard = (await canBindLocalhost()) ? describe : describe.skip;
+const describeDashboard = describeWithCapability(await canBindLocalhost(), 'a bindable loopback socket');
 
 describeDashboard('dashboard server', () => {
   let dir: string;

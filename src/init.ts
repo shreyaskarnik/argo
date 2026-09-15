@@ -5,6 +5,16 @@ import {
   generateDemoScript,
   generateScenesSkeleton,
 } from './parse-playwright.js';
+import {
+  installCommand,
+  isDepInstalled,
+  KOKORO_DEP,
+  OPENAI_DEP,
+  ELEVENLABS_DEP,
+  GEMINI_DEP,
+  SARVAM_DEP,
+  TRANSFORMERS_DEP,
+} from './optional-deps.js';
 
 async function writeIfMissing(filePath: string, content: string): Promise<boolean> {
   try {
@@ -90,6 +100,7 @@ export default defineConfig({
     fps: 30,
     browser: 'webkit',         // webkit > firefox > chromium for video quality on macOS
     // deviceScaleFactor: 2,   // 2x capture + lanczos downscale (known issue with webkit — enable after fix)
+    // cursorHighlight: true,  // show a pseudo-cursor throughout the recording
   },
   export: {
     preset: 'slow',            // slower = smaller file, higher quality
@@ -146,6 +157,22 @@ export async function init(cwd: string = process.cwd()): Promise<void> {
   console.log('  1. Edit demos/example.demo.ts');
   console.log('  2. Run: npx argo record example');
   console.log('  3. Run: npx argo pipeline example');
+  printEngineHintIfMissing();
+}
+
+/** Scaffolding is the first place a new user can discover that no TTS engine
+ *  is installed. Say so here rather than letting the first `pipeline` run
+ *  fail on it. Silent when an engine is already present. */
+function printEngineHintIfMissing(): void {
+  const specs = [KOKORO_DEP, OPENAI_DEP, ELEVENLABS_DEP, GEMINI_DEP, SARVAM_DEP, TRANSFORMERS_DEP];
+  if (specs.some(isDepInstalled)) return;
+  // Always the project-mode command: `init` has just scaffolded a project
+  // here, so that is where the engine belongs even when Argo itself was
+  // invoked globally or through npx.
+  console.log('\nNo TTS engine is installed yet. Pick one:');
+  console.log(`  local, no API key:  ${installCommand(KOKORO_DEP, 'project')}`);
+  console.log(`  cloud, needs a key: ${installCommand(OPENAI_DEP, 'project')}`);
+  console.log('  see all engines:    npx argo doctor');
 }
 
 export interface InitFromOptions {

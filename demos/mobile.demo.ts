@@ -28,6 +28,8 @@ test('mobile', async ({ page, narration }) => {
 
   cursorHighlight(page, { color: '#e85d04', radius: 16 });
 
+  await narration.startRecording(page);
+
   // Scene 1: intro — show the menu
   narration.mark('intro');
   await showOverlay(page, 'intro', narration.durationFor('intro'));

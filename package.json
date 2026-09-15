@@ -1,6 +1,6 @@
 {
   "name": "@argo-video/cli",
-  "version": "0.38.1",
+  "version": "0.39.2",
   "description": "Turn Playwright demo scripts into polished product demo videos with AI voiceover",
   "type": "module",
   "main": "./dist/index.js",
@@ -17,35 +17,33 @@
   },
   "scripts": {
     "build": "tsc && npm run copy-assets",
-    "copy-assets": "mkdir -p dist/transitions/shaders && cp src/transitions/shaders/*.glsl dist/transitions/shaders/",
+    "copy-assets": "node scripts/copy-assets.mjs",
+    "prepare": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "peerDependencies": {
+    "@elevenlabs/elevenlabs-js": ">=2",
+    "@google/genai": ">=1",
+    "@huggingface/transformers": "^3.5.1 || ^4.2.0",
     "@playwright/test": ">=1.59.0",
-    "playwright": ">=1.59.0"
+    "kokoro-js": "^1.2.1",
+    "openai": ">=4",
+    "playwright": ">=1.59.0",
+    "sarvamai": ">=1"
   },
   "dependencies": {
-    "@huggingface/transformers": "^4.2.0",
     "commander": "^12.0.0",
-    "gsap": "^3.15.0",
-    "kokoro-js": "^1.2.1"
+    "gsap": "^3.15.0"
   },
   "overrides": {
-    "kokoro-js": {
-      "@huggingface/transformers": "$@huggingface/transformers"
-    },
     "ws": "^8.21.0",
     "form-data": "^4.0.6",
     "vite": "^7.3.5",
     "esbuild": "^0.28.1",
-    "protobufjs": "^7.6.3"
-  },
-  "optionalDependencies": {
-    "@elevenlabs/elevenlabs-js": "^2.0.0",
-    "@google/genai": "^1.0.0",
-    "openai": "^4.0.0",
-    "sarvamai": "^1.0.0"
+    "protobufjs": "^7.6.3",
+    "sharp": "^0.35.3",
+    "nanoid": "^3.3.18"
   },
   "publishConfig": {
     "access": "public"
@@ -61,10 +59,39 @@
     "scripts"
   ],
   "devDependencies": {
+    "@elevenlabs/elevenlabs-js": "^2.63.0",
+    "@google/genai": "^1.52.0",
+    "@huggingface/transformers": "^3.5.1",
     "@playwright/test": "^1.59.1",
     "@types/node": "^25.5.0",
+    "kokoro-js": "^1.2.1",
+    "openai": "^4.104.0",
     "playwright": "^1.59.1",
+    "sarvamai": "^1.1.8",
     "typescript": "^5.5.0",
-    "vitest": "^3.2.6"
+    "vitest": "^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@elevenlabs/elevenlabs-js": {
+      "optional": true
+    },
+    "@google/genai": {
+      "optional": true
+    },
+    "@huggingface/transformers": {
+      "optional": true
+    },
+    "kokoro-js": {
+      "optional": true
+    },
+    "openai": {
+      "optional": true
+    },
+    "sarvamai": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

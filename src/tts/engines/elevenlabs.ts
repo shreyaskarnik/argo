@@ -1,4 +1,5 @@
 import type { TTSEngine, TTSEngineOptions, TTSEngineMetadata } from '../engine.js';
+import { importOptional, ELEVENLABS_DEP } from '../../optional-deps.js';
 
 export interface ElevenLabsEngineOptions {
   apiKey?: string;
@@ -39,15 +40,13 @@ export class ElevenLabsEngine implements TTSEngine {
   async generate(text: string, options: TTSEngineOptions): Promise<Buffer> {
     if (!text?.trim()) throw new Error('TTS text must not be empty');
 
-    let ElevenLabsClient: any;
-    try {
-      // @ts-ignore — @elevenlabs/elevenlabs-js is an optional dependency
-      ({ ElevenLabsClient } = await import('@elevenlabs/elevenlabs-js'));
-    } catch {
-      throw new Error(
-        "ElevenLabs TTS engine requires the '@elevenlabs/elevenlabs-js' package. Install it with: npm i @elevenlabs/elevenlabs-js"
-      );
-    }
+    // Loosely typed on purpose: the `convert()` call below uses snake_case
+    // keys that the current SDK typings do not accept. Typing it would change
+    // request shape, which is a behavioural fix, not a packaging one.
+    const { ElevenLabsClient }: any = await importOptional(
+      () => import('@elevenlabs/elevenlabs-js'),
+      ELEVENLABS_DEP,
+    );
 
     const client = new ElevenLabsClient({ apiKey: this.resolveApiKey() });
     const audioStream = await client.textToSpeech.convert(
@@ -69,8 +68,9 @@ export class ElevenLabsEngine implements TTSEngine {
     }
     const mp3Buffer = Buffer.concat(chunks);
 
-    // Convert MP3 to Argo WAV format
+    // Convert MP3 to Argo WAV format. ElevenLabs has no speed parameter, so
+    // the rate change rides along with the conversion.
     const { convertToWav } = await import('../engine.js');
-    return convertToWav(mp3Buffer);
+    return convertToWav(mp3Buffer, options.speed ?? 1);
   }
 }

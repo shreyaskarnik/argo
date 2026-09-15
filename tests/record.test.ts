@@ -89,6 +89,7 @@ describe('record', () => {
           ARGO_SCREENCAST_HEIGHT: '720',
           // showActions defaults off, sceneThumbs defaults on
           ARGO_SHOW_ACTIONS: '',
+          ARGO_CURSOR_HIGHLIGHT: '',
           ARGO_SCENE_THUMBS: '1',
           ARGO_THUMBS_DIR: resolve(join('.argo', 'demo', 'thumbs')),
           ARGO_LIVE_FRAME_PATH: resolve(join('.argo', 'demo', '.live-frame.jpg')),
@@ -135,6 +136,42 @@ describe('record', () => {
       'npx',
       expect.any(Array),
       expect.objectContaining({ env: expect.objectContaining({ ARGO_SHOW_ACTIONS: '{}' }) }),
+      expect.any(Function),
+    );
+  });
+
+  it('serializes automatic cursor highlight options to the recording runtime', async () => {
+    mockSubprocessSuccess();
+    await record('demo', {
+      demosDir: 'custom-demos',
+      baseURL: 'http://localhost:4321',
+      video: { width: 1280, height: 720 },
+      cursorHighlight: { color: '#ff0000', radius: 24, clickRipple: false },
+    });
+    expect(execFileMock).toHaveBeenCalledWith(
+      'npx',
+      expect.any(Array),
+      expect.objectContaining({
+        env: expect.objectContaining({
+          ARGO_CURSOR_HIGHLIGHT: JSON.stringify({ color: '#ff0000', radius: 24, clickRipple: false }),
+        }),
+      }),
+      expect.any(Function),
+    );
+  });
+
+  it('passes cursorHighlight: true as default-options JSON', async () => {
+    mockSubprocessSuccess();
+    await record('demo', {
+      demosDir: 'custom-demos',
+      baseURL: 'http://localhost:4321',
+      video: { width: 1280, height: 720 },
+      cursorHighlight: true,
+    });
+    expect(execFileMock).toHaveBeenCalledWith(
+      'npx',
+      expect.any(Array),
+      expect.objectContaining({ env: expect.objectContaining({ ARGO_CURSOR_HIGHLIGHT: '{}' }) }),
       expect.any(Function),
     );
   });

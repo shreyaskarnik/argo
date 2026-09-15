@@ -6,6 +6,11 @@ test('hello-world', async ({ page, narration }) => {
   await page.goto('/app.html');
   await page.waitForTimeout(800);
 
+  // Begin capture once the page has settled. Everything above is setup and is
+  // deliberately excluded from the video; this also re-anchors the timeline so
+  // the first mark() lands at t=0.
+  await narration.startRecording(page);
+
   // Scene 1: Hero section
   narration.mark('hero');
   await showOverlay(page, 'hero', {

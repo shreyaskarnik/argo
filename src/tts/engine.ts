@@ -199,14 +199,159 @@ export function parseWavHeader(wav: Buffer): WavHeader {
   };
 }
 
+/** ffmpeg's `atempo` filter accepts a factor in [0.5, 2.0] per instance and
+ *  errors outside it, so a larger change has to be split across several
+ *  instances whose product is the requested speed. */
+const ATEMPO_MIN = 0.5;
+const ATEMPO_MAX = 2;
+
+/** Widest range the chain will honour, i.e. two `atempo` stages either way.
+ *  Past this the voice stops being intelligible, so a request that far out is
+ *  far more likely a typo than an intent. */
+const SPEED_MIN = ATEMPO_MIN * ATEMPO_MIN;
+const SPEED_MAX = ATEMPO_MAX * ATEMPO_MAX;
+
+/**
+ * Normalise a requested `speed` before it reaches the atempo chain.
+ *
+ * Throws on values the chain cannot converge on: it divides by the stage
+ * factor each pass, so `0`, a negative, or `Infinity` would loop forever —
+ * a hang mid-TTS with no output and no error. `NaN` escapes both loops and
+ * emits a literal `atempo=NaN`, which makes ffmpeg exit non-zero inside
+ * `execFileSync`. Both are misconfiguration, so they fail loudly.
+ *
+ * Merely extreme values are clamped rather than rejected — the intent is
+ * legible even when the number is silly.
+ */
+function guardSpeed(speed: number): number {
+  if (!Number.isFinite(speed) || speed <= 0) {
+    throw new Error(`TTS speed must be a positive finite number, got ${speed}`);
+  }
+  const capped = Math.min(SPEED_MAX, Math.max(SPEED_MIN, speed));
+  if (capped !== speed) {
+    console.warn(`Warning: TTS speed ${speed} clamped to ${capped}`);
+  }
+  return capped;
+}
+
+/** Trim floating-point noise so the filter string stays readable and ffmpeg
+ *  never sees something like `atempo=1.7999999999999998`. */
+function fmt(n: number): string {
+  return String(Number(n.toFixed(6)));
+}
+
+/**
+ * Build the ffmpeg args that change playback rate to `speed`.
+ *
+ * `atempo` rather than `asetrate`: it resamples in the time domain, so the
+ * voice speeds up without shifting pitch. Returns an empty array at 1x so the
+ * default path spawns ffmpeg with no filter at all.
+ */
+export function buildAtempoChain(speed: number): string[] {
+  if (speed === 1) return [];
+  speed = guardSpeed(speed);
+
+  const stages: number[] = [];
+  let remaining = speed;
+  while (remaining > ATEMPO_MAX) {
+    stages.push(ATEMPO_MAX);
+    remaining /= ATEMPO_MAX;
+  }
+  while (remaining < ATEMPO_MIN) {
+    stages.push(ATEMPO_MIN);
+    remaining /= ATEMPO_MIN;
+  }
+  stages.push(remaining);
+
+  return ['-filter:a', stages.map(s => `atempo=${fmt(s)}`).join(',')];
+}
+
+/** A headerless audio stream. ffmpeg cannot sniff one, so it has to be told. */
+export interface RawAudioFormat {
+  /** ffmpeg demuxer name, passed to `-f`. `s16le` for signed 16-bit
+   *  little-endian. Not a codec: `-c:a` would reject it. */
+  format: string;
+  sampleRate: number;
+  channels: number;
+}
+
+/** One parameter's value, tolerating the spacing and quoting RFC 2045 allows. */
+function mimeParam(params: string[], name: string): string | undefined {
+  const pattern = new RegExp(`^${name}\\s*=\\s*(.*)$`, 'i');
+  for (const param of params) {
+    const match = pattern.exec(param);
+    if (match) return match[1].trim().replace(/^"(.*)"$/s, '$1');
+  }
+  return undefined;
+}
+
+/**
+ * Read a raw-PCM media type into the arguments ffmpeg needs to open it.
+ *
+ * Raw PCM carries no header, so ffmpeg cannot open it without being told the
+ * format. Gemini's TTS models send `audio/L16;codec=pcm;rate=24000`.
+ *
+ * Little-endian contradicts RFC 2586 section 3, which defines L16 as network
+ * byte order, but it is what Google sends. A conforming provider needs `s16be`.
+ *
+ * Returns null for self-describing formats, which ffmpeg can probe itself.
+ * Throws for an L16 type carrying no readable rate, which nothing can recover.
+ */
+export function parseRawAudioMime(mimeType: string | undefined): RawAudioFormat | null {
+  if (!mimeType) return null;
+  const [type, ...params] = mimeType.split(';').map(part => part.trim());
+  // L16 is the only raw encoding the engines here emit. `audio/L8` (RFC 3551)
+  // and `audio/L24` (RFC 3190) exist but nothing returns them, so they are
+  // left unhandled rather than guessed at.
+  if (type.toLowerCase() !== 'audio/l16') return null;
+
+  const rawRate = mimeParam(params, 'rate');
+  const rate = Number(rawRate);
+  if (!Number.isFinite(rate) || rate <= 0) {
+    // Refusing beats guessing. Declaring 24000 for a stream that is really
+    // 16000 does not fail: it returns a clip a third shorter at 1.5x pitch,
+    // exit code 0, and argo derives scene durations from clip length, so every
+    // wait in the recording shortens and nothing reports a problem. RFC 2586
+    // lists `rate` as required, so a missing one is malformed input.
+    throw new Error(
+      `cannot read a sample rate from "${mimeType}". Raw PCM carries no header, ` +
+        'so the rate has to come from the media type.',
+    );
+  }
+  // Unlike `rate`, the channel default is the RFC's own: "channels ... defaults
+  // to 1" in the L16 registration.
+  const channels = Number(mimeParam(params, 'channels'));
+  return {
+    format: 's16le',
+    sampleRate: rate,
+    channels: Number.isFinite(channels) && channels > 0 ? channels : 1,
+  };
+}
+
 /**
  * Convert arbitrary audio (MP3, OGG, PCM, etc.) to Argo's WAV format
  * (mono, Float32, 24kHz) using ffmpeg.
+ *
+ * `speed` is applied here because engines that render server-side (ElevenLabs,
+ * Gemini) have no native rate control — this conversion is the only place the
+ * rate can change. Engines with their own speed parameter must not use it.
+ *
+ * `inputFormat` describes a headerless stream. Pass it whenever the source is
+ * raw PCM; omit it and ffmpeg probes the container itself.
  */
-export function convertToWav(audioBuffer: Buffer): Buffer {
+export function convertToWav(
+  audioBuffer: Buffer,
+  speed = 1,
+  inputFormat?: RawAudioFormat | null,
+): Buffer {
   const { execFileSync } = childProcess;
+  const inputArgs = inputFormat
+    ? ['-f', inputFormat.format, '-ar', String(inputFormat.sampleRate), '-ac', String(inputFormat.channels)]
+    : [];
   const result = execFileSync('ffmpeg', [
+    ...inputArgs,
     '-i', 'pipe:0',
+    ...buildAtempoChain(speed),
     '-f', 'wav',
     '-acodec', 'pcm_f32le',
     '-ac', '1',

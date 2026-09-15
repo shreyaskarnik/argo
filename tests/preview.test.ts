@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describeWithCapability } from './helpers/capability.js';
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -87,7 +88,7 @@ async function canBindLocalhost(): Promise<boolean> {
   });
 }
 
-const describePreview = (await canBindLocalhost()) ? describe : describe.skip;
+const describePreview = describeWithCapability(await canBindLocalhost(), 'a bindable loopback socket');
 
 describePreview('preview server', () => {
   let dir: string;

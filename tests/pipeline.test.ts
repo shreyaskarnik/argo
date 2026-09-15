@@ -144,6 +144,19 @@ describe('runPipeline', () => {
     }));
   });
 
+  it('forwards automatic cursor highlighting to the recorder', async () => {
+    const config = {
+      ...defaultConfig,
+      video: { ...defaultConfig.video, cursorHighlight: { color: '#22c55e', radius: 18 } },
+    };
+
+    await runPipeline(DEMO_NAME, config);
+
+    expect(mockedRecord).toHaveBeenCalledWith(DEMO_NAME, expect.objectContaining({
+      cursorHighlight: { color: '#22c55e', radius: 18 },
+    }));
+  });
+
   it('passes correct options to exportVideo', async () => {
     await runPipeline(DEMO_NAME, defaultConfig);
     expect(mockedExportVideo).toHaveBeenCalledWith(expect.objectContaining({

@@ -41,6 +41,14 @@ function validateDemoName(name: string): string {
   return name;
 }
 
+/** Default to Kokoro when the config names no engine.
+ *
+ *  Kokoro is an optional peer dependency, but do not probe for it here.
+ *  Constructing the engine loads nothing, and TTS is the first step of the
+ *  pipeline, so `importOptional` raises the same install hint at the first
+ *  `generate()` a moment later. Probing up front instead breaks the demos
+ *  that need no engine at all: silent demos carry no `text`, so
+ *  `generateClips` filters every scene out and never calls `generate()`. */
 async function ensureTTSEngine(config: ArgoConfig): Promise<ArgoConfig> {
   if (!config.tts.engine) {
     const { KokoroEngine } = await import('./tts/kokoro.js');
@@ -106,6 +114,7 @@ export function createProgram(): Command {
         autoBackground: config.overlays?.autoBackground,
         defaultPlacement: config.overlays?.defaultPlacement,
         showActions: config.video.showActions,
+        cursorHighlight: config.video.cursorHighlight,
         sceneThumbnails: config.video.sceneThumbnails,
         headed: cmdOpts.headed,
       });
@@ -627,5 +636,12 @@ export function createProgram(): Command {
 }
 
 if (process.env.VITEST === undefined) {
-  createProgram().parseAsync(process.argv).catch((err) => { console.error(err.message); process.exit(1); });
+  createProgram().parseAsync(process.argv).catch((err) => {
+    console.error(err.message);
+    // Optional-dependency errors wrap the original resolution failure. Without
+    // this, the underlying cause is unreachable from every CLI path.
+    if (err?.cause instanceof Error) console.error(`  caused by: ${err.cause.message}`);
+    if (process.env.DEBUG) console.error(err.stack);
+    process.exit(1);
+  });
 }

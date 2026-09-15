@@ -87,6 +87,19 @@ describe('CLI', () => {
 
       expect(mockedLoadConfig).toHaveBeenCalledWith(process.cwd(), 'custom.ts');
     });
+
+    it('forwards automatic cursor highlighting from video config', async () => {
+      mockedLoadConfig.mockResolvedValue({
+        ...defaultConfig,
+        video: { ...defaultConfig.video, cursorHighlight: true },
+      } as any);
+
+      await run('record', 'onboarding');
+
+      expect(mockedRecord).toHaveBeenCalledWith('onboarding', expect.objectContaining({
+        cursorHighlight: true,
+      }));
+    });
   });
 
   describe('argo tts generate <manifest>', () => {

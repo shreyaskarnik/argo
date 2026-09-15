@@ -1,5 +1,6 @@
 import type { TTSEngine, TTSEngineOptions, TTSEngineMetadata } from '../engine.js';
 import { splitTextForTTS, concatSamples } from '../engine.js';
+import { importOptional, TRANSFORMERS_DEP } from '../../optional-deps.js';
 
 export interface TransformersEngineOptions {
   /** Model ID from Hugging Face Hub. Default: 'onnx-community/Supertonic-TTS-ONNX' */
@@ -43,15 +44,15 @@ export class TransformersEngine implements TTSEngine {
     if (this.pipeline) return this.pipeline;
     if (!this.initPromise) {
       this.initPromise = (async () => {
-        let pipeline: any;
-        try {
-          ({ pipeline } = await import('@huggingface/transformers'));
-        } catch {
-          throw new Error(
-            "Transformers TTS engine requires the '@huggingface/transformers' package. " +
-            'Install it with: npm i @huggingface/transformers',
-          );
-        }
+        // `pipeline` stays loosely typed: dtype/device are user-supplied
+        // strings, and the SDK types them as closed literal unions.
+        const { pipeline }: any = await importOptional(
+          () => import('@huggingface/transformers'),
+          TRANSFORMERS_DEP,
+        ).catch((err) => {
+          this.initPromise = null;
+          throw err;
+        });
         try {
           this.pipeline = await pipeline('text-to-speech', this.model, {
             dtype: this.dtype,

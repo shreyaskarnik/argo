@@ -24,6 +24,11 @@ test('shaders-showcase', async ({ page, narration }) => {
       </body></html>
     `);
     await page.waitForTimeout(300);
+
+    // Start capture once the first scene is on screen — before this, the page
+    // is blank and would be recorded as such.
+    if (i === 0) await narration.startRecording(page);
+
     narration.mark(scenes[i]);
     await page.waitForTimeout(narration.durationFor(scenes[i], { minMs: 2500, maxMs: 4000 }));
   }

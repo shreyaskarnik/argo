@@ -12,22 +12,95 @@ env:
 
 jobs:
   unit:
-    name: Unit tests
+    name: Unit tests (node ${{ matrix.node }})
     runs-on: ubuntu-latest
     # A stalled apt/playwright install should fail fast, not burn the full
     # 6h default job budget. The unit suite itself runs in seconds.
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both ends of the supported range. Testing only the top hid a test
+        # that used a Node 22+ API and silently collected zero assertions
+        # everywhere below it.
+        node: [20, 24]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
       # ffmpeg is needed for boundary-frame extraction and shader pre-render.
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: npm install
       - run: npx playwright install --with-deps chromium
       - run: npm run build
       - run: npm test
+
+  pack-smoke:
+    name: Packed tarball E2E
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: npm install
+      - run: npm run build
+
+      # Install the way a user does, from the tarball `npm publish` would
+      # upload. The repo suite mocks recording and imports from src/, so it
+      # cannot see a package that is broken only once packed and installed —
+      # a missing `files` entry, a bad `exports` condition, or a demo that
+      # never starts the screencast.
+      - name: Pack
+        run: echo "TARBALL=$(pwd)/$(npm pack --silent)" >> "$GITHUB_ENV"
+
+      # Outside the repo tree on purpose: inside it, Node would resolve
+      # @argo-video/cli from the checkout's node_modules and the tarball
+      # would never actually be exercised.
+      - name: Install fixture against the tarball
+        run: |
+          cp -R .github/fixtures/pack-smoke "$RUNNER_TEMP/pack-smoke"
+          cd "$RUNNER_TEMP/pack-smoke"
+          npm install
+          npm install "$TARBALL"
+          npm ls @argo-video/cli
+          # Resolve through the exports map the way a consumer does. A missing
+          # or wrong condition there breaks every downstream project while the
+          # repo's own suite, which imports from src/, stays green.
+          node --input-type=module -e "
+            const m = await import('@argo-video/cli');
+            for (const name of ['test', 'defineConfig', 'showOverlay']) {
+              if (!(name in m)) throw new Error('missing export: ' + name);
+            }
+            console.log('tarball resolves through exports map');
+          "
+
+      # From inside the fixture, not the checkout. The two resolve different
+      # Playwright versions (the fixture takes whatever ^1.59.1 gives today),
+      # and each version pins its own browser revision — installing from the
+      # repo root downloads a build the fixture's Playwright will not use.
+      - name: Install browser for the fixture's Playwright
+        run: cd "$RUNNER_TEMP/pack-smoke" && npx playwright install --with-deps chromium
+
+      - name: Run pipeline from the installed package
+        run: cd "$RUNNER_TEMP/pack-smoke" && npx argo pipeline hello-world --browser chromium
+
+      - name: Verify output
+        run: |
+          pip install --quiet pillow
+          python3 scripts/verify-ci-smoke.py "$RUNNER_TEMP/pack-smoke/videos/hello-world.mp4"
+
+      - name: Upload mp4 artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-smoke
+          path: ${{ runner.temp }}/pack-smoke/videos/hello-world.mp4
+          if-no-files-found: warn
 
   cross-browser:
     name: ci-smoke (${{ matrix.browser }})

@@ -1,6 +1,19 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { loadConfig } from './config.js';
+import {
+  detectInstallMode,
+  installCommand,
+  isDepInstalled,
+  KOKORO_DEP,
+  OPENAI_DEP,
+  ELEVENLABS_DEP,
+  GEMINI_DEP,
+  SARVAM_DEP,
+  TRANSFORMERS_DEP,
+  WHISPER_DEP,
+  type OptionalDepSpec,
+} from './optional-deps.js';
 
 interface CheckResult {
   name: string;
@@ -101,6 +114,57 @@ export async function runDoctor(cwd: string = process.cwd()): Promise<CheckResul
     }
   } else {
     results.push({ name: 'config', status: 'warn', message: 'No config file found — run: npx argo init' });
+  }
+
+  results.push(...checkEngines());
+
+  return results;
+}
+
+/** TTS engines ship as optional peer dependencies, so which ones actually
+ *  work depends on what the user installed. Report each one, and for the
+ *  missing ones give the command that matches how Argo itself was installed
+ *  (project, global, and npx each need different syntax). */
+function checkEngines(): CheckResult[] {
+  const mode = detectInstallMode();
+  // Every engine `engines.*` exposes that ships as an npm package. mlxAudio is
+  // absent on purpose: it talks HTTP to a separately started Python server, so
+  // there is nothing to resolve. `transcribe` is Whisper STT, not a voice, so
+  // it is reported but does not count as a usable engine.
+  const specs: Array<[string, OptionalDepSpec, boolean]> = [
+    ['kokoro', KOKORO_DEP, true],
+    ['openai', OPENAI_DEP, true],
+    ['elevenlabs', ELEVENLABS_DEP, true],
+    ['gemini', GEMINI_DEP, true],
+    ['sarvam', SARVAM_DEP, true],
+    ['transformers', TRANSFORMERS_DEP, true],
+    ['transcribe', WHISPER_DEP, false],
+  ];
+
+  const results: CheckResult[] = [
+    { name: 'install mode', status: 'ok', message: mode },
+  ];
+  let anyEngine = false;
+
+  for (const [name, spec, isVoiceEngine] of specs) {
+    if (isDepInstalled(spec)) {
+      if (isVoiceEngine) anyEngine = true;
+      results.push({ name: `engine/${name}`, status: 'ok', message: 'installed' });
+    } else {
+      results.push({
+        name: `engine/${name}`,
+        status: 'warn',
+        message: `not installed. ${installCommand(spec, mode)}`,
+      });
+    }
+  }
+
+  if (!anyEngine) {
+    results.push({
+      name: 'engines',
+      status: 'warn',
+      message: `No npm TTS engine installed. ${installCommand(KOKORO_DEP, mode)} (or use engines.mlxAudio)`,
+    });
   }
 
   return results;

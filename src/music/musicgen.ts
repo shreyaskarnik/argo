@@ -6,6 +6,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { importOptional, MUSICGEN_DEP } from '../optional-deps.js';
 import { createWavBuffer } from '../tts/engine.js';
 
 export interface MusicGenOptions {
@@ -76,18 +77,10 @@ export async function generateMusic(options: MusicGenOptions): Promise<Buffer> {
   const maxNewTokens = Math.ceil(durationSec * TOKENS_PER_SECOND);
 
   // Lazy-load transformers (same pattern as TTS Transformers engine)
-  let AutoTokenizer: any;
-  let MusicgenForConditionalGeneration: any;
-  try {
-    ({ AutoTokenizer, MusicgenForConditionalGeneration } = await import(
-      '@huggingface/transformers'
-    ));
-  } catch {
-    throw new Error(
-      "MusicGen requires the '@huggingface/transformers' package. " +
-        'Install it with: npm i @huggingface/transformers',
-    );
-  }
+  const { AutoTokenizer, MusicgenForConditionalGeneration }: any = await importOptional(
+    () => import('@huggingface/transformers'),
+    MUSICGEN_DEP,
+  );
 
   console.log(`  \u25b8 Loading model: ${MODEL_ID}`);
   console.log(

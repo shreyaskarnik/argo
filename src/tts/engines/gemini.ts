@@ -1,4 +1,5 @@
 import type { TTSEngine, TTSEngineOptions, TTSEngineMetadata } from '../engine.js';
+import { importOptional, GEMINI_DEP } from '../../optional-deps.js';
 
 export interface GeminiEngineOptions {
   apiKey?: string;
@@ -11,7 +12,10 @@ export class GeminiEngine implements TTSEngine {
 
   constructor(options?: GeminiEngineOptions) {
     this.apiKey = options?.apiKey ?? '';
-    this.model = options?.model ?? 'gemini-2.5-flash';
+    // Must be a TTS model: the general ones answer an AUDIO request with 400,
+    // "This model only supports text output". The `native-audio` models are no
+    // use either, they speak only the Live API socket.
+    this.model = options?.model ?? 'gemini-3.1-flash-tts-preview';
   }
 
   private resolveApiKey(): string {
@@ -33,15 +37,10 @@ export class GeminiEngine implements TTSEngine {
   async generate(text: string, options: TTSEngineOptions): Promise<Buffer> {
     if (!text?.trim()) throw new Error('TTS text must not be empty');
 
-    let GoogleGenAI: any;
-    try {
-      // @ts-ignore — @google/genai is an optional dependency
-      ({ GoogleGenAI } = await import('@google/genai'));
-    } catch {
-      throw new Error(
-        "Gemini TTS engine requires the '@google/genai' package. Install it with: npm i @google/genai"
-      );
-    }
+    const { GoogleGenAI } = await importOptional(
+      () => import('@google/genai'),
+      GEMINI_DEP,
+    );
 
     const ai = new GoogleGenAI({ apiKey: this.resolveApiKey() });
     const response = await ai.models.generateContent({
@@ -70,8 +69,10 @@ export class GeminiEngine implements TTSEngine {
 
     const audioBuffer = Buffer.from(audioPart.inlineData.data, 'base64');
 
-    // Convert to Argo WAV format
-    const { convertToWav } = await import('../engine.js');
-    return convertToWav(audioBuffer);
+    // Convert to Argo WAV format. Gemini has no speed parameter, so the rate
+    // change rides along with the conversion.
+    const { convertToWav, parseRawAudioMime } = await import('../engine.js');
+    const inputFormat = parseRawAudioMime(audioPart.inlineData.mimeType);
+    return convertToWav(audioBuffer, options.speed ?? 1, inputFormat);
   }
 }

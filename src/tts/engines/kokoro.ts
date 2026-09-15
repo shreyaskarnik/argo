@@ -1,5 +1,6 @@
 import type { TTSEngine, TTSEngineOptions, TTSEngineMetadata } from '../engine.js';
 import { splitTextForTTS, concatSamples } from '../engine.js';
+import { importOptional, KOKORO_DEP } from '../../optional-deps.js';
 
 export interface KokoroEngineOptions {
   modelId?: string;
@@ -31,8 +32,16 @@ export class KokoroEngine implements TTSEngine {
     if (this.tts) return this.tts;
     if (!this.initPromise) {
       this.initPromise = (async () => {
+        // Resolve the package first so a missing optional dependency reports
+        // the install command instead of being reported as a failed download.
+        const { KokoroTTS } = await importOptional(
+          () => import('kokoro-js'),
+          KOKORO_DEP,
+        ).catch((err) => {
+          this.initPromise = null;
+          throw err;
+        });
         try {
-          const { KokoroTTS } = await import('kokoro-js');
           this.tts = await KokoroTTS.from_pretrained(this.modelId, {
             dtype: this.dtype as 'fp32' | 'fp16' | 'q8' | 'q4' | 'q4f16',
             device: this.device,

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describeWithCapability } from '../helpers/capability.js';
 import { chromium, type Browser, type Page } from 'playwright';
 import { expect as pwExpect } from '@playwright/test';
 import { mkdtemp, rm, writeFile, mkdir, readFile } from 'node:fs/promises';
@@ -34,7 +35,10 @@ async function canLaunchChromium(): Promise<boolean> {
   }
 }
 
-const describePreviewE2E = (await canBindLocalhost()) && (await canLaunchChromium()) ? describe : describe.skip;
+const describePreviewE2E = describeWithCapability(
+  (await canBindLocalhost()) && (await canLaunchChromium()),
+  'a bindable loopback socket and a Chromium binary',
+);
 
 async function scaffoldPreviewDemo(dir: string, demoName: string) {
   const argoDir = join(dir, '.argo', demoName);
