@@ -308,7 +308,11 @@ argo add vignette                   # install into blocksDir (default: blocks/)
 argo add vignette --registry <url>  # use a different registry for one install
 ```
 
-Installed items land in `blocksDir` (default `blocks/`, git-tracked — review before committing) as `blocks/<name>/<file>` plus a `registry-item.json` sidecar recording what was fetched. Registry examples aren't installable via `argo add` — install those with the hyperframes CLI instead.
+Installed items land in `blocksDir` (default `blocks/`, git-tracked — review before committing) as `blocks/<name>/<file>` plus a `registry-item.json` sidecar recording what was fetched. Files are written byte-for-byte, including nested assets such as `assets/fonts/…`. Large assets that the registry hosts on a CDN are downloaded from their declared `https://` URL. Registry examples aren't installable via `argo add` — install those with the hyperframes CLI instead.
+
+Trust model: `argo add` downloads third-party files, and a component's `<script>` runs inside the page you record. Blocks load their scripts from public CDNs (mostly jsDelivr) without integrity checks. Review installed items the same way you'd review any dependency; they're committed to git, so a diff shows exactly what arrived.
+
+> **Known limitation:** components are injected into the page being recorded, so relative asset URLs inside a component (for example the `hw-*` handwriting fonts) resolve against your app, not `blocksDir`. Those components install correctly but fall back to default fonts and assets. Blocks aren't affected, because they render from their own file.
 
 Use an installed component full-frame via the `hf-component` overlay cue:
 
