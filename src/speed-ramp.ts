@@ -100,7 +100,11 @@ export function remapTimeMs(timeMs: number, segments: Segment[]): number {
     }
     return Math.round(outputMs);
   }
-  return Math.round(outputMs);
+  // Past the last segment, keep going at its speed rather than saturating. No
+  // placement lands here, but remapCameraMoves divides by the distance between
+  // two remapped times, and a move's zoom-out tail can overhang the recording.
+  const last = segments[segments.length - 1];
+  return Math.round(outputMs + (timeMs - last.endMs) / last.speed);
 }
 
 export function applySpeedRampToTimeline(

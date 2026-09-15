@@ -275,6 +275,82 @@ export function shiftCameraMoves(moves: CameraMove[], offsetMs: number): CameraM
 }
 
 /**
+ * Remap camera move times from the recording timeline onto the export one.
+ *
+ * The ramp's `trim`/`setpts` segments run upstream of `zoompan`, so the
+ * `in_time` a move matches against is the ramped timestamp, not the recorded
+ * one. Both ends are remapped, not just the start: a move spanning a compressed
+ * gap occupies less of the output timeline than it did of the recording, so
+ * shifting without shrinking would leave the zoom running past its content.
+ */
+export function remapCameraMoves(
+  moves: CameraMove[],
+  remap: (timeMs: number) => number,
+): CameraMove[] {
+  // A move covers [start, end): content at its end instant belongs to whatever
+  // follows, so a freeze starting exactly there must not stretch it. Remap the
+  // end from just inside the move rather than at the boundary itself.
+  const EDGE_MS = 1e-3;
+  const remapEnd = (timeMs: number) => remap(timeMs - EDGE_MS) + EDGE_MS;
+
+  return moves.map((m) => {
+    const holdMs = m.holdMs ?? 0;
+    const spanMs = moveEndMs(m) - m.startMs;
+    const startMs = remap(m.startMs);
+    if (spanMs <= 0) return { ...m, startMs };
+
+    // Map each phase boundary on its own. A freeze inserts time at one instant
+    // and a ramp changes speed per segment, so a single start-to-end ratio
+    // smears either across all three phases: a freeze inside the hold would
+    // stretch the zoom-in and zoom-out in proportion to its length.
+    const zoomInEndMs = remap(m.startMs + m.durationMs);
+    const zoomOutStartMs = remap(m.startMs + m.durationMs + holdMs);
+    const endMs = remapEnd(moveEndMs(m));
+
+    // One `durationMs` drives both fades, so when the two remap differently
+    // (a gap sped up under only one of them) take their mean. That keeps the
+    // hold exact and the overall span exact, and splits the residual between
+    // the fades rather than pushing it all into one.
+    const fadeMs = ((zoomInEndMs - startMs) + (endMs - zoomOutStartMs)) / 2;
+    const remappedHoldMs = zoomOutStartMs - zoomInEndMs;
+    return {
+      ...m,
+      startMs,
+      // Never round a fade to zero: buildCameraMoveFilter divides by it, and
+      // `(in_time-S)/0.0000` is a move ffmpeg renders as doing nothing at all.
+      // A short fade in a heavily sped-up scene can compress below half a ms.
+      durationMs: Math.max(1, Math.round(fadeMs)),
+      ...(m.holdMs === undefined && Math.round(remappedHoldMs) === 0
+        ? {}
+        : { holdMs: Math.round(remappedHoldMs) }),
+    };
+  });
+}
+
+/**
+ * Compose the two rewrites a camera move has to survive, the speed ramp and any
+ * freezes, into one recording-time to export-time mapping.
+ *
+ * Shared by every export path, since a correction that reaches some and not the
+ * others diverges silently.
+ */
+export function exportTimelineRemap(
+  remapForSpeedRamp: (timeMs: number) => number,
+  freezes: readonly { absoluteMs: number; durationMs: number }[],
+): (timeMs: number) => number {
+  return (timeMs) => {
+    const ramped = remapForSpeedRamp(timeMs);
+    // Freezes are positioned on the post-ramp timeline and insert time, so
+    // anything at or after one moves later by its duration.
+    let inserted = 0;
+    for (const freeze of freezes) {
+      if (freeze.absoluteMs <= ramped) inserted += freeze.durationMs;
+    }
+    return ramped + inserted;
+  };
+}
+
+/**
  * Scale camera move coordinates from CSS layout pixels to output-frame pixels.
  * During recording, bounding boxes are measured in CSS pixels; export may
  * downscale, preserve, or upscale relative to that layout.

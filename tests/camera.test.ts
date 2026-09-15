@@ -183,6 +183,20 @@ describe('spotlight', () => {
     expect(args.padding).toBe(20);
   });
 
+  it('carries cutout shape through, defaulted or overridden', async () => {
+    await spotlight(page, '#btn');
+    const [, args] = (page.evaluate as any).mock.calls[0];
+    expect(args.radius).toBe(10);
+    expect(args.feather).toBe(12);
+    // Read eagerly in the page function, so dropping it throws into a swallowed warning.
+    expect(args.defaults).toEqual({ opacity: 0.7, padding: 12, radius: 10, feather: 12 });
+
+    await spotlight(page, '#btn', { radius: 0, feather: 0 });
+    const [, squared] = (page.evaluate as any).mock.calls[1];
+    expect(squared.radius).toBe(0);
+    expect(squared.feather).toBe(0);
+  });
+
   it('accepts a Locator and pre-resolves bounding box', async () => {
     const locator = createMockLocator({ x: 50, y: 100, width: 200, height: 80 });
     await spotlight(page, locator);
