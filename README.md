@@ -637,6 +637,8 @@ export: {
 
 `gapSpeed: 2.0` means inter-scene gaps play at 2× speed. Only gaps longer than `minGapMs` (default 500ms) are affected. Both video and audio are sped up together.
 
+To limit waiting by output duration instead, use `speedRamp: { gapSpeed: 1, maxGapMs: 2000 }`. Each gap longer than 2 seconds is accelerated to 2 seconds; shorter gaps remain at normal speed. `maxGapMs` must be positive and finite and overrides `gapSpeed`, `minGapMs`, and inherited scene speed for gaps. Narrated scene durations and explicit scene speed overrides are unchanged; chapters, subtitles and camera timings follow the remapped timeline. Keep meaningful actions inside scenes: any unmarked gap, including leading and trailing gaps, is eligible. This changes playback only and does not replace page-readiness checks.
+
 ### Multi-Format Export
 
 Export additional formats alongside the main 16:9 MP4:

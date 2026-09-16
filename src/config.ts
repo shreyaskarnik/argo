@@ -118,6 +118,8 @@ export interface SpeedRampConfig {
   gapSpeed: number;
   /** Minimum gap duration (ms) before speed ramp is applied. Default 500. */
   minGapMs?: number;
+  /** Cap each output gap in milliseconds, overriding gapSpeed and minGapMs; leave shorter gaps at 1×. */
+  maxGapMs?: number;
 }
 
 export interface AudioConfig {

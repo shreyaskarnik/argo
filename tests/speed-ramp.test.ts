@@ -6,6 +6,43 @@ import {
 } from '../src/speed-ramp.js';
 
 describe('speed ramp helpers', () => {
+  it('caps output gaps without shortening scenes or already-short gaps', () => {
+    const plan = applySpeedRampToTimeline(
+      [
+        { scene: 'intro', startMs: 1000, endMs: 3000 },
+        { scene: 'detail', startMs: 16000, endMs: 19000 },
+        { scene: 'outro', startMs: 23000, endMs: 25000 },
+      ],
+      29000,
+      { gapSpeed: 1, maxGapMs: 2000 },
+    );
+    expect(plan.placements).toEqual([
+      { scene: 'intro', startMs: 1000, endMs: 3000 },
+      { scene: 'detail', startMs: 5000, endMs: 8000 },
+      { scene: 'outro', startMs: 10000, endMs: 12000 },
+    ]);
+    expect(plan.totalDurationMs).toBe(14000);
+  });
+
+  it('uses the output cap instead of fixed-gap settings while preserving scene speed', () => {
+    const plan = applySpeedRampToTimeline(
+      [{ scene: 'detail', startMs: 4000, endMs: 8000 }],
+      9000,
+      { gapSpeed: 8, minGapMs: 10000, maxGapMs: 2000 },
+      { detail: 2 },
+    );
+    expect(plan.placements).toEqual([{ scene: 'detail', startMs: 2000, endMs: 4000 }]);
+    expect(plan.totalDurationMs).toBe(5000);
+  });
+
+  it.each([0, -1, NaN, Infinity])('rejects invalid output cap %s', (maxGapMs) => {
+    expect(() => applySpeedRampToTimeline(
+      [{ scene: 'intro', startMs: 0, endMs: 1000 }],
+      2000,
+      { gapSpeed: 1, maxGapMs },
+    )).toThrow(/maxGapMs.*positive.*finite/);
+  });
+
   it('computes gap and scene segments across the whole timeline', () => {
     const segments = computeSegments(
       [
