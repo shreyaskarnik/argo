@@ -578,6 +578,24 @@ choco install ffmpeg       # Windows
    }
    ```
 
+   **OpenAI-compatible servers** — `engines.openai()` also talks to any server that implements OpenAI's
+   `/v1/audio/speech`, such as a self-hosted TTS server. With `baseUrl` set, `OPENAI_API_KEY` is never read, so your
+   OpenAI key is not sent to that server; pass `apiKey` if the server needs one:
+
+   ```js
+   tts: {
+     engine: engines.openai({
+       baseUrl: 'http://localhost:8881/v1',
+       model: 'my-model',
+       timeoutMs: 600_000, // slow local servers
+     }),
+   }
+   ```
+
+   `timeoutMs` raises the SDK's timeout, but with `openai` 5 or newer a request still fails after about 5 minutes
+   without response headers: those versions use Node's built-in `fetch`, whose own 300-second limit applies first.
+   `openai` 4 honours `timeoutMs` beyond that.
+
 2. **Record** — Playwright runs the demo script in a real browser. The `narration` fixture records timestamps for each `mark()` call. Video is captured at native resolution.
 
 3. **Align** — Each TTS clip is placed at its scene's recorded timestamp. Overlapping clips are pushed forward with a 100ms gap. All clips are mixed into a single `narration-aligned.wav`.

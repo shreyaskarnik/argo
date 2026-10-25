@@ -7,26 +7,44 @@ export interface OpenAIEngineOptions {
   model?: string;
   /** System instructions for the model (supported by gpt-4o-mini-tts and newer). */
   instructions?: string;
+  /**
+   * Base URL of any OpenAI-compatible server, including the `/v1` segment (e.g. `http://localhost:8881/v1`).
+   * Default: OpenAI's own API. When set, `OPENAI_API_KEY` is never read, so an OpenAI key is not sent to
+   * another server; pass `apiKey` if that server needs one.
+   */
+  baseUrl?: string;
+  /**
+   * Request timeout in milliseconds, for slow local servers. Default: the OpenAI SDK's (10 minutes).
+   * With `openai` >= 5, Node's built-in `fetch` still gives up after ~300 s without response headers.
+   */
+  timeoutMs?: number;
 }
 
 export class OpenAIEngine implements TTSEngine {
   private apiKey: string;
   private model: string;
   private instructions?: string;
+  private baseUrl?: string;
+  private timeoutMs?: number;
 
   constructor(options?: OpenAIEngineOptions) {
     this.apiKey = options?.apiKey ?? '';
     this.model = options?.model ?? 'tts-1';
     this.instructions = options?.instructions;
+    this.baseUrl = options?.baseUrl;
+    this.timeoutMs = options?.timeoutMs;
   }
 
   describe(): TTSEngineMetadata {
     const meta: TTSEngineMetadata = { engine: 'openai', model: this.model };
     if (this.instructions) meta.instructions = this.instructions;
+    if (this.baseUrl) meta.baseUrl = this.baseUrl;
     return meta;
   }
 
   private resolveApiKey(): string {
+    // Many local servers need no key, but the SDK refuses an empty one.
+    if (this.baseUrl) return this.apiKey || 'unused';
     const key = this.apiKey || process.env.OPENAI_API_KEY || '';
     if (!key) {
       throw new Error(
@@ -45,7 +63,11 @@ export class OpenAIEngine implements TTSEngine {
       OPENAI_DEP,
     );
 
-    const client = new OpenAI({ apiKey: this.resolveApiKey() });
+    const client = new OpenAI({
+      apiKey: this.resolveApiKey(),
+      ...(this.baseUrl ? { baseURL: this.baseUrl } : {}),
+      ...(this.timeoutMs != null ? { timeout: this.timeoutMs } : {}),
+    });
 
     // Request raw PCM so we can build an exact WAV without ffmpeg pipe artifacts
     const params: Record<string, unknown> = {
