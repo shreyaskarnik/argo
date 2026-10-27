@@ -42,7 +42,7 @@
     "vite": "^7.3.5",
     "esbuild": "^0.28.1",
     "protobufjs": "^7.6.3",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "nanoid": "^3.3.18"
   },
   "publishConfig": {
