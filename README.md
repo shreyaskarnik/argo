@@ -494,7 +494,7 @@ choco install ffmpeg       # Windows
 
 ## How the pipeline works
 
-1. **TTS** — Generates WAV clips from the scenes manifest. Kokoro is the default (local, free), but you can swap in OpenAI, ElevenLabs, Gemini, Sarvam, or mlx-audio via `engines.*` factories. Clips are cached by content hash in `.argo/<demo>/clips/`.
+1. **TTS** — Generates WAV clips from the scenes manifest. Kokoro is the default (local, free), but you can swap in OpenAI, ElevenLabs, Gemini, Sarvam, mlx-audio, or Phonon via `engines.*` factories. Clips are cached by content hash in `.argo/<demo>/clips/`.
 
    ```js
    import { defineConfig, engines } from '@argo-video/cli';
@@ -510,6 +510,7 @@ choco install ffmpeg       # Windows
    |--------|------|---------|------|---------|
    | `engines.kokoro()` | local | `npm i kokoro-js@1` | ~410 MB | none |
    | `engines.mlxAudio()` | local | `pip install mlx-audio` | n/a (Python) | none |
+   | `engines.phonon()` | local | `docker run ... ptts-openai-server` | n/a (server) | none |
    | `engines.openai()` | cloud | `npm i openai` | ~20 MB | `OPENAI_API_KEY` |
    | `engines.elevenlabs()` | cloud | `npm i @elevenlabs/elevenlabs-js` | ~88 MB | `ELEVENLABS_API_KEY` |
    | `engines.gemini()` | cloud | `npm i @google/genai` | ~36 MB | `GEMINI_API_KEY` |
@@ -554,6 +555,21 @@ choco install ffmpeg       # Windows
      }),
    }
    ```
+
+   **Phonon** — [Gradium's](https://huggingface.co/gradium/phonon-31m-en) small on-device model (31M params, Apache-2.0 weights), served by its OpenAI-compatible server. The `phonon-tts` npm package is browser-only (WebAssembly in a Web Worker), so Argo talks to the server over HTTP instead; nothing to `npm install`:
+
+   ```bash
+   docker run -p 127.0.0.1:8880:8880 -e PTTS_LANG=en ghcr.io/gradium-ai/ptts-openai-server:0.5.0
+   ```
+
+   ```js
+   tts: {
+     engine: engines.phonon(),          // baseUrl defaults to PHONON_TTS_URL or http://localhost:8880
+     defaultVoice: 'default',           // or a catalog voice, e.g. 'Zoey'; GET /v1/audio/voices lists them
+   }
+   ```
+
+   Model and language are server-side (`PTTS_MODEL`, `PTTS_LANG`). Kokoro voice names such as `af_heart` (Argo's global default) fall back to the engine's `voice` option with a one-time warning. Scene `speed` is applied with ffmpeg `atempo`, since the server only accepts 1.0.
 
    **Voice cloning** — Clone your own voice locally with mlx-audio. Record a 15-second clip, and every demo sounds like you — privately, no data leaves your machine:
 

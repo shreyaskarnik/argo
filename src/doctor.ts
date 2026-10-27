@@ -127,9 +127,9 @@ export async function runDoctor(cwd: string = process.cwd()): Promise<CheckResul
  *  (project, global, and npx each need different syntax). */
 function checkEngines(): CheckResult[] {
   const mode = detectInstallMode();
-  // Every engine `engines.*` exposes that ships as an npm package. mlxAudio is
-  // absent on purpose: it talks HTTP to a separately started Python server, so
-  // there is nothing to resolve. `transcribe` is Whisper STT, not a voice, so
+  // Every engine `engines.*` exposes that ships as an npm package. mlxAudio and
+  // phonon are absent on purpose: they talk HTTP to a separately started
+  // server, so there is nothing to resolve. `transcribe` is Whisper STT, not a voice, so
   // it is reported but does not count as a usable engine.
   const specs: Array<[string, OptionalDepSpec, boolean]> = [
     ['kokoro', KOKORO_DEP, true],
@@ -163,7 +163,7 @@ function checkEngines(): CheckResult[] {
     results.push({
       name: 'engines',
       status: 'warn',
-      message: `No npm TTS engine installed. ${installCommand(KOKORO_DEP, mode)} (or use engines.mlxAudio)`,
+      message: `No npm TTS engine installed. ${installCommand(KOKORO_DEP, mode)} (or use engines.mlxAudio / engines.phonon)`,
     });
   }
 

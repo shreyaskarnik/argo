@@ -2,7 +2,7 @@
 
 ## Engine Selection
 
-Argo supports 7 TTS engines via typed factory functions in config:
+Argo supports 8 TTS engines via typed factory functions in config:
 
 ```javascript
 import { defineConfig, engines } from '@argo-video/cli';
@@ -27,6 +27,7 @@ is added. `npx argo doctor` lists which are present.
 | `engines.gemini()` | cloud | `npm i @google/genai` | Gemini voice names |
 | `engines.sarvam()` | cloud | `npm i sarvamai` | `meera` + Indian language voices |
 | `engines.mlxAudio()` | local | `pip install mlx-audio` | model-dependent (Apple Silicon only) |
+| `engines.phonon()` | local | `docker run -p 127.0.0.1:8880:8880 -e PTTS_LANG=en ghcr.io/gradium-ai/ptts-openai-server:0.5.0` | `default`, catalog names like `Zoey`, `Easton` |
 | `engines.transformers()` | local | `npm i @huggingface/transformers@3` | any HuggingFace `text-to-speech` model |
 
 Those commands assume a project-local Argo. For a global install add `-g`,
@@ -64,6 +65,24 @@ engines.transformers({
 ```
 
 Supertonic-TTS-2 supports: `en`, `ko`, `es`, `pt`, `fr`. You can also set `lang` per-scene in the manifest.
+
+### Phonon Engine
+
+[Phonon](https://huggingface.co/gradium/phonon-31m-en) (Gradium) is a small on-device TTS model (31M params, English; 40M variants for fr/de/es/pt under CC BY-NC). Argo calls its OpenAI-compatible server (`ptts-openai-server`, port 8880). The `phonon-tts` npm package runs only in browsers, so it is not used.
+
+```javascript
+engines.phonon({
+  baseUrl: 'http://localhost:8880', // default; or set PHONON_TTS_URL
+  voice: 'default',                 // fallback when a scene has no voice or a Kokoro-style one
+  timeoutMs: 180_000,
+})
+```
+
+**Gotchas:**
+- Model and language are configured on the server (`PTTS_MODEL`, `PTTS_LANG`), not in Argo. Per-scene `lang` is ignored.
+- Set `tts.defaultVoice` to a Phonon voice. Argo's global default `af_heart` is a Kokoro name; it falls back to `voice` with a one-time warning. `GET /v1/audio/voices` lists valid names.
+- The server rejects `speed` other than 1.0, so Argo requests 1x audio and applies scene `speed` with ffmpeg `atempo`.
+- Audio is requested as raw 16-bit PCM at 24 kHz (Argo's native rate). Text over 4096 chars is split at sentence boundaries.
 
 ### OpenAI `instructions` Option
 
@@ -164,6 +183,7 @@ This is engine-specific — when switching engines, review all voiceover text:
 - **OpenAI** handles most acronyms natively — just write `TTS`, `AI`, `MLX`
 - **Qwen3 (mlx-audio)** is similar to Kokoro — needs phonetic help
 - **Transformers** varies by model — test pronunciation and adjust
+- **Phonon** normalizes numbers, dates and symbols server-side per `PTTS_LANG`; still test acronyms
 
 ### Text Chunking
 
