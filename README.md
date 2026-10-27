@@ -594,7 +594,18 @@ choco install ffmpeg       # Windows
 
    `timeoutMs` raises the SDK's timeout, but with `openai` 5 or newer a request still fails after about 5 minutes
    without response headers: those versions use Node's built-in `fetch`, whose own 300-second limit applies first.
-   `openai` 4 honours `timeoutMs` beyond that.
+   `openai` 4 honours `timeoutMs` beyond that. To wait longer on `openai` 5+, pass an undici dispatcher through
+   `fetchOptions` (`npm i undici`):
+
+   ```js
+   import { Agent } from 'undici';
+
+   engines.openai({
+     baseUrl: 'http://localhost:8881/v1',
+     timeoutMs: 1_800_000,
+     fetchOptions: { dispatcher: new Agent({ headersTimeout: 0, bodyTimeout: 0 }) },
+   })
+   ```
 
 2. **Record** — Playwright runs the demo script in a real browser. The `narration` fixture records timestamps for each `mark()` call. Video is captured at native resolution.
 

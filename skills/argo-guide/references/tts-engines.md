@@ -86,7 +86,7 @@ engines.openai({
 ```
 
 - With `baseUrl` set, `OPENAI_API_KEY` is never read — an OpenAI key is not leaked to another server. Pass `apiKey` if the server needs one.
-- With `openai` >= 5, requests still fail after ~300 s without response headers (Node `fetch`'s `headersTimeout`), regardless of `timeoutMs`. `openai` 4 honours longer timeouts.
+- With `openai` >= 5, requests still fail after ~300 s without response headers (Node `fetch`'s `headersTimeout`), regardless of `timeoutMs`. `openai` 4 honours longer timeouts. On 5+, lift the limit with `fetchOptions: { dispatcher: new Agent({ headersTimeout: 0, bodyTimeout: 0 }) }` (`import { Agent } from 'undici'`).
 - `baseUrl` is recorded in `<demo>.meta.json` but is not part of the clip cache key — clear `.argo/<demo>/clips` after switching servers.
 
 ---

@@ -15,9 +15,16 @@ export interface OpenAIEngineOptions {
   baseUrl?: string;
   /**
    * Request timeout in milliseconds, for slow local servers. Default: the OpenAI SDK's (10 minutes).
-   * With `openai` >= 5, Node's built-in `fetch` still gives up after ~300 s without response headers.
+   * With `openai` >= 5, Node's built-in `fetch` still gives up after ~300 s without response headers;
+   * lift that with `fetchOptions`.
    */
   timeoutMs?: number;
+  /**
+   * Extra options merged into every `fetch` call the SDK makes (`openai` >= 5). To wait longer than ~300 s,
+   * pass an undici dispatcher with a larger `headersTimeout`:
+   * `fetchOptions: { dispatcher: new Agent({ headersTimeout: 0, bodyTimeout: 0 }) }` (`import { Agent } from 'undici'`).
+   */
+  fetchOptions?: Record<string, unknown>;
 }
 
 export class OpenAIEngine implements TTSEngine {
@@ -26,6 +33,7 @@ export class OpenAIEngine implements TTSEngine {
   private instructions?: string;
   private baseUrl?: string;
   private timeoutMs?: number;
+  private fetchOptions?: Record<string, unknown>;
 
   constructor(options?: OpenAIEngineOptions) {
     this.apiKey = options?.apiKey ?? '';
@@ -33,6 +41,7 @@ export class OpenAIEngine implements TTSEngine {
     this.instructions = options?.instructions;
     this.baseUrl = options?.baseUrl;
     this.timeoutMs = options?.timeoutMs;
+    this.fetchOptions = options?.fetchOptions;
   }
 
   describe(): TTSEngineMetadata {
@@ -67,6 +76,7 @@ export class OpenAIEngine implements TTSEngine {
       apiKey: this.resolveApiKey(),
       ...(this.baseUrl ? { baseURL: this.baseUrl } : {}),
       ...(this.timeoutMs != null ? { timeout: this.timeoutMs } : {}),
+      ...(this.fetchOptions ? { fetchOptions: this.fetchOptions } : {}),
     });
 
     // Request raw PCM so we can build an exact WAV without ffmpeg pipe artifacts

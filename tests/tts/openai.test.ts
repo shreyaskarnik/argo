@@ -50,6 +50,12 @@ describe('OpenAIEngine', () => {
     });
   });
 
+  it('passes fetchOptions through to the client', async () => {
+    const dispatcher = { tag: 'agent' };
+    await new OpenAIEngine({ baseUrl: 'http://localhost:8881/v1', fetchOptions: { dispatcher } }).generate('Hello', {});
+    expect(clientOptions.mock.calls[0][0].fetchOptions).toEqual({ dispatcher });
+  });
+
   it('never sends OPENAI_API_KEY to another server', async () => {
     process.env.OPENAI_API_KEY = 'sk-env';
     await new OpenAIEngine({ baseUrl: 'http://localhost:8881/v1' }).generate('Hello', {});
