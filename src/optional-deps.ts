@@ -60,7 +60,18 @@ export interface OptionalDepSpec {
   project: string[];
   /** Install list for a globally installed Argo. */
   global: string[];
+  /** True when the packages bring in onnxruntime-node (see `installCommand`). */
+  onnxRuntime?: boolean;
 }
+
+/** The host the printed command will run on. */
+export interface InstallHost {
+  platform: string;
+  arch: string;
+}
+
+/** Skips onnxruntime-node's CUDA download (see `installCommand`). */
+const SKIP_ONNX_CUDA = 'npm_config_onnxruntime_node_install_cuda=skip';
 
 // The specs below pin a major, and write it `@3` rather than `@^3`. The two
 // ranges are identical to npm (node-semver normalises both to
@@ -84,24 +95,28 @@ export const KOKORO_DEP: OptionalDepSpec = {
   project: ['kokoro-js@1'],
   // kokoro-js keeps its own transformers copy private in a global tree.
   global: ['kokoro-js@1', '@huggingface/transformers@3'],
+  onnxRuntime: true,
 };
 
 export const TRANSFORMERS_DEP: OptionalDepSpec = {
   feature: 'local Transformers.js models',
   project: ['@huggingface/transformers@3'],
   global: ['@huggingface/transformers@3'],
+  onnxRuntime: true,
 };
 
 export const WHISPER_DEP: OptionalDepSpec = {
   feature: 'Whisper word-level transcription (`tts.transcribe`)',
   project: ['@huggingface/transformers@3'],
   global: ['@huggingface/transformers@3'],
+  onnxRuntime: true,
 };
 
 export const MUSICGEN_DEP: OptionalDepSpec = {
   feature: 'MusicGen background music generation',
   project: ['@huggingface/transformers@3'],
   global: ['@huggingface/transformers@3'],
+  onnxRuntime: true,
 };
 
 export const OPENAI_DEP: OptionalDepSpec = {
@@ -187,8 +202,27 @@ export function resetInstallModeCache(): void {
   cachedMode = null;
 }
 
-/** The exact command to install `spec` for the current install mode. */
-export function installCommand(spec: OptionalDepSpec, mode = detectInstallMode()): string {
+/** The exact command to install `spec` for the current install mode.
+ *
+ *  On Linux x64, onnxruntime-node's install script downloads a CUDA add-on
+ *  from github.com/microsoft/onnxruntime releases, and fails the whole
+ *  `npm i` when that download does (it 404'd once the repository went
+ *  away). Argo's engines only use the cpu, wasm and webgpu devices, never
+ *  CUDA, and the CPU runtime ships in the npm tarball, so the command skips
+ *  the download. That is right even while GitHub serves it: it is a large
+ *  download nothing uses. The env-var form is the one npm 11 accepts without
+ *  a deprecation warning. Other hosts get the plain command: the script
+ *  downloads nothing there, and `VAR=value cmd` is not Windows shell syntax. */
+export function installCommand(
+  spec: OptionalDepSpec,
+  mode = detectInstallMode(),
+  host: InstallHost = { platform: process.platform, arch: process.arch },
+): string {
+  const skipCuda = spec.onnxRuntime && host.platform === 'linux' && host.arch === 'x64';
+  return skipCuda ? `${SKIP_ONNX_CUDA} ${baseInstallCommand(spec, mode)}` : baseInstallCommand(spec, mode);
+}
+
+function baseInstallCommand(spec: OptionalDepSpec, mode: InstallMode): string {
   switch (mode) {
     case 'global':
       // One command, not several: separate global installs do not dedupe.

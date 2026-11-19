@@ -48,6 +48,8 @@ npm i -D @argo-video/cli
 # see which engines are installed and the exact command for your setup.
 npm i kokoro-js@1        # local, free, no API key (~410 MB of ONNX runtime)
 npm i openai             # cloud, needs OPENAI_API_KEY (~20 MB)
+# On Linux x64, install Kokoro with the CUDA download skipped (see "Linux x64" below):
+#   npm_config_onnxruntime_node_install_cuda=skip npm i kokoro-js@1
 
 # Initialize project
 npx argo init
@@ -542,6 +544,21 @@ choco install ffmpeg       # Windows
    Word-level transcription (`tts.transcribe`) needs
    `@huggingface/transformers`. Installing `kokoro-js` already brings it in
    on a project install, so there is usually nothing extra to do.
+
+   **Linux x64:** Kokoro and Transformers.js bring in `onnxruntime-node`,
+   whose install step downloads a CUDA add-on from GitHub on Linux x64 and
+   fails the whole `npm i` if that download does. Argo never uses CUDA (the
+   CPU runtime ships in the npm package), so skip it:
+
+   ```bash
+   npm_config_onnxruntime_node_install_cuda=skip npm i kokoro-js@1
+   ```
+
+   `npx argo doctor` already prints the command this way on Linux x64. The
+   variable only covers the install you run, so a later `npm install` or
+   `npm ci` needs it too: set it as an environment variable in CI, and for
+   teammates add `onnxruntime-node-install-cuda=skip` to the project's
+   `.npmrc` (npm 11 warns that it doesn't know the key, but honours it).
 
    **Transformers.js** — Use any HuggingFace `text-to-speech` model locally. Supertonic, or any future ONNX TTS model:
 

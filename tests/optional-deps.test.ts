@@ -74,8 +74,47 @@ describe('installCommand', () => {
     ],
   ];
 
+  // A host where onnxruntime-node's install script downloads nothing, so the
+  // cases above read the same on every machine that runs them.
   it.each(cases)('%s', (_name, spec, mode, expected) => {
-    expect(installCommand(spec, mode)).toBe(expected);
+    expect(installCommand(spec, mode, { platform: 'darwin', arch: 'arm64' })).toBe(expected);
+  });
+
+  // On Linux x64, onnxruntime-node's install script downloads a CUDA add-on
+  // from github.com/microsoft/onnxruntime, and fails `npm i` when that
+  // download does (#65). Argo never uses CUDA, so the hint skips it.
+  describe('on Linux x64, skips the CUDA download for packages that bring onnxruntime', () => {
+    const LINUX_X64 = { platform: 'linux', arch: 'x64' } as const;
+    const SKIP = 'npm_config_onnxruntime_node_install_cuda=skip';
+
+    const linuxCases: Array<[name: string, spec: OptionalDepSpec, mode: InstallMode, expected: string]> = [
+      ['project Kokoro', KOKORO_DEP, 'project', `${SKIP} npm i kokoro-js@1`],
+      ['global Kokoro', KOKORO_DEP, 'global', `${SKIP} npm i -g kokoro-js@1 @huggingface/transformers@3`],
+      [
+        'npx Kokoro',
+        KOKORO_DEP,
+        'npx',
+        `${SKIP} npx -p @argo-video/cli -p kokoro-js@1 -p @huggingface/transformers@3 -- argo <command>`,
+      ],
+      ['Transformers.js', TRANSFORMERS_DEP, 'project', `${SKIP} npm i @huggingface/transformers@3`],
+      ['Whisper', WHISPER_DEP, 'project', `${SKIP} npm i @huggingface/transformers@3`],
+      ['MusicGen', MUSICGEN_DEP, 'project', `${SKIP} npm i @huggingface/transformers@3`],
+      ['but not a cloud SDK', OPENAI_DEP, 'project', 'npm i openai'],
+    ];
+
+    it.each(linuxCases)('%s', (_name, spec, mode, expected) => {
+      expect(installCommand(spec, mode, LINUX_X64)).toBe(expected);
+    });
+
+    // The script only downloads on Linux x64, and `VAR=value cmd` is not
+    // valid syntax in Windows shells, so every other host gets the plain command.
+    it.each([
+      { platform: 'linux', arch: 'arm64' },
+      { platform: 'darwin', arch: 'x64' },
+      { platform: 'win32', arch: 'x64' },
+    ])('not on $platform $arch', (host) => {
+      expect(installCommand(KOKORO_DEP, 'project', host)).toBe('npm i kokoro-js@1');
+    });
   });
 });
 
