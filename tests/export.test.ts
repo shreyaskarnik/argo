@@ -435,6 +435,59 @@ describe('exportVideo', () => {
     expect(fc).toContain('[amixed]loudnorm');
   });
 
+  // amix defaults to normalize=1, which divides every input by the input count:
+  // music under narration would cost the narration 6 dB, however quiet the music.
+  it('mixes music without normalizing, so the narration keeps its level', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      musicPath: 'assets/bg-music.mp3',
+      totalDurationMs: 10000,
+    });
+
+    const a = mockedRunFfmpegWithProgress.mock.calls[0][0] as string[];
+    const fc = a[a.indexOf('-filter_complex') + 1];
+    expect(fc).toContain('[1:a][bgm]amix=inputs=2:duration=first:dropout_transition=2:normalize=0[amixed]');
+  });
+
+  // ---------- extra audio tracks (composition sound effects) ----------
+
+  it('mixes extra audio tracks over the narration without normalizing or compensating', async () => {
+    setupHappy();
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      extraAudioTracks: [
+        { src: 'sfx/ding.wav', startMs: 1000 },
+        { src: 'sfx/whoosh.wav', startMs: 2500, volume: 0.4 },
+      ],
+    });
+
+    const a = mockedSpawnSync.mock.calls[0][1] as string[];
+    const fc = a[a.indexOf('-filter_complex') + 1];
+    expect(fc).toContain('[2:a]adelay=1000|1000,volume=0.7[xa0]');
+    expect(fc).toContain('[3:a]adelay=2500|2500,volume=0.4[xa1]');
+    expect(fc).toContain('[1:a][xa0][xa1]amix=inputs=3:duration=longest:dropout_transition=0:normalize=0[xamixed]');
+  });
+
+  it('keeps each extra audio track at its own volume when there is no narration', async () => {
+    setupHappy();
+    mockedExistsSync.mockImplementation((p) => {
+      const path = String(p);
+      return !path.includes('.imported') && !path.endsWith('narration-aligned.wav');
+    });
+    await exportVideo({
+      demoName: 'demo', argoDir: '.argo', outputDir: 'out',
+      extraAudioTracks: [
+        { src: 'sfx/ding.wav', startMs: 0 },
+        { src: 'sfx/whoosh.wav', startMs: 500 },
+      ],
+    });
+
+    const a = mockedSpawnSync.mock.calls[0][1] as string[];
+    const fc = a[a.indexOf('-filter_complex') + 1];
+    expect(fc).toContain('[xa0][xa1]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0[xamixed]');
+  });
+
   // ---------- watermark ----------
 
   it('adds watermark overlay with default position (bottom-right) and opacity', async () => {

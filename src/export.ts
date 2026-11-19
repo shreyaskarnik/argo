@@ -594,7 +594,11 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
     const musicRef = `${musicInputIdx}:a`;
 
     if (hasAudio && audioSource) {
-      // Mix music under narration: lower music volume, combine with amix
+      // Mix music under narration: lower music volume, combine with amix.
+      // normalize=0 keeps the narration at its own level: amix's default divides
+      // every input by the input count, which cost the narration 6 dB however
+      // quiet the music. The sum can now pass full scale when near-full-scale
+      // narration meets a music peak; `loudnorm` (TP=-1.5) limits that.
       // afade on the music gives a 2s fade-out at the end (duration estimated from total)
       const fadeFilter = totalDurationMs && totalDurationMs > 2000
         ? `,afade=t=out:st=${formatSeconds(totalDurationMs - 2000)}:d=2`
@@ -603,7 +607,7 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
         `[${musicRef}]volume=${musicVol}${fadeFilter}[bgm]`,
       );
       filterParts.push(
-        `[${audioSource}][bgm]amix=inputs=2:duration=first:dropout_transition=2[amixed]`,
+        `[${audioSource}][bgm]amix=inputs=2:duration=first:dropout_transition=2:normalize=0[amixed]`,
       );
       audioSource = 'amixed';
     } else {
@@ -620,7 +624,8 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
 
   // Extra audio tracks (composition SFX) — adelay each to its scene start,
   // apply volume, then amix all surviving audio sources together. Done AFTER
-  // the music mix so loudnorm picks up the full mix.
+  // the music mix so loudnorm picks up the full mix. normalize=0 for the same
+  // reason as the music mix: each source keeps its own level.
   if (extraAudioInputs.length > 0) {
     const extraLabels: string[] = [];
     for (let i = 0; i < extraAudioInputs.length; i++) {
@@ -637,14 +642,14 @@ export async function exportVideo(options: ExportOptions): Promise<string> {
       // Mix existing narration/music with extras
       const inputs = [`[${audioSource}]`, ...extraLabels].join('');
       filterParts.push(
-        `${inputs}amix=inputs=${1 + extraLabels.length}:duration=longest:dropout_transition=0,volume=${1 + extraLabels.length * 0.5}[xamixed]`,
+        `${inputs}amix=inputs=${1 + extraLabels.length}:duration=longest:dropout_transition=0:normalize=0[xamixed]`,
       );
       audioSource = 'xamixed';
     } else {
       // No prior audio — extras become the only audio. amix them together.
       const inputs = extraLabels.join('');
       filterParts.push(
-        `${inputs}amix=inputs=${extraLabels.length}:duration=longest:dropout_transition=0[xamixed]`,
+        `${inputs}amix=inputs=${extraLabels.length}:duration=longest:dropout_transition=0:normalize=0[xamixed]`,
       );
       audioSource = 'xamixed';
     }
