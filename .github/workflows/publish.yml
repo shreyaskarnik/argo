@@ -12,6 +12,7 @@ env:
 
 jobs:
   publish:
+    # Pinned until Playwright supports ubuntu-latest (26.04). See #67.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:

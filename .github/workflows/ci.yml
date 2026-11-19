@@ -15,7 +15,8 @@ env:
   npm_config_onnxruntime_node_install_cuda: skip
 
 # Runners are pinned to ubuntu-24.04: ubuntu-latest moved to 26.04, where
-# Playwright 1.59 refuses to install chromium. Move together with Playwright.
+# Playwright 1.59 refuses to install chromium. Restore ubuntu-latest together
+# with the Playwright upgrade, here and in publish.yml. See #67.
 
 jobs:
   unit:
