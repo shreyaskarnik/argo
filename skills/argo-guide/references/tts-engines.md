@@ -34,6 +34,12 @@ and install Kokoro's two packages in one command so npm deduplicates the
 ONNX runtime: `npm i -g kokoro-js@1 @huggingface/transformers@3`. For npx,
 compose them: `npx -p @argo-video/cli -p openai -- argo pipeline <demo>`.
 
+On Linux x64, prefix Kokoro and Transformers.js installs with
+`npm_config_onnxruntime_node_install_cuda=skip`. Their `onnxruntime-node`
+dependency otherwise downloads a CUDA add-on from GitHub during install and
+fails `npm i` when that download does. Argo never uses CUDA. `argo doctor`
+prints the command with the prefix on Linux x64.
+
 Cloud engines read API keys from environment variables (`OPENAI_API_KEY`, `ELEVENLABS_API_KEY`, `GEMINI_API_KEY`, `SARVAM_API_KEY`) or accept `apiKey` in factory options.
 
 Custom engines: implement the `TTSEngine` interface and pass to `tts.engine`.
