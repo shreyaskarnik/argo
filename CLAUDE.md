@@ -171,6 +171,8 @@ Per-scene freeze-frame holds via `post: [{ type: 'freeze', atMs, durationMs }]` 
 
 `export.audio.music` mixes a background track under narration. Music loops via `-stream_loop -1`, mixed at constant `musicVolume` (default 0.15) via `amix`, 2-second fade-out at the end. Music mixing goes inside `filter_complex` when other filters are active. Loudnorm is applied after mixing.
 
+Every `amix` passes `normalize=0`. The default divides each input by the number of inputs still playing, so music cost the narration 6 dB and the narration jumped back up when a composition sound effect ended. The sum can now pass full scale; `loudnorm` (`TP=-1.5`) limits it when on.
+
 ### Watermark (`src/export.ts`)
 
 `export.watermark: { src, position, opacity, margin }` overlays a PNG at any corner via ffmpeg `overlay` filter with `colorchannelmixer` for opacity. Applied as the LAST video filter in the chain (after transitions, camera moves, downscale).
