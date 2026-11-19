@@ -14,10 +14,13 @@ env:
   # `npm install` on Linux x64. Argo uses the CPU runtime only. See #65.
   npm_config_onnxruntime_node_install_cuda: skip
 
+# Runners are pinned to ubuntu-24.04: ubuntu-latest moved to 26.04, where
+# Playwright 1.59 refuses to install chromium. Move together with Playwright.
+
 jobs:
   unit:
     name: Unit tests (node ${{ matrix.node }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # A stalled apt/playwright install should fail fast, not burn the full
     # 6h default job budget. The unit suite itself runs in seconds.
     timeout-minutes: 20
@@ -43,7 +46,7 @@ jobs:
   pack-smoke:
     name: Packed tarball E2E
     needs: unit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
@@ -109,7 +112,7 @@ jobs:
   cross-browser:
     name: ci-smoke (${{ matrix.browser }})
     needs: unit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
