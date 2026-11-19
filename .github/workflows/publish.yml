@@ -4,6 +4,12 @@ on:
   release:
     types: [published]
 
+# onnxruntime-node 1.21.0 (pinned by @huggingface/transformers 3.x) downloads
+# a CUDA add-on from a GitHub release that no longer exists, failing
+# `npm install` on Linux x64. Argo uses the CPU runtime only. See #65.
+env:
+  npm_config_onnxruntime_node_install_cuda: skip
+
 jobs:
   publish:
     runs-on: ubuntu-latest
